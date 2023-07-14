@@ -4,7 +4,7 @@ import fastparse.P
 import viper.silver.ast.{FilePosition, IntLit, Program}
 import viper.silver.ast.utility.ViperStrategy
 import viper.silver.parser.FastParserCompanion.whitespace
-import viper.silver.parser.{FastParser, PExp, PProgram}
+import viper.silver.parser.{FastParser, PCall, PExp, PProgram}
 import viper.silver.plugin.{ParserPluginTemplate, SilverPlugin}
 import viper.silver.verifier.{AbstractError, VerificationResult}
 
@@ -20,16 +20,27 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
   private val comprehensionKeyword: String = "comp"
 
   // Fix the FP somewhere else
-  def compOp[_: P]: P[((FilePosition, FilePosition), (PExp, PExp))] =
-    FP(keyword(comprehensionKeyword) ~/ "[" ~/ exp ~ "," ~ exp ~/ "]")
+  def compOp[_: P]: P[((FilePosition, FilePosition), (PCall, PExp))] =
+    FP(keyword(comprehensionKeyword) ~/ "[" ~/ fp.funcApp ~ "," ~ exp ~/ "]")
 
-  def compDef[_:P]: P[(PExp, PExp)] =
-    P("{") ~ exp ~ "|" ~ exp ~ "}"
+  def compDef[_:P]: P[(PMappingFieldReceiver, PExp)] =
+    P("{") ~ mapRecVal ~ "|" ~ exp ~ "}"
 
   def comp[_:P]: P[PComprehension] =
     (compOp ~ compDef).map{
-      case (pos, (exp11, exp12), (exp21, exp22)) => PComprehension(exp11,exp12,exp21,exp22)(pos)
+      case (pos, (op, opUnit), (mRF, parsedFilter)) =>
+        PComprehension(op,opUnit,mRF,parsedFilter)(pos)
     }
+
+  def mapRecVal[_:P]: P[PMappingFieldReceiver] =
+    FP(fp.idnuse ~  "(" ~ fp.funcApp ~ "." ~ fp.idnuse ~ fp.actualArgList ~ ")").map{
+      case (posTuple, (mappingFunc, receiverApp, field, mappingFuncArgs)) => PMappingFieldReceiver(
+        PCall(mappingFunc, mappingFuncArgs)(posTuple),
+        field,
+        receiverApp
+      )(posTuple)
+    }
+
 
   /** Called before any processing happened.
     *
@@ -51,6 +62,7 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
     * @return Modified Parse AST
     */
   override def beforeResolve(input: PProgram) : PProgram = {
+
     print(input)
     input
   }
@@ -81,9 +93,8 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
     */
   override def beforeVerify(input: Program) : Program = {
     val out = input.transform({
-      case c@Comprehension(exp) => exp
+      case c@Comprehension(op, unit, mapping, field, receiver, filter) => unit
     })
-    print(input);
     out
 //    ViperStrategy.Slim({
 //      case c@Comprehension(exp) => exp
@@ -96,7 +107,7 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
     * @param input Result of verification
     * @return Modified result
     */
-  override def mapVerificationResult(input: VerificationResult): VerificationResult = {
+  override def mapVerificationResult(program: Program, input: VerificationResult): VerificationResult = {
     input
   }
 
