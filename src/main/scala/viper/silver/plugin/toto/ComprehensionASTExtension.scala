@@ -1,13 +1,15 @@
 package viper.silver.plugin.toto
 
-import viper.silver.ast.{ErrorTrafo, Exp, ExtensionExp, Info, NoInfo, NoPosition, NoTrafos, Node, Position, Type}
+import viper.silver.ast.{ErrorTrafo, Exp, ExtensionExp, Field, Info, LocalVar, NoInfo, NoPosition, NoTrafos, Node, Position, Type}
 import viper.silver.ast.pretty.FastPrettyPrinter.{ContOps, text, toParenDoc}
 import viper.silver.ast.pretty.PrettyPrintPrimitives
+import viper.silver.parser.PIdnUse
 import viper.silver.verifier.VerificationResult
 
 
-case class Comprehension(op: Exp, unit: Exp, receiver: Exp, filter: Exp)(val pos: Position = NoPosition, val info: Info = NoInfo,
-                                     val errT: ErrorTrafo = NoTrafos) extends ExtensionExp {
+case class Comprehension(op: Exp, unit: Exp, mapping: Option[Exp], field: Any,
+                         receiver: Exp, filter: Exp)(val pos: Position = NoPosition, val info: Info = NoInfo,
+                                                                                                        val errT: ErrorTrafo = NoTrafos) extends ExtensionExp {
   override lazy val prettyPrint: PrettyPrintPrimitives#Cont =
     text("comp") <+>  toParenDoc(op) <+> toParenDoc(unit) <+> toParenDoc(receiver) <+> toParenDoc(filter)
 
