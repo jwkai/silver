@@ -455,17 +455,27 @@ class PTypeSubstitution(val m: Map[String, PType]) //extends Map[String,PType]()
 
   def add(a: String, b: PType): Either[(PType, PType), PTypeSubstitution] = add(PTypeVar(a), b)
 
+  // Performs unification of two types, by applying the current substitution to both
+  // and then unifying the results.
   def add(a: PType, b: PType): Either[(PType, PType), PTypeSubstitution] = {
+    // Apply the current substitution to both types
     val as = a.substitute(this)
     val bs = b.substitute(this)
     (as, bs) match {
+      // If both types are equal, return a the current typesubstitution
       case (aa, bb) if aa == bb => Right(this)
+      // If one of the types is a type variable, and it is not contained in the current substitution,
       case (PTypeVar(name), t) if PTypeVar.isFreePTVName(name) =>
         assert(!contains(name))
+        //  Substitute the free variable for t and also add it to the current substitution
         Right(substitute(name, t) + (name -> t))
+      // If type variable is on the right, swap the arguments
       case (_, PTypeVar(name)) if PTypeVar.isFreePTVName(name) => add(bs, as)
+      // If both types are generic types, and the generic names are equal
+      // then unify the type arguments
       case (gt1: PGenericType, gt2: PGenericType) if gt1.genericName == gt2.genericName =>
         val zippedArgs = gt1.typeArguments zip gt2.typeArguments
+        // Fold over the generic type arguments, unifying each pair
         (zippedArgs.foldLeft[Either[(PType, PType), PTypeSubstitution]](Right(this))
           ((ss: Either[(PType, PType), PTypeSubstitution], p: (PType, PType)) => ss match {
             case Right(sss) => sss.add(p._1, p._2) match {
@@ -482,6 +492,7 @@ class PTypeSubstitution(val m: Map[String, PType]) //extends Map[String,PType]()
             }
             case Left((aa, bb)) => Left((aa, bb))
           }))
+        // Else return the pair of types that cannot be unified
       case (aa, bb) => Left((aa, bb))
     }
 
