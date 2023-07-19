@@ -1,10 +1,10 @@
 package viper.silver.plugin.toto
 
 import fastparse.P
-import viper.silver.ast.{FilePosition, IntLit, Program}
+import viper.silver.ast.{FilePosition, IntLit, NoPosition, Program}
 import viper.silver.ast.utility.ViperStrategy
 import viper.silver.parser.FastParserCompanion.whitespace
-import viper.silver.parser.{FastParser, PCall, PExp, PProgram}
+import viper.silver.parser.{FastParser, PCall, PDomainType, PDomainTypeKinds, PExp, PIdnUse, PProgram, PSetType, PType}
 import viper.silver.plugin.{ParserPluginTemplate, SilverPlugin}
 import viper.silver.verifier.{AbstractError, VerificationResult}
 
@@ -33,9 +33,9 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
     }
 
   def mapRecVal[_:P]: P[PMappingFieldReceiver] =
-    FP(fp.idnuse ~  "(" ~ fp.funcApp ~ "." ~ fp.idnuse ~ fp.actualArgList ~ ")").map{
+    FP(fp.idnuse ~  "(" ~ fp.funcApp ~ "." ~ fp.idnuse ~ (P(",") ~ fp.actualArgList).? ~ ")").map{
       case (posTuple, (mappingFunc, receiverApp, field, mappingFuncArgs)) => PMappingFieldReceiver(
-        PCall(mappingFunc, mappingFuncArgs)(posTuple),
+        PCall(mappingFunc, mappingFuncArgs.getOrElse(Seq()))(posTuple),
         field,
         receiverApp
       )(posTuple)
@@ -129,5 +129,21 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
     */
   override def reportError(error: AbstractError): Unit = {
     super.reportError(error)
+  }
+}
+
+object ComprehensionPlugin {
+
+  def makeDomainType(name: String, typeArgs: Seq[PType]): PDomainType = {
+    val noPosTuple = (NoPosition,NoPosition)
+    val outType = PDomainType(PIdnUse(name)(noPosTuple), typeArgs)(noPosTuple)
+    outType.kind = PDomainTypeKinds.Domain
+    outType
+  }
+
+  def makeSetType(typeArg: PType): PSetType = {
+    val noPosTuple = (NoPosition,NoPosition)
+    val outType = PSetType(typeArg)(noPosTuple)
+    outType
   }
 }
