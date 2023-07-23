@@ -2,7 +2,7 @@ domain Receiver[A] {
     function eval(r:Receiver[A], a:A): Ref
     function inverseval(re:Receiver[A], r:Ref): A
     function filterReceiverGood(f: Set[A], r: Receiver[A]) : Bool
-    function identityReceiver(): Receiver[A]
+    function anyReceiver(): Receiver[Int]
 }
 
 domain Operator[A] {
@@ -22,7 +22,7 @@ domain Comp[A,V,B] {
         op: Operator[B],u: B) : Comp[A,V,B]
 }
 
-function filter1(start: Int, end: Int): Set[Bool]
+function filter1(start: Int, end: Int): Int
 
 domain CompEval[A,V,B] {
     function evalComp(c: Comp[A,V,B], snap: Map[A,B]) : B
@@ -33,7 +33,7 @@ field val: Bool
 method test1(i1: Int) {
     var a: Bool := true
 
-    var b: Bool := comp[and(),true]{identityMap(identityReceiver().val, false) | filter1(0,10)}
+    var b: Bool := comp[and(),true]{identityMap(anyReceiver().val, false) | filter1(0,10)}
 
     assert(b == true)
 }
