@@ -3,6 +3,7 @@ package viper.silver.plugin.toto;
 import viper.silver.ast.{Exp, Field, NoPosition, Position}
 import viper.silver.parser.PExtender
 import viper.silver.parser._
+import viper.silver.plugin.toto.PComprehension.getNewTypeVariable
 
 import scala.collection.immutable.{AbstractSeq, LinearSeq}
 import scala.xml.NodeSeq;
@@ -10,40 +11,39 @@ import scala.xml.NodeSeq;
 case class PComprehension(op: PCall, unit: PExp, mappingFieldReceiver: PMappingFieldReceiver, filter: PExp)(val pos: (Position, Position)) extends PExtender with PExp {
   override val getSubnodes: Seq[PNode] = Seq(op, unit, mappingFieldReceiver, filter)
 
-//  override val typ =
 
   override def typecheck(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] = {
     var messagesOut : Seq[String] = Seq()
-    t.checkTopTyped(filter, None)
-//    PDomainType("Operator", Seq(PType))(pos)
-    t.checkTopTyped(unit, None)
-    val correctOpType = ComprehensionPlugin.makeDomainType("Operator", Seq(unit.typ))
-    t.checkTopTyped(op, Some(correctOpType))
+
+    // Check type of filter, must be a Set
+    t.checkTopTyped(filter, Some(PSetType(getNewTypeVariable("CompSet"))()))
     val setType: PType = filter.typ match {
       case PSetType(e) => e
       case _ =>
         messagesOut = messagesOut :+ "Filter should of Set[...] type."
         return Some(messagesOut)
     }
-    mappingFieldReceiver.typecheckComp(t, n, unit.typ, setType)
-//    mappingFieldReceiver.receiver.typ match {
-//      case PDomainType(domain, args) =>
-//        if (domain.name == "Receiver")
-//          ()
-//        else
-//          messagesOut = messagesOut :+ "Receiver expression not a receiver."
-//      case _ =>
-//        messagesOut = messagesOut :+ "Receiver expression not a receiver."
-//    }
+
+    // Check type of unit
+    t.checkTopTyped(unit, None)
+
+    // Check type of op, must be an Operator with unit as argument
+    val correctOpType = ComprehensionPlugin.makeDomainType("Operator", Seq(unit.typ))
+    t.checkTopTyped(op, Some(correctOpType))
+
+    // Check type of mappingFieldReceiver
+    mappingFieldReceiver.typecheckComp(t,  unit.typ, setType)
+
+    // Set type of this node
     this.typ = unit.typ
-    None
+    Some(messagesOut)
   }
 
   override def typecheck(t: TypeChecker, n: NameAnalyser, expected: PType): Option[Seq[String]] = {
+    // this calls t.checkTopTyped, which will call checkInternal, which calls the above typecheck
     t.checkTopTyped(this, Some(expected))
     None
   }
-
 
   val _typeSubstitutions: Seq[PTypeSubstitution] = Seq(PTypeSubstitution.id)
 
@@ -51,25 +51,27 @@ case class PComprehension(op: PCall, unit: PExp, mappingFieldReceiver: PMappingF
 
   override def forceSubstitution(ts: PTypeSubstitution): Unit = unit.forceSubstitution(ts)
 
+  // Translate the parser node into an AST node
   override def translateExp(t: Translator): Exp = {
-    t.exp(unit)
-//    val translatedOp = t.exp(op)
-//    val translatedUnit = t.exp(unit)
-//    val translatedFilter = t.exp(filter)
-//    receiver match {
-//      case appliedMapping @ PCall(mapping, args, typeAnnotated) =>
-//        args.head match {
-//          case PFieldAccess(appliedReceiver, fieldIden) =>
-//            Comprehension(
-//              translatedOp,
-//              translatedUnit,
-//              Some(t.exp(appliedMapping.copy(args = args.tail)(appliedMapping.pos))),
-//              t.exp(fieldIden), t.exp(appliedReceiver), translatedFilter)(t.liftPos(this))
-//        }
-//      case PFieldAccess(appliedReceiver, fieldIden) =>
-//        Comprehension(translatedOp, translatedUnit, None,
-//          t.exp(fieldIden), t.exp(appliedReceiver),translatedFilter)(t.liftPos(this))
-//    }
+    val opTranslated = t.exp(op)
+    val unitTranslated = t.exp(unit)
+    val mappingFieldReceiverTranslated = mappingFieldReceiver.translateMember(t)
+    val filterTranslated = t.exp(filter)
+    opTranslated
+//    Comprehension(opTranslated, unitTranslated, mappingFieldReceiverTranslated, filterTranslated)(pos)
+  }
+
+}
+
+object PComprehension {
+  private var counter = 0
+  private def increment(): Int = {
+    counter += 1;
+    counter
+  }
+
+  private def getNewTypeVariable(name: String): PDomainType = {
+    PTypeVar(s"$name#" + increment())
   }
 
 }
