@@ -1,10 +1,11 @@
 package viper.silver.plugin.toto
 
 import fastparse.P
+import viper.silver.FastMessaging
 import viper.silver.ast.{FilePosition, IntLit, NoPosition, Program}
 import viper.silver.ast.utility.ViperStrategy
 import viper.silver.parser.FastParserCompanion.whitespace
-import viper.silver.parser.{FastParser, PCall, PDomainType, PDomainTypeKinds, PExp, PIdnUse, PProgram, PSetType, PType}
+import viper.silver.parser.{FastParser, PCall, PDomainType, PDomainTypeKinds, PExp, PIdnUse, PProgram, PSetType, PType, TypeChecker}
 import viper.silver.plugin.{ParserPluginTemplate, SilverPlugin}
 import viper.silver.verifier.{AbstractError, VerificationResult}
 
@@ -50,9 +51,9 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
     */
   override def beforeParse(input: String, isImported: Boolean) : String = {
     ParserExtension.addNewExpAtStart(comp(_))
-    ParserExtension.addNewPreCondition(comp(_))
-    ParserExtension.addNewPostCondition(comp(_))
-    ParserExtension.addNewInvariantCondition(comp(_))
+//    ParserExtension.addNewPreCondition(comp(_))
+//    ParserExtension.addNewPostCondition(comp(_))
+//    ParserExtension.addNewInvariantCondition(comp(_))
     input
   }
 
@@ -145,5 +146,42 @@ object ComprehensionPlugin {
     val noPosTuple = (NoPosition,NoPosition)
     val outType = PSetType(typeArg)(noPosTuple)
     outType
+  }
+
+
+  def typeCheckCustom(t: TypeChecker, exp: PExp, oexpected: Option[PType],
+                       doCheckInternal : Boolean = true,
+                       customMessage: Option[String]): Unit = {
+    if (doCheckInternal) {
+      t.checkInternal(exp)
+    }
+    if (exp.typ.isValidOrUndeclared && exp.typeSubstitutions.nonEmpty) {
+      val etss = oexpected match {
+        case Some(expected) if expected.isValidOrUndeclared => exp.typeSubstitutions.flatMap(_.add(exp.typ, expected).toOption)
+        case _ => exp.typeSubstitutions
+      }
+      if (etss.nonEmpty) {
+        val ts = t.selectAndGroundTypeSubstitution(exp, etss)
+        exp.forceSubstitution(ts)
+      } else {
+        oexpected match {
+          case Some(expected) =>
+            val reportedActual = if (exp.typ.isGround) {
+              exp.typ
+            } else {
+              exp.typ.substitute(t.selectAndGroundTypeSubstitution(exp, exp.typeSubstitutions))
+            }
+            if (customMessage.nonEmpty) {
+              t.messages ++= FastMessaging.message(exp, customMessage.get +
+                s"Expected ${expected.toString}, but found ${reportedActual}")
+            } else {
+              t.messages ++= FastMessaging.message(exp,
+                s"Expected type ${expected.toString}, but found ${reportedActual} at the expression at ${exp.pos._1}")
+            }
+          case None =>
+            t.typeError(exp)
+        }
+      }
+    }
   }
 }
