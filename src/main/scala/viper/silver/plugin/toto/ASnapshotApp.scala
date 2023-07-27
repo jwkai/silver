@@ -5,8 +5,8 @@ import viper.silver.ast.pretty.FastPrettyPrinter.{ContOps, text, toParenDoc}
 import viper.silver.ast.pretty.{FastPrettyPrinter, PrettyPrintPrimitives}
 import viper.silver.verifier.VerificationResult
 
-case class SnapshotAST(comprehension4Tuple: Comprehension4Tuple, filter: Exp,field: Field)
-                      (val pos: Position = NoPosition, val info: Info = NoInfo,
+case class ASnapshotApp(comprehension4Tuple: AComprehension4Tuple, filter: Exp, field: String)
+                       (val pos: Position = NoPosition, val info: Info = NoInfo,
                                            val errT: ErrorTrafo = NoTrafos) extends ExtensionExp {
   private var snapshotFunctionDeclaration : Declaration = _
 
