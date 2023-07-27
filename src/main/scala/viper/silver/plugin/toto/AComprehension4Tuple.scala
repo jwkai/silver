@@ -7,7 +7,8 @@ import viper.silver.parser.PIdnUse
 import viper.silver.verifier.VerificationResult
 
 
-case class Comprehension4Tuple(receiver: Exp, mapping: Option[Exp], op: Exp, unit: Exp)(val pos: Position = NoPosition, val info: Info = NoInfo,
+case class AComprehension4Tuple(receiver: Exp, mapping: Option[Exp], op: Exp, unit: Exp)
+                               (val pos: Position = NoPosition, val info: Info = NoInfo,
                                                      val errT: ErrorTrafo = NoTrafos) extends ExtensionExp {
 
   override lazy val prettyPrint: PrettyPrintPrimitives#Cont =

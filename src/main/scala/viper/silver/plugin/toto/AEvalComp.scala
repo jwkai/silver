@@ -5,8 +5,8 @@ import viper.silver.ast.pretty.FastPrettyPrinter.{ContOps,text, toParenDoc}
 import viper.silver.ast.pretty.PrettyPrintPrimitives
 import viper.silver.verifier.VerificationResult
 
-case class EvalCompASTNode(op: Exp, unit: Exp, mapping: Option[Exp], field: Any,
-                         receiver: Exp, filter: Exp)(val pos: Position = NoPosition, val info: Info = NoInfo,
+case class AEvalComp(op: Exp, unit: Exp, mapping: Option[Exp], field: Any,
+                     receiver: Exp, filter: Exp)(val pos: Position = NoPosition, val info: Info = NoInfo,
                                                      val errT: ErrorTrafo = NoTrafos) extends ExtensionExp {
 
   override lazy val prettyPrint: PrettyPrintPrimitives#Cont =
