@@ -1,7 +1,7 @@
 package viper.silver.plugin.toto
 
 import viper.silver.FastMessaging
-import viper.silver.ast.{Member, NoPosition, Position}
+import viper.silver.ast.{Exp, Member, NoPosition, Position}
 import viper.silver.parser.{NameAnalyser, PCall, PDomainFunction, PDomainType, PExp, PExtender, PField, PIdnUse, PNode, PType, PTypeSubstitution, Translator, TypeChecker}
 
 case class PMappingFieldReceiver(mapping: PCall, fieldID: PIdnUse, receiver: PCall)(val pos: (Position, Position))
@@ -22,10 +22,13 @@ case class PMappingFieldReceiver(mapping: PCall, fieldID: PIdnUse, receiver: PCa
     Some(Seq("Typecheck should only be called from PComprehension node."))
   }
 
-  def translateTo(t: Translator): Unit = {
-    t.exp(fieldID)
+  def translateTo(t: Translator): (Option[Exp], String, Exp) = {
+    val mappingOut = t.exp(mapping)
+    val fieldOut = fieldID.name
+    val receiverOut = t.exp(receiver)
+    (Some(mappingOut), fieldOut, receiverOut)
   }
 
-  override def translateMember(t: Translator): Member = ???
+//  override def translateMember(t: Translator): Member = ???
 
 }
