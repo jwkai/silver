@@ -13,7 +13,7 @@ domain Operator[A] {
 
 domain Mapping[V,B] {
     function applyMap(m: Mapping[V,B], val: V) : B
-    function identityMap(a : Bool): Mapping[V,V]
+    function identityMap(a : Int): Mapping[V,V]
 
 }
 
@@ -22,18 +22,18 @@ domain Comp[A,V,B] {
         op: Operator[B],u: B) : Comp[A,V,B]
 }
 
-function filter1(start: Int, end: Int): Int
+function filter1(start: Int, end: Int): Set[Int]
 
 domain CompEval[A,V,B] {
     function evalComp(c: Comp[A,V,B], snap: Map[A,B]) : B
 }
 
-field val: Bool
+field val: Int
 
 method test1(i1: Int) {
     var a: Bool := true
 
-    var b: Bool := comp[and(),true]{identityMap(anyReceiver().val, false) | filter1(0,10)}
+    var b: Int := comp[and(),0]{identityMap(anyReceiver().val, 1) | filter1(0,10)}
 
-    assert(b == true)
+    assert(b == 5)
 }
