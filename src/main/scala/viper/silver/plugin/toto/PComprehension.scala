@@ -1,12 +1,8 @@
-package viper.silver.plugin.toto;
+package viper.silver.plugin.toto
 
-import viper.silver.ast.{Exp, Field, NoPosition, Position}
-import viper.silver.parser.PExtender
+import viper.silver.ast.{Exp, Position}
 import viper.silver.parser._
 import viper.silver.plugin.toto.PComprehension.getNewTypeVariable
-
-import scala.collection.immutable.{AbstractSeq, LinearSeq}
-import scala.xml.NodeSeq;
 
 case class PComprehension(op: PCall, unit: PExp, mappingFieldReceiver: PMappingFieldReceiver, filter: PExp)(val pos: (Position, Position)) extends PExtender with PExp {
   override val getSubnodes: Seq[PNode] = Seq(op, unit, mappingFieldReceiver, filter)
@@ -55,10 +51,14 @@ case class PComprehension(op: PCall, unit: PExp, mappingFieldReceiver: PMappingF
   override def translateExp(t: Translator): Exp = {
     val opTranslated = t.exp(op)
     val unitTranslated = t.exp(unit)
-    val mappingFieldReceiverTranslated = mappingFieldReceiver.translateMember(t)
+    val (mappingOpt, fieldString, receiverTranslated) = mappingFieldReceiver.translateTo(t)
     val filterTranslated = t.exp(filter)
-    opTranslated
-//    Comprehension(opTranslated, unitTranslated, mappingFieldReceiverTranslated, filterTranslated)(pos)
+//    val mappingTranslated = mappingOpt.getOrElse(throw new Exception("Mapping should be defined."))
+
+    val tuple = AComprehension4Tuple(receiverTranslated, mappingOpt, opTranslated, unitTranslated)(pos._1)
+    val snap = ASnapshotApp(tuple, filterTranslated, fieldString)(pos._1)
+    val f = snap.filter
+    AEvalComp(tuple, snap)(pos._1)
   }
 
 }
@@ -66,7 +66,7 @@ case class PComprehension(op: PCall, unit: PExp, mappingFieldReceiver: PMappingF
 object PComprehension {
   private var counter = 0
   private def increment(): Int = {
-    counter += 1;
+    counter += 1
     counter
   }
 
