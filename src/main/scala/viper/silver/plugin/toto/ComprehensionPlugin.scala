@@ -2,7 +2,8 @@ package viper.silver.plugin.toto
 
 import fastparse.P
 import viper.silver.FastMessaging
-import viper.silver.ast.{FilePosition, IntLit, NoPosition, Program}
+import viper.silver.ast.pretty.FastPrettyPrinter.pretty
+import viper.silver.ast.{DomainFuncApp, FilePosition, IntLit, NoPosition, Program}
 import viper.silver.ast.utility.ViperStrategy
 import viper.silver.parser.FastParserCompanion.whitespace
 import viper.silver.parser.{FastParser, PCall, PDomainType, PDomainTypeKinds, PExp, PIdnUse, PProgram, PSetType, PType, TypeChecker}
@@ -63,8 +64,6 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
     * @return Modified Parse AST
     */
   override def beforeResolve(input: PProgram) : PProgram = {
-
-    print(input)
     input
   }
 
@@ -93,9 +92,19 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
     * @return Modified AST
     */
   override def beforeVerify(input: Program) : Program = {
+    val dfevalComp = input.findDomainFunction("evalComp")
+    val dfcomp = input.findDomainFunction("comp")
     val out = input.transform({
-      case c@Comprehension(op, unit, mapping, field, receiver, filter) => unit
+      case c@ AEvalComp(tuple,snap) => tuple.unit
+
+
+        // type Vars?
+//        DomainFuncApp(dfevalComp, Seq(tuple.op), )(NoPosition)
+//
+//
+//        DomainFuncApp(df, Seq(IntLit(1)(NoPosition)))(NoPosition)
     })
+    print(pretty(out))
     out
 //    ViperStrategy.Slim({
 //      case c@Comprehension(exp) => exp
