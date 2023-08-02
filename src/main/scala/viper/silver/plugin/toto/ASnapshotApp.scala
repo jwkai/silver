@@ -38,15 +38,16 @@ case class ASnapshotApp(comprehension4Tuple: AComprehension4Tuple, filter: Exp, 
 
   override def extensionIsPure: Boolean = true
 
-  // TODO
+  // TODO Correct?
   override def typ: Type = {
-    val filterOn = filter.typ match {
-      case c : SetType =>
-        c.elementType
-      case _ =>
-        throw new Exception("Filter must be a set")
-    }
-    MapType(filterOn, comprehension4Tuple.unit.typ)
+    snapshotFunctionDeclaration.outType
+//    val filterOn = filter.typ match {
+//      case c : SetType =>
+//        c.elementType
+//      case _ =>
+//        throw new Exception("Filter must be a set")
+//    }
+//    MapType(filterOn, comprehension4Tuple.unit.typ)
   }
   //    MapType(filter.typ.typeVariables.head,
 //    comprehension4Tuple.mapping.getOrElse(comprehension4Tuple.unit).typ)
