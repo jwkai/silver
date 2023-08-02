@@ -9,9 +9,15 @@ case class ASnapshotApp(comprehension4Tuple: AComprehension4Tuple, filter: Exp, 
                        (val pos: Position = NoPosition, val info: Info = NoInfo,
                                            val errT: ErrorTrafo = NoTrafos) extends ExtensionExp {
 
-  var snapshotFunctionDeclaration : Declaration = {
+  var snapshotFunctionDeclaration: ASnapshotDecl = {
     val receiverType = comprehension4Tuple.tripleType
     ASnapshotDecl.getOrMakeNewSnapDecl(receiverType, field)
+  }
+
+
+  def toViper: Exp = {
+    FuncApp(snapshotFunctionDeclaration.viperDecl,
+      Seq(comprehension4Tuple.toViper, filter))(pos, info, errT)
   }
 
 //  def linkToSnapFunction(d: Declaration): Unit = {
