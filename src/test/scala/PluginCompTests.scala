@@ -18,6 +18,7 @@ import java.nio.file.Paths
 
 class PluginCompTests extends AnyFunSuite {
   val inputfile = "plugintests/sample_comp_test.vpr"
+//  val inputfile = "examples/graph-copy/graph-copy.vpr"
   val plugins = Seq(
 //    "TestPluginAllCalled",
     "viper.silver.plugin.toto.ComprehensionPlugin"
