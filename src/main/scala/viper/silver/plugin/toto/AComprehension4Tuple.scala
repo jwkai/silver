@@ -21,7 +21,15 @@ case class AComprehension4Tuple(receiver: Exp, mapping: Option[Exp], op: Exp, un
 
 
   val tripleType: (Type, Type, Type)   = {
-    val A = receiver.typ
+    val recA = receiver.typ match {
+      case d: DomainType if d.domainName == "Receiver" =>
+        d.typVarsMap.values
+      case _ => throw new Exception("Receiver must be a  type")
+    }
+    if (recA.size != 1) {
+      throw new Exception("Receiver must be a Receiver of 1 variable")
+    }
+    val A = recA.head
     val VB = mapping match {
       case Some(m) =>
         m.typ match {
@@ -29,7 +37,7 @@ case class AComprehension4Tuple(receiver: Exp, mapping: Option[Exp], op: Exp, un
             d.typVarsMap.values
           case _ => throw new Exception("Mapping must be a mapping")
         }
-      case None => throw new Exception("Not implemented")
+      case None => Seq(unit.typ, unit.typ)
     }
     if (VB.size != 2) {
       throw new Exception("Mapping must be a mapping from 2 variables")
@@ -38,6 +46,21 @@ case class AComprehension4Tuple(receiver: Exp, mapping: Option[Exp], op: Exp, un
     val B = VB.tail.head
     (A, V, B)
   }
+
+
+  def toViper: DomainFuncApp = {
+    val typeVarMap = Map(
+      TypeVar("A") -> tripleType._1,
+      TypeVar("V") -> tripleType._2,
+      TypeVar("B") -> tripleType._3
+    )
+    val typViper = DomainType("Comp", typeVarMap)(typeVarMap.keys.toSeq)
+    //TODO Fix the getOrElse and empty Map
+    DomainFuncApp("comp", Seq(receiver, mapping.orNull, op, unit),Map())(
+      pos, info, typViper , "Comp", errT
+    )
+  }
+
 
   // Does not get used, transform to ordinary Viper before verification
   override def verifyExtExp(): VerificationResult = {
