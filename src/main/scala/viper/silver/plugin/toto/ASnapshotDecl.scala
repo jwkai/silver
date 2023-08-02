@@ -21,6 +21,11 @@ case class ASnapshotDecl private (compType: (Type, Type, Type), fieldID: String)
 
   override val scopedDecls: Seq[Declaration] = Seq()
 
+
+  val outType: Type = {
+    MapType(compType._1, compType._3)
+  }
+
   val viperDecl: Function = {
     val typeVarMap = Map(
       TypeVar("A") -> compType._1,
@@ -33,7 +38,7 @@ case class ASnapshotDecl private (compType: (Type, Type, Type), fieldID: String)
     )()
     val args1 =
       LocalVarDecl("f", SetType(compType._1))()
-    Function(name, Seq(args0, args1), compType._3, Seq(), Seq(), None)()
+    Function(name, Seq(args0, args1), outType, Seq(), Seq(), None)()
   }
 
 
