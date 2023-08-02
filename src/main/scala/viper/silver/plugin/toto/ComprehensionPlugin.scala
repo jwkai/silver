@@ -3,7 +3,7 @@ package viper.silver.plugin.toto
 import fastparse.P
 import viper.silver.FastMessaging
 import viper.silver.ast.pretty.FastPrettyPrinter.pretty
-import viper.silver.ast.{DomainFuncApp, FilePosition, IntLit, NoPosition, Program}
+import viper.silver.ast.{DomainFuncApp, FilePosition, FuncApp, IntLit, NoPosition, Program}
 import viper.silver.ast.utility.ViperStrategy
 import viper.silver.parser.FastParserCompanion.whitespace
 import viper.silver.parser.{FastParser, PCall, PDomainType, PDomainTypeKinds, PExp, PIdnUse, PProgram, PSetType, PType, TypeChecker}
@@ -94,18 +94,26 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
   override def beforeVerify(input: Program) : Program = {
     val dfevalComp = input.findDomainFunction("evalComp")
     val dfcomp = input.findDomainFunction("comp")
-    val out = input.transform({
-      case c@ AEvalComp(tuple,snap) => tuple.unit
+    var newInput =
+      input.copy(functions = input.functions.concat(ASnapshotDecl.getAllSnapDecls))(
+        input.pos, input.info, input.errT
+      )
 
-
-        // type Vars?
-//        DomainFuncApp(dfevalComp, Seq(tuple.op), )(NoPosition)
-//
-//
-//        DomainFuncApp(df, Seq(IntLit(1)(NoPosition)))(NoPosition)
+    // Change the thing to comp
+//    newInput = newInput.transform({
+//      case c@ASnapshotApp(comprehension4Tuple, filter, _) =>
+//        c.toViper
+//    })
+//    newInput = newInput.transform({
+//      case c@ AComprehension4Tuple(_, _, _, _) =>
+//        c.toViper
+//    })
+    newInput = newInput.transform( {
+      case c@ AEvalComp(_, _) =>
+        c.toViper
     })
-    print(pretty(out))
-    out
+    print(pretty(newInput))
+    newInput
 //    ViperStrategy.Slim({
 //      case c@Comprehension(exp) => exp
 //    }).execute(input)
