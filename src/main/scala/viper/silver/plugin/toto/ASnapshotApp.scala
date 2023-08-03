@@ -11,13 +11,13 @@ case class ASnapshotApp(comprehension4Tuple: AComprehension4Tuple, filter: Exp, 
 
   var snapshotFunctionDeclaration: ASnapshotDecl = {
     val receiverType = comprehension4Tuple.tripleType
-    ASnapshotDecl.getOrMakeNewSnapDecl(receiverType, field)
+    ASnapshotDecl(receiverType, field)
   }
 
 
-  def toViper: Exp = {
-    FuncApp(snapshotFunctionDeclaration.viperDecl,
-      Seq(comprehension4Tuple.toViper, filter))(pos, info, errT)
+  def toViper(input: Program): Exp = {
+    FuncApp(snapshotFunctionDeclaration.viperDecl(input),
+      Seq(comprehension4Tuple.toViper(input), filter))(pos, info, errT)
   }
 
 //  def linkToSnapFunction(d: Declaration): Unit = {
