@@ -27,7 +27,7 @@ case class AComprehension4Tuple(receiver: Exp, mapping: Option[Exp], op: Exp, un
       case _ => throw new Exception("Receiver must be a  type")
     }
     if (recA.size != 1) {
-      throw new Exception("Receiver must be a Receiver of 1 variable")
+      throw new Exception("Receiver must be a Receiver of 1 variable. Resolving should have failed.")
     }
     val A = recA.head
     val VB = mapping match {
@@ -35,7 +35,7 @@ case class AComprehension4Tuple(receiver: Exp, mapping: Option[Exp], op: Exp, un
         m.typ match {
           case d: DomainType if d.domainName == "Mapping" =>
             d.typVarsMap.values
-          case _ => throw new Exception("Mapping must be a mapping")
+          case _ => throw new Exception("Mapping must be a mapping. Resolving should have failed.")
         }
       case None => Seq(unit.typ, unit.typ)
     }
@@ -48,17 +48,21 @@ case class AComprehension4Tuple(receiver: Exp, mapping: Option[Exp], op: Exp, un
   }
 
 
-  def toViper: DomainFuncApp = {
+  def toViper(input: Program) : DomainFuncApp = {
+    val typeVars = input.findDomain("Comp").typVars
+    if (typeVars.length != 3) {
+      throw new Exception("Comp domain must have 3 type variables")
+    }
     val typeVarMap = Map(
-      TypeVar("A") -> tripleType._1,
-      TypeVar("V") -> tripleType._2,
-      TypeVar("B") -> tripleType._3
+      typeVars(0) -> tripleType._1,
+      typeVars(1) -> tripleType._2,
+      typeVars(2) -> tripleType._3
     )
-    val typViper = DomainType("Comp", typeVarMap)(typeVarMap.keys.toSeq)
-    //TODO Fix the getOrElse and empty Map
-    DomainFuncApp("comp", Seq(receiver, mapping.orNull, op, unit),Map())(
-      pos, info, typViper , "Comp", errT
-    )
+//    val typViper = DomainType.apply(compDomain, typeVarMap)
+    val compFunc = input.findDomainFunction("comp")
+    DomainFuncApp.apply(compFunc, Seq(receiver, mapping.orNull, op, unit), typeVarMap)(pos, info, errT)
+//    DomainFuncApp("comp", Seq(receiver, mapping.orNull, op, unit),typeVarMap)(
+//      pos, info, typViper , "Comp", errT
   }
 
 
