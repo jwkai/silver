@@ -21,23 +21,25 @@ case class ASnapshotDecl private (compType: (Type, Type, Type), fieldID: String)
 
   override val scopedDecls: Seq[Declaration] = Seq()
 
-
   val outType: Type = {
     MapType(compType._1, compType._3)
   }
 
-  val viperDecl: Function = {
+  def viperDecl(input: Program): Function = {
+    val compDomain = input.findDomain("Comp")
+    val typeVars = compDomain.typVars
+    if (typeVars.length != 3) {
+      throw new Exception("Comp domain must have 3 type variables")
+    }
     val typeVarMap = Map(
-      TypeVar("A") -> compType._1,
-      TypeVar("V") -> compType._2,
-      TypeVar("B") -> compType._3
+      typeVars(0) -> compType._1,
+      typeVars(1) -> compType._2,
+      typeVars(2) -> compType._3
     )
-
     val args0 = LocalVarDecl("c",
-      DomainType("Comp", typeVarMap)(typeVarMap.keys.toSeq)
+      DomainType.apply(compDomain, typeVarMap)
     )()
-    val args1 =
-      LocalVarDecl("f", SetType(compType._1))()
+    val args1 = LocalVarDecl("f", SetType(compType._1))()
     Function(name, Seq(args0, args1), outType, Seq(), Seq(), None)()
   }
 
@@ -50,9 +52,13 @@ object ASnapshotDecl {
 
   private val snapshotDecls: scala.collection.mutable.Map[String, ASnapshotDecl] = scala.collection.mutable.Map()
 
-  def getOrMakeNewSnapDecl(compType: (Type, Type, Type), fieldID: String): ASnapshotDecl = {
+  private def getOrMakeNewSnapDecl(compType: (Type, Type, Type), fieldID: String): ASnapshotDecl = {
     val key = tupleFieldToString(compType, fieldID)
-    snapshotDecls.getOrElseUpdate(key, ASnapshotDecl(compType, fieldID)())
+    snapshotDecls.getOrElseUpdate(key, new ASnapshotDecl(compType, fieldID)(NoPosition))
+  }
+
+  def apply(compType: (Type, Type, Type), fieldID: String): ASnapshotDecl = {
+    getOrMakeNewSnapDecl(compType, fieldID)
   }
 
   def tupleFieldToString(t: (Type, Type, Type), fieldID: String): String = {
@@ -60,8 +66,8 @@ object ASnapshotDecl {
   }
 
 
-  def getAllSnapDecls: Seq[Function] = {
-    snapshotDecls.values.map(_.viperDecl).toSeq
+  def getAllSnapDecls(input: Program) : Seq[Function] = {
+    snapshotDecls.values.map(_.viperDecl(input)).toSeq
   }
 
 }
