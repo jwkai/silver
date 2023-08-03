@@ -6,7 +6,7 @@ import viper.silver.ast.pretty.FastPrettyPrinter.pretty
 import viper.silver.ast.{DomainFuncApp, FilePosition, FuncApp, IntLit, NoPosition, Program}
 import viper.silver.ast.utility.ViperStrategy
 import viper.silver.parser.FastParserCompanion.whitespace
-import viper.silver.parser.{FastParser, PCall, PDomainType, PDomainTypeKinds, PExp, PIdnUse, PProgram, PSetType, PType, TypeChecker}
+import viper.silver.parser.{FastParser, PCall, PDomain, PDomainFunction, PDomainType, PDomainTypeKinds, PExp, PIdnDef, PIdnUse, PProgram, PSetType, PType, PTypeVarDecl, TypeChecker}
 import viper.silver.plugin.{ParserPluginTemplate, SilverPlugin}
 import viper.silver.verifier.{AbstractError, VerificationResult}
 
@@ -34,14 +34,38 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
         PComprehension(op,opUnit,mRF,parsedFilter)(pos)
     }
 
-  def mapRecVal[_:P]: P[PMappingFieldReceiver] =
-    FP(fp.idnuse ~  "(" ~ fp.funcApp ~ "." ~ fp.idnuse ~ (P(",") ~ fp.actualArgList).? ~ ")").map{
-      case (posTuple, (mappingFunc, receiverApp, field, mappingFuncArgs)) => PMappingFieldReceiver(
-        PCall(mappingFunc, mappingFuncArgs.getOrElse(Seq()))(posTuple),
+//  def mapRecVal[_:P]: P[PMappingFieldReceiver] =
+//    FP(fp.idnuse ~  "(" ~ fp.funcApp ~ "." ~ fp.idnuse ~ (P(",") ~ fp.actualArgList).? ~ ")").map{
+//      case (posTuple, (mappingFunc, receiverApp, field, mappingFuncArgs)) => PMappingFieldReceiver(
+//        PCall(mappingFunc, mappingFuncArgs.getOrElse(Seq()))(posTuple),
+//        field,
+//        receiverApp
+//      )(posTuple)
+//    }
+
+  def recVal[_: P]: P[PMappingFieldReceiver]   = {
+    // Parse the mapping function with two possible syntaxes
+    FP(fp.funcApp ~ "." ~ fp.idnuse).map{
+      case (posTuple, (receiver, field)) => PMappingFieldReceiver(
+        null,
         field,
-        receiverApp
+        receiver
       )(posTuple)
     }
+  }
+
+  def mapRecVal[_: P]: P[PMappingFieldReceiver] = {
+    FP(fp.idnuse ~ fp.parens(recVal ~ (P(",") ~ fp.actualArgList).?)).map{
+      case (posTuple, (mappingFunc, (pMappingFieldReceiver, mappingFuncArgs))) =>
+        pMappingFieldReceiver.copy(mapping =
+          PCall(mappingFunc, mappingFuncArgs.getOrElse(Seq()))(posTuple))(posTuple)
+    }
+  }
+
+
+  def mapRecBoth[_:P]: P[PMappingFieldReceiver] = {
+    recVal | mapRecVal
+  }
 
 
   /** Called before any processing happened.
@@ -92,10 +116,10 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
     * @return Modified AST
     */
   override def beforeVerify(input: Program) : Program = {
-    val dfevalComp = input.findDomainFunction("evalComp")
-    val dfcomp = input.findDomainFunction("comp")
+//    val dfevalComp = input.findDomainFunction("evalComp")
+//    val dfcomp = input.findDomainFunction("comp")
     var newInput =
-      input.copy(functions = input.functions.concat(ASnapshotDecl.getAllSnapDecls))(
+      input.copy(functions = input.functions.concat(ASnapshotDecl.getAllSnapDecls(input)))(
         input.pos, input.info, input.errT
       )
 
@@ -110,7 +134,7 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
 //    })
     newInput = newInput.transform( {
       case c@ AEvalComp(_, _) =>
-        c.toViper
+        c.toViper(newInput)
     })
     print(pretty(newInput))
     newInput
@@ -201,4 +225,63 @@ object ComprehensionPlugin {
       }
     }
   }
+
+  private def addDomains(input: PProgram): PProgram = {
+    // checks and add an Comp domain if doesn't exist
+    if (checkCompExists(input)) {
+      throw new Exception("Comp domain already exists. Implementing edits")
+    }
+    val noPosTuple = (NoPosition,NoPosition)
+    val typVar0 = PTypeVarDecl(PIdnDef("A")(noPosTuple))(noPosTuple)
+    val typVar1 = PTypeVarDecl(PIdnDef("V")(noPosTuple))(noPosTuple)
+    val typVar2 = PTypeVarDecl(PIdnDef("B")(noPosTuple))(noPosTuple)
+    val compDomain = PDomain(PIdnDef("Comp")(noPosTuple),
+      Seq(typVar0, typVar1, typVar2), Seq(), Seq(), None)(noPosTuple, Seq())
+
+
+
+    val compFunc = PDomainFunction(PIdnDef("comp")(noPosTuple), Seq(), null, false, None)(
+      PIdnUse("Comp")(noPosTuple))(noPosTuple, Seq())
+
+
+
+  }
+
+  private def checkcompFuncExists(input: PProgram): Boolean = {
+    input.domains.find(d => d.idndef.name == "Comp") match {
+      case Some(domain) =>
+        domain.funcs.find(f => f.idndef.name == "comp") match {
+          case Some(_) =>
+            true
+          case None =>
+            false
+        }
+      case None =>
+        throw new Exception("Should not get here.")
+    }
+
+  }
+
+
+  private def checkCompExists(input: PProgram): Boolean = {
+    input.domains.find(d => d.idndef.name == "Comp") match {
+      case Some(value) =>
+        val dTypeVars = value.typVars
+        if (dTypeVars.length >= 3) {
+          throw new Exception("Comp domain should have at least 3 type variables")
+        }
+        //        val correctTV = dTypeVars(0).idndef.name == "A" &&
+        //          dTypeVars(1).idndef.name == "V" &&
+        //          dTypeVars(2).idndef.name == "B"
+        //        if (!correctTV) {
+        //          throw new Exception("Comp domain should have type variables A, V, B")
+        //        }
+        true
+      case None =>
+        false
+    }
+  }
+
+
+
 }
