@@ -6,7 +6,7 @@ import viper.silver.ast.pretty.FastPrettyPrinter.pretty
 import viper.silver.ast.{DomainFuncApp, FilePosition, FuncApp, IntLit, NoPosition, Program}
 import viper.silver.ast.utility.ViperStrategy
 import viper.silver.parser.FastParserCompanion.whitespace
-import viper.silver.parser.{FastParser, PCall, PDomain, PDomainFunction, PDomainType, PDomainTypeKinds, PExp, PIdnDef, PIdnUse, PProgram, PSetType, PType, PTypeVarDecl, TypeChecker}
+import viper.silver.parser.{FastParser, PCall, PDomain, PDomainFunction, PDomainType, PDomainTypeKinds, PExp, PFormalArgDecl, PIdnDef, PIdnUse, PProgram, PSetType, PType, PTypeVar, PTypeVarDecl, TypeChecker}
 import viper.silver.plugin.{ParserPluginTemplate, SilverPlugin}
 import viper.silver.verifier.{AbstractError, VerificationResult}
 
@@ -88,7 +88,9 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
     * @return Modified Parse AST
     */
   override def beforeResolve(input: PProgram) : PProgram = {
-    input
+//    errors
+    val newInput = input //TODO
+    newInput
   }
 
   /** Called after identifiers have been resolved but before the parse AST is translated into the normal AST.
@@ -176,6 +178,15 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
 
 object ComprehensionPlugin {
 
+  final val compDomainKeyword = "Comp"
+  final val compFunctionKeyword = "comp"
+
+  final val receiverDomainKeyword = "Receiver"
+  final val mappingDomainKeyword = "Mapping"
+  final val operatorDomainKeyword = "Operator"
+
+
+
   def makeDomainType(name: String, typeArgs: Seq[PType]): PDomainType = {
     val noPosTuple = (NoPosition,NoPosition)
     val outType = PDomainType(PIdnUse(name)(noPosTuple), typeArgs)(noPosTuple)
@@ -226,31 +237,54 @@ object ComprehensionPlugin {
     }
   }
 
-  private def addDomains(input: PProgram): PProgram = {
+  private def addCompDomain(input: PProgram): PProgram = {
+    val compDomainTypeVar0 = "A"
+    val compDomainTypeVar1 = "V"
+    val compDomainTypeVar2 = "B"
+
     // checks and add an Comp domain if doesn't exist
     if (checkCompExists(input)) {
       throw new Exception("Comp domain already exists. Implementing edits")
     }
     val noPosTuple = (NoPosition,NoPosition)
-    val typVar0 = PTypeVarDecl(PIdnDef("A")(noPosTuple))(noPosTuple)
-    val typVar1 = PTypeVarDecl(PIdnDef("V")(noPosTuple))(noPosTuple)
-    val typVar2 = PTypeVarDecl(PIdnDef("B")(noPosTuple))(noPosTuple)
-    val compDomain = PDomain(PIdnDef("Comp")(noPosTuple),
+    val typVar0 = PTypeVarDecl(PIdnDef(compDomainTypeVar0)(noPosTuple))(noPosTuple)
+    val typVar1 = PTypeVarDecl(PIdnDef(compDomainTypeVar1)(noPosTuple))(noPosTuple)
+    val typVar2 = PTypeVarDecl(PIdnDef(compDomainTypeVar2)(noPosTuple))(noPosTuple)
+    val compDomain = PDomain(PIdnDef(compDomainKeyword)(noPosTuple),
       Seq(typVar0, typVar1, typVar2), Seq(), Seq(), None)(noPosTuple, Seq())
+//    val compInputRec = PFormalArgDecl(PIdnDef("r")(noPosTuple),)
 
 
+    val receiverType = PDomainType(PIdnUse(receiverDomainKeyword)(noPosTuple),
+      Seq(PTypeVar(compDomainTypeVar0)))(noPosTuple)
+    val mappingType = PDomainType(PIdnUse(mappingDomainKeyword)(noPosTuple),
+      Seq(PTypeVar(compDomainTypeVar1), PTypeVar(compDomainTypeVar2)))(noPosTuple)
+    val operatorType = PDomainType(PIdnUse(operatorDomainKeyword)(noPosTuple),
+      Seq(PTypeVar(compDomainTypeVar2)))(noPosTuple)
+    val unitType = PTypeVar(compDomainTypeVar2)
 
-    val compFunc = PDomainFunction(PIdnDef("comp")(noPosTuple), Seq(), null, false, None)(
-      PIdnUse("Comp")(noPosTuple))(noPosTuple, Seq())
+    val compFuncArg0 = PFormalArgDecl(PIdnDef("r")(noPosTuple), receiverType)(noPosTuple)
+    val compFuncArg1 = PFormalArgDecl(PIdnDef("m")(noPosTuple), mappingType)(noPosTuple)
+    val compFuncArg2 = PFormalArgDecl(PIdnDef("op")(noPosTuple), operatorType)(noPosTuple)
+    val compFuncArg3 = PFormalArgDecl(PIdnDef("u")(noPosTuple), unitType)(noPosTuple)
+
+    val compFuncOutType = PDomainType(PIdnUse(compDomainKeyword)(noPosTuple),
+      Seq(PTypeVar(compDomainTypeVar0),
+        PTypeVar(compDomainTypeVar1),
+        PTypeVar(compDomainTypeVar2)))(noPosTuple)
+
+    val compFunc = PDomainFunction(PIdnDef(compFunctionKeyword)(noPosTuple),
+      Seq(compFuncArg0, compFuncArg1, compFuncArg2, compFuncArg3), compFuncOutType, unique = false, None)(
+      PIdnUse(compDomainKeyword)(noPosTuple))(noPosTuple, Seq())
 
 
 
   }
 
-  private def checkcompFuncExists(input: PProgram): Boolean = {
-    input.domains.find(d => d.idndef.name == "Comp") match {
+  private def checkCompFuncExists(input: PProgram): Boolean = {
+    input.domains.find(d => d.idndef.name == compDomainKeyword) match {
       case Some(domain) =>
-        domain.funcs.find(f => f.idndef.name == "comp") match {
+        domain.funcs.find(f => f.idndef.name == compFunctionKeyword) match {
           case Some(_) =>
             true
           case None =>
@@ -264,18 +298,12 @@ object ComprehensionPlugin {
 
 
   private def checkCompExists(input: PProgram): Boolean = {
-    input.domains.find(d => d.idndef.name == "Comp") match {
+    input.domains.find(d => d.idndef.name == compDomainKeyword) match {
       case Some(value) =>
         val dTypeVars = value.typVars
         if (dTypeVars.length >= 3) {
           throw new Exception("Comp domain should have at least 3 type variables")
         }
-        //        val correctTV = dTypeVars(0).idndef.name == "A" &&
-        //          dTypeVars(1).idndef.name == "V" &&
-        //          dTypeVars(2).idndef.name == "B"
-        //        if (!correctTV) {
-        //          throw new Exception("Comp domain should have type variables A, V, B")
-        //        }
         true
       case None =>
         false
