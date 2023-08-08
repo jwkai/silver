@@ -20,13 +20,10 @@ domain Mapping[V,B] {
 domain Comp[A,V,B] {
     function comp(r:Receiver[A], m: Mapping[V,B],
         op: Operator[B],u: B) : Comp[A,V,B]
+    function evalComp(c: Comp[A,V,B], snap: Map[A,B]) : B
 }
 
 function filter1(start: Int, end: Int): Set[Int]
-
-domain CompEval[A,V,B] {
-    function evalComp(c: Comp[A,V,B], snap: Map[A,B]) : B
-}
 
 field val: Int
 
