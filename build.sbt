@@ -29,6 +29,7 @@ ThisBuild / javaOptions  ++= Seq("-Dfile.encoding=UTF-8")
 // This JAR file contains all classes and resources for testing and projects like Carbon
 // and Silicon can rely on it to access the test suit implemented in Silver.
 ThisBuild / Test / publishArtifact := true
+enablePlugins(JavaAppPackaging)
 
 // Silver specific project settings
 lazy val silver = (project in file("."))
