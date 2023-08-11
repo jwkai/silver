@@ -1,9 +1,9 @@
 package viper.silver.plugin.toto
 
 import viper.silver.ast.{Member, Position}
-import viper.silver.parser.{NameAnalyser, PExtender, PGlobalDeclaration, PIdnDef, PMember, PNode, Translator, TypeChecker}
+import viper.silver.parser.{NameAnalyser, PExp, PExtender, PFormalArgDecl, PGlobalDeclaration, PIdnDef, PMember, PNode, Translator, TypeChecker}
 
-case class POperator(idndef: PIdnDef)
+case class POperator(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], body : PExp)
                     (val pos: (Position, Position)) extends PExtender with PMember with PGlobalDeclaration {
   override val getSubnodes: Seq[PNode] = Seq(idndef)
 
