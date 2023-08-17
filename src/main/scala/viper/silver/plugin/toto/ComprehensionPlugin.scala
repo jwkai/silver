@@ -3,10 +3,9 @@ package viper.silver.plugin.toto
 import fastparse.P
 import viper.silver.FastMessaging
 import viper.silver.ast.pretty.FastPrettyPrinter.pretty
-import viper.silver.ast.{DomainFuncApp, FilePosition, FuncApp, IntLit, NoPosition, Program}
-import viper.silver.ast.utility.ViperStrategy
+import viper.silver.ast.{FilePosition, NoPosition, Program}
 import viper.silver.parser.FastParserCompanion.whitespace
-import viper.silver.parser.{FastParser, PCall, PDomain, PDomainFunction, PDomainType, PDomainTypeKinds, PExp, PFormalArgDecl, PIdnDef, PIdnUse, PProgram, PSetType, PType, PTypeVar, PTypeVarDecl, TypeChecker}
+import viper.silver.parser._
 import viper.silver.plugin.{ParserPluginTemplate, SilverPlugin}
 import viper.silver.verifier.{AbstractError, VerificationResult}
 
@@ -17,22 +16,45 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
                           @unused config: viper.silver.frontend.SilFrontendConfig,
                           fp: FastParser) extends SilverPlugin with ParserPluginTemplate {
 
-  import fp.{FP, keyword, exp, ParserExtension}
+  import fp.{FP, ParserExtension, exp, keyword}
 
   private val comprehensionKeyword: String = "comp"
 
+  private val recKeyword: String = "receiver"
+  private val opUnitKeyword: String = "opUnit"
+  private val mapKeyword: String = "mapping"
+
   // Fix the FP somewhere else
-  def compOp[_: P]: P[((FilePosition, FilePosition), (PCall, PExp))] =
+  def compOp[$: P]: P[((FilePosition, FilePosition), (PCall, PExp))] =
     FP(keyword(comprehensionKeyword) ~/ "[" ~/ fp.funcApp ~ "," ~ exp ~/ "]")
 
-  def compDef[_:P]: P[(PMappingFieldReceiver, PExp)] =
-    P("{") ~ mapRecVal ~ "|" ~ exp ~ "}"
+  def compDef[$: P]: P[(PMappingFieldReceiver, PExp)] =
+    P("{") ~ mapRecBoth ~ "|" ~ exp ~ "}"
 
-  def comp[_:P]: P[PComprehension] =
+  def comp[$: P]: P[PComprehension] =
     (compOp ~ compDef).map{
       case (pos, (op, opUnit), (mRF, parsedFilter)) =>
         PComprehension(op,opUnit,mRF,parsedFilter)(pos)
     }
+
+
+  def funDef[$:P]: P[PFunInline] =
+    FP(keyword("fun") ~ fp.formalArgList ~ "::" ~ fp.exp).map{
+      case (pos, (args, body)) => PFunInline(args, body)(pos)
+    }
+
+  def recDef[$:P]: P[PReceiver] =
+    FP(keyword(recKeyword) ~ fp.idndef ~ fp.parens(fp.formalArgList) ~ fp.parens(funDef)).map {
+      case (pos, (name, args, body)) => PReceiver(name, args, body)(pos)
+    }
+
+  def opUnitDef[$:P]: P[POperator] =
+    FP(keyword(opUnitKeyword) ~ fp.idndef ~ fp.parens(fp.formalArgList) ~ fp.parens(
+      exp ~ "," ~ funDef)).map {
+      case (pos, (name, args, (unitdef, fundef))) => POperator(name, args, fundef, unitdef)(pos)
+    }
+
+
 
 //  def mapRecVal[_:P]: P[PMappingFieldReceiver] =
 //    FP(fp.idnuse ~  "(" ~ fp.funcApp ~ "." ~ fp.idnuse ~ (P(",") ~ fp.actualArgList).? ~ ")").map{
@@ -43,7 +65,7 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
 //      )(posTuple)
 //    }
 
-  def recVal[_: P]: P[PMappingFieldReceiver]   = {
+  def recVal[$: P]: P[PMappingFieldReceiver]   = {
     // Parse the mapping function with two possible syntaxes
     FP(fp.funcApp ~ "." ~ fp.idnuse).map{
       case (posTuple, (receiver, field)) => PMappingFieldReceiver(
@@ -54,7 +76,7 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
     }
   }
 
-  def mapRecVal[_: P]: P[PMappingFieldReceiver] = {
+  def mapRecVal[$: P]: P[PMappingFieldReceiver] = {
     FP(fp.idnuse ~ fp.parens(recVal ~ (P(",") ~ fp.actualArgList).?)).map{
       case (posTuple, (mappingFunc, (pMappingFieldReceiver, mappingFuncArgs))) =>
         pMappingFieldReceiver.copy(mapping =
@@ -63,7 +85,7 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
   }
 
 
-  def mapRecBoth[_:P]: P[PMappingFieldReceiver] = {
+  def mapRecBoth[$: P]: P[PMappingFieldReceiver] = {
     recVal | mapRecVal
   }
 
@@ -76,6 +98,8 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
     */
   override def beforeParse(input: String, isImported: Boolean) : String = {
     ParserExtension.addNewExpAtStart(comp(_))
+    ParserExtension.addNewDeclAtStart(recDef(_))
+//    ParserExtension.addNewDeclAtStart(opUnitDef(_))
 //    ParserExtension.addNewPreCondition(comp(_))
 //    ParserExtension.addNewPostCondition(comp(_))
 //    ParserExtension.addNewInvariantCondition(comp(_))
