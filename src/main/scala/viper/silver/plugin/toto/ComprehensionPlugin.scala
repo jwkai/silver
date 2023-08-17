@@ -51,7 +51,7 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
   def opUnitDef[$:P]: P[POperator] =
     FP(keyword(opUnitKeyword) ~ fp.idndef ~ fp.parens(fp.formalArgList) ~ fp.parens(
       exp ~ "," ~ funDef)).map {
-      case (pos, (name, args, (unitdef, fundef))) => POperator(name, args, fundef, unitdef)(pos)
+      case (pos, (name, args, (unitdef, fundef))) => POperator(name, args, unitdef, fundef)(pos)
     }
 
 
