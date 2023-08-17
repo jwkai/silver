@@ -1,5 +1,9 @@
 package viper.silver.plugin.toto
 
+import fastparse.{P, Parsed}
+import viper.silver.ast.NoPosition
+import viper.silver.parser.{FastParser, FastParserCompanion, ParseException}
+
 
 object DomainsGenerator {
   final val compDKey = "Comp"
@@ -65,6 +69,23 @@ object DomainsGenerator {
          |    ${axioms.mkString("\n")}
          |}\n """.stripMargin
     compOut
+  }
+
+
+  def useParser(parser: P[_], input: String ): String = {
+    val fp = new FastParser();
+    fastparse.parse("haha", fp.domainDecl(_)) match {
+      case Parsed.Success(value, index) => ???
+      case fail: Parsed.Failure =>
+        val trace = fail.trace()
+        val fullStack = fastparse.Parsed.Failure.formatStack(trace.input, trace.stack)
+        val msg = s"${trace.aggregateMsg}. Occurred while parsing: $fullStack"
+//        val (line, col) = lineCol.getPos(trace.index)
+//        val pos = FilePosition(_file, line, col)
+        throw ParseException(msg, (NoPosition, NoPosition))
+    }
+
+
   }
 
 }
