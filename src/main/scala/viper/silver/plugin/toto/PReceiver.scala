@@ -16,8 +16,10 @@ case class PReceiver(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], body : PF
   override def typecheck(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] = {
     t.checkMember(this) {
       formalArgs.foreach( a => t.check(a.typ))
-      body.typecheckReceiver(t, n)
-      typ = ComprehensionPlugin.makeDomainType("Receiver", Seq(body.args(0).typ))
+      body.typecheckReceiver(t, n) match {
+        case out @ Some(_) => return out
+        case None => typ = ComprehensionPlugin.makeDomainType(DomainsGenerator.recDKey, Seq(body.args(0).typ))
+      }
     }
     None
   }
