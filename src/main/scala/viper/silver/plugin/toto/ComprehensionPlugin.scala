@@ -8,6 +8,8 @@ import viper.silver.parser.FastParserCompanion.whitespace
 import viper.silver.parser._
 import viper.silver.plugin.{ParserPluginTemplate, SilverPlugin}
 import viper.silver.verifier.{AbstractError, VerificationResult}
+import viper.silver.plugin.toto.DomainsGenerator._
+import viper.silver.plugin.toto.DomainsGeneratorPAST.convertUserDefs
 
 import scala.annotation.unused
 
@@ -21,20 +23,22 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
   private val comprehensionKeyword: String = "comp"
 
   private val recKeyword: String = "receiver"
-  private val opUnitKeyword: String = "opUnit"
+  private val opUnitKeyword: String = "unitOp"
   private val mapKeyword: String = "mapping"
+  private val filterKeyword: String = "filter"
 
   // Fix the FP somewhere else
-  def compOp[$: P]: P[((FilePosition, FilePosition), (PCall, PExp))] =
-    FP(keyword(comprehensionKeyword) ~/ "[" ~/ fp.funcApp ~ "," ~ exp ~/ "]")
+  def compOp[$: P]: P[((FilePosition, FilePosition), PCall)] =
+    FP(keyword(comprehensionKeyword) ~/ "[" ~/ fp.funcApp ~/ "]")
+//    FP(keyword(comprehensionKeyword) ~/ "[" ~/ fp.funcApp ~ "," ~ exp ~/ "]")
 
   def compDef[$: P]: P[(PMappingFieldReceiver, PExp)] =
     P("{") ~ mapRecBoth ~ "|" ~ exp ~ "}"
 
   def comp[$: P]: P[PComprehension] =
     (compOp ~ compDef).map{
-      case (pos, (op, opUnit), (mRF, parsedFilter)) =>
-        PComprehension(op,opUnit,mRF,parsedFilter)(pos)
+      case (pos, unitOp, (mRF, parsedFilter)) =>
+        PComprehension(unitOp,mRF,parsedFilter)(pos)
     }
 
 
@@ -53,6 +57,19 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
       exp ~ "," ~ funDef)).map {
       case (pos, (name, args, (unitdef, fundef))) => POperator(name, args, unitdef, fundef)(pos)
     }
+
+  def mappingDef[$:P]: P[PMapping] =
+    FP(keyword(mapKeyword) ~ fp.idndef ~ fp.parens(fp.formalArgList) ~ fp.parens(funDef)).map {
+      case (pos, (name, args, body)) => PMapping(name, args, body)(pos)
+    }
+
+  def filterDef[$:P]: P[PFilter] =
+    FP(keyword(filterKeyword) ~ fp.idndef ~ fp.parens(fp.formalArgList) ~ fp.parens(funDef)).map {
+      case (pos, (name, args, body)) => PFilter(name, args, body)(pos)
+    }
+
+
+
 
 
 
@@ -99,15 +116,19 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
   override def beforeParse(input: String, isImported: Boolean) : String = {
     ParserExtension.addNewExpAtStart(comp(_))
     ParserExtension.addNewDeclAtStart(recDef(_))
+    ParserExtension.addNewDeclAtStart(mappingDef(_))
+    ParserExtension.addNewDeclAtStart(filterDef(_))
+    ParserExtension.addNewDeclAtStart(opUnitDef(_))
+
 //    ParserExtension.addNewDeclAtStart(opUnitDef(_))
 //    ParserExtension.addNewPreCondition(comp(_))
 //    ParserExtension.addNewPostCondition(comp(_))
 //    ParserExtension.addNewInvariantCondition(comp(_))
-    val newInput = input + "\n" + DomainsGenerator.compDomainString() + "\n" +
-      DomainsGenerator.receiverDomainString() + "\n" + DomainsGenerator.mappingDomainString() + "\n" +
-      DomainsGenerator.opDomainString()
-    print(newInput)
-    newInput
+//    val newInput = input + "\n" + DomainsGenerator.compDomainString() + "\n" +
+//      DomainsGenerator.receiverDomainString() + "\n" + DomainsGenerator.mappingDomainString() + "\n" +
+//      DomainsGenerator.opDomainString()
+//    print(newInput)
+    input
   }
 
   /** Called after parse AST has been constructed but before identifiers are resolved and the program is type checked.
@@ -117,7 +138,14 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
     */
   override def beforeResolve(input: PProgram) : PProgram = {
 //    errors
-    val newInput = input //TODO
+    val domainsToAdd = Seq(
+      compDomainString(),
+      receiverDomainString(),
+      opDomainString(),
+      mappingDomainString()).map(parseDomainString(_))// :+ convertUserDefs(input.extensions)
+
+    val newInput = input.copy(
+      domains = input.domains ++ domainsToAdd)(input.pos)
     newInput
   }
 
@@ -127,6 +155,13 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
     * @return Modified Parse AST
     */
   override def beforeTranslate(input: PProgram): PProgram = {
+//    val newInput = input.copy(extensions = input.extensions.filterNot(e => e match {
+//        case _: PFilter => true
+//        case _: PReceiver => true
+//        case _: POperator => true
+//        case _: PMapping => true
+//        case _ => false
+//      }))(input.pos)
     input
   }
 
