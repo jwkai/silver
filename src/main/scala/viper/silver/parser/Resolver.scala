@@ -646,6 +646,12 @@ case class TypeChecker(names: NameAnalyser) {
                           pfa.domainTypeRenaming = Some(fdtv)
                           pfa._extraLocalTypeVariables = (domain.typVars map (tv => PTypeVar(tv.idndef.name))).toSet
                           extraReturnTypeConstraint = explicitType
+
+                        case _ =>
+                          checkMember(fd) {
+                            check(fd.typ)
+                            fd.formalArgs foreach (a => check(a.typ))
+                          }
                       }
                     case Some(ppa: PPredicate) =>
                       pfa.extfunction = ppa
@@ -754,7 +760,7 @@ case class TypeChecker(names: NameAnalyser) {
         pq._typeSubstitutions = pq.body.typeSubstitutions.toList.distinct
         pq.typ = Bool
         curMember = oldCurMember
-      
+
       case pne@PNewExp(_) => issueError(pne, s"unexpected use of `new` as an expression")
     }
   }
