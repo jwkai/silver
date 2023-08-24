@@ -128,7 +128,13 @@ case class FilePosition(file: Path, vline: Int, col: Int) extends util.parsing.i
   override lazy val line: Int = vline
   override lazy val column: Int = col
   override lazy val lineContents: String = toString
-  override lazy val toString: String = s"${file.getFileName}@$vline.$col"
+  override lazy val toString: String = {
+    if (file != null) {
+      s"${file.getFileName}@$vline.$col"
+    } else {
+      "Generated position"
+    }
+  }
 }
 
 /**
