@@ -26,7 +26,7 @@ case class ASnapshotDecl private (compType: (Type, Type, Type), fieldID: String)
   }
 
   def viperDecl(input: Program): Function = {
-    val compDomain = input.findDomain("Comp")
+    val compDomain = input.findDomain(DomainsGenerator.compDKey)
     val typeVars = compDomain.typVars
     if (typeVars.length != 3) {
       throw new Exception("Comp domain must have 3 type variables")
