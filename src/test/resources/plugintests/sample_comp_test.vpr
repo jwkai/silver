@@ -1,15 +1,21 @@
+domain someR {
+    function getR(i: Int): Ref
+}
 
 
 
+filter allInt(start: Int, end: Int) (fun i: Int :: i >= start && i < end )
+unitOp add(x: Int) (-x ,fun a: Int, b: Int :: a + b + x)
+receiver unitRec() (fun i: Int :: getR(i))
+mapping unitMap()  (fun a: Int :: a)
 
-function filter1(start: Int, end: Int): Set[Int]
 
 field val: Int
 
 method test1(i1: Int) {
     var a: Bool := true
 
-    var b: Int := comp[and(),0]{identityMap(anyReceiver().val, 1) | filter1(0,10)}
+    var b: Int := comp[add(1)]{unitMap(unitRec().val) | allInt(0,10)}
 
     assert(b == 5)
 }
