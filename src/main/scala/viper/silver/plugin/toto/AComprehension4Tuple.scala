@@ -6,25 +6,29 @@ import viper.silver.ast._
 import viper.silver.verifier.VerificationResult
 
 
-case class AComprehension4Tuple(receiver: Exp, mapping: Option[Exp], op: Exp, unit: Exp)
+case class AComprehension4Tuple(receiver: Exp, mapping: Option[Exp], op: Exp)
                                (val pos: Position = NoPosition, val info: Info = NoInfo,
                                                      val errT: ErrorTrafo = NoTrafos) extends ExtensionExp {
 
   override lazy val prettyPrint: PrettyPrintPrimitives#Cont =
-    text("comp") <+>  toParenDoc(op) <+> toParenDoc(unit) <+> toParenDoc(receiver)
+    text("comp") <+>  toParenDoc(op) <+> toParenDoc(receiver)
 
-  override val extensionSubnodes: Seq[Node] = Seq(receiver, mapping, op, unit).flatten
+  override val extensionSubnodes: Seq[Node] = Seq(receiver, mapping, op).flatten
 
   override def extensionIsPure: Boolean = true
 
-  override def typ: Type = unit.typ
+  override def typ: Type = op.typ match {
+    case d @ DomainType(DomainsGenerator.opDKey, _) =>
+      d.typVarsMap.values.head
+    case _ => throw new Exception("Operator must be an operator. Resolving should have failed.")
+  }
 
 
   val tripleType: (Type, Type, Type)   = {
     val recA = receiver.typ match {
-      case d: DomainType if d.domainName == "Receiver" =>
+      case d: DomainType if d.domainName == DomainsGenerator.recDKey =>
         d.typVarsMap.values
-      case _ => throw new Exception("Receiver must be a  type")
+      case _ => throw new Exception(s"Receiver must be a ${DomainsGenerator.recDKey} type")
     }
     if (recA.size != 1) {
       throw new Exception("Receiver must be a Receiver of 1 variable. Resolving should have failed.")
@@ -33,11 +37,12 @@ case class AComprehension4Tuple(receiver: Exp, mapping: Option[Exp], op: Exp, un
     val VB = mapping match {
       case Some(m) =>
         m.typ match {
-          case d: DomainType if d.domainName == "Mapping" =>
+          case d: DomainType if d.domainName == DomainsGenerator.mapDKey =>
             d.typVarsMap.values
-          case _ => throw new Exception("Mapping must be a mapping. Resolving should have failed.")
+          case _ => throw new Exception(s"Mapping must be a ${DomainsGenerator.mapDKey} type. " +
+            s"Resolving should have failed.")
         }
-      case None => Seq(unit.typ, unit.typ)
+      case None => Seq(typ, typ)
     }
     if (VB.size != 2) {
       throw new Exception("Mapping must be a mapping from 2 variables")
@@ -60,7 +65,7 @@ case class AComprehension4Tuple(receiver: Exp, mapping: Option[Exp], op: Exp, un
     )
 //    val typViper = DomainType.apply(compDomain, typeVarMap)
     val compFunc = input.findDomainFunction("comp")
-    DomainFuncApp.apply(compFunc, Seq(receiver, mapping.orNull, op, unit), typeVarMap)(pos, info, errT)
+    DomainFuncApp.apply(compFunc, Seq(receiver, mapping.orNull, op), typeVarMap)(pos, info, errT)
 //    DomainFuncApp("comp", Seq(receiver, mapping.orNull, op, unit),typeVarMap)(
 //      pos, info, typViper , "Comp", errT
   }
