@@ -1,8 +1,8 @@
 package viper.silver.plugin.toto
 
 import fastparse.{P, Parsed}
-import viper.silver.ast.NoPosition
-import viper.silver.parser.{FastParser, FastParserCompanion, ParseException}
+import viper.silver.ast.{NoPosition, Position, VirtualPosition}
+import viper.silver.parser.{FastParser, FastParserCompanion, PDomain, PNode, ParseException}
 
 
 object DomainsGenerator {
@@ -39,7 +39,7 @@ object DomainsGenerator {
     val axioms: Seq[String] = Seq()
     val mappingOut =
       s"""domain $mapDKey[$compDTV1,$compDTV2] {
-         |    function $mapEvalKey(m: $mapDKey[$compDTV1,$compDTV2], val:$compDTV1) : $compDTV2
+         |    function $mapEvalKey(m: $mapDKey[$compDTV1,$compDTV2], _mInput:$compDTV1) : $compDTV2
          |
          |    ${axioms.mkString("\n")}
          |}\n """.stripMargin
@@ -72,11 +72,16 @@ object DomainsGenerator {
   }
 
 
-  def useParser(parser: P[_], input: String ): String = {
-    val fp = new FastParser();
-    fastparse.parse("haha", fp.domainDecl(_)) match {
-      case Parsed.Success(value, index) => ???
+  def parseDomainString(input: String): PDomain = {
+    val fp = new DummyParser();
+    fp._line_offset = Array();
+    fastparse.parse(input, fp.domainDecl(_)) match {
+      case Parsed.Success(newDomain, index) =>
+        changePosRecursive(newDomain,
+          (VirtualPosition(s"Generated ${newDomain.idndef.name} domain start"),
+          VirtualPosition(s"Generated ${newDomain.idndef.name} domain end"))).asInstanceOf[PDomain]
       case fail: Parsed.Failure =>
+        // This should not happen
         val trace = fail.trace()
         val fullStack = fastparse.Parsed.Failure.formatStack(trace.input, trace.stack)
         val msg = s"${trace.aggregateMsg}. Occurred while parsing: $fullStack"
@@ -84,8 +89,14 @@ object DomainsGenerator {
 //        val pos = FilePosition(_file, line, col)
         throw ParseException(msg, (NoPosition, NoPosition))
     }
+  }
 
 
+
+  // Copied from MacroExpander.scala
+  def changePosRecursive(body: PNode, pos: (Position, Position)): PNode = {
+    val children = body.children.map { child => if (child.isInstanceOf[PNode]) changePosRecursive(child.asInstanceOf[PNode], pos) else child }
+    body.withChildren(children, Some(pos))
   }
 
 }
