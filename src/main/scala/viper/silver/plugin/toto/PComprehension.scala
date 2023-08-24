@@ -4,9 +4,8 @@ import viper.silver.ast.{Exp, Position}
 import viper.silver.parser._
 import viper.silver.plugin.toto.PComprehension.getNewTypeVariable
 
-case class PComprehension(op: PCall, unit: PExp, mappingFieldReceiver: PMappingFieldReceiver, filter: PExp)(val pos: (Position, Position)) extends PExtender with PExp {
-  override val getSubnodes: Seq[PNode] = Seq(op, unit, mappingFieldReceiver, filter)
-
+case class PComprehension(opUnit: PCall, mappingFieldReceiver: PMappingFieldReceiver, filter: PExp)(val pos: (Position, Position)) extends PExtender with PExp {
+  override val getSubnodes: Seq[PNode] = Seq(opUnit, mappingFieldReceiver, filter)
 
   override def typecheck(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] = {
     var messagesOut : Seq[String] = Seq()
@@ -21,17 +20,25 @@ case class PComprehension(op: PCall, unit: PExp, mappingFieldReceiver: PMappingF
     }
 
     // Check type of unit
-    t.checkTopTyped(unit, None)
+//    t.checkTopTyped(unit, None)
 
     // Check type of op, must be an Operator with unit as argument
-    val correctOpType = ComprehensionPlugin.makeDomainType("Operator", Seq(unit.typ))
-    t.checkTopTyped(op, Some(correctOpType))
+//    val correctOpType = ComprehensionPlugin.makeDomainType("Operator", Seq(unit.typ))
+    t.checkTopTyped(opUnit, Some(ComprehensionPlugin.
+      makeDomainType("Operator", Seq(getNewTypeVariable("CompOp")))))
+
+    opUnit.typ match {
+      case pd: PDomainType if pd.domain.name == DomainsGenerator.opDKey =>
+        typ = pd.typeArguments.head
+      case _ =>
+        messagesOut = messagesOut :+ "Operator should of Operator[_] type."
+        return Some(messagesOut)
+    }
 
     // Check type of mappingFieldReceiver
-    mappingFieldReceiver.typecheckComp(t,  unit.typ, setType)
+    mappingFieldReceiver.typecheckComp(t, n, typ, setType)
 
     // Set type of this node
-    this.typ = unit.typ
     Some(messagesOut)
   }
 
@@ -43,21 +50,21 @@ case class PComprehension(op: PCall, unit: PExp, mappingFieldReceiver: PMappingF
 
   val _typeSubstitutions: Seq[PTypeSubstitution] = Seq(PTypeSubstitution.id)
 
-  override def typeSubstitutions: collection.Seq[PTypeSubstitution] = unit.typeSubstitutions
+  override def typeSubstitutions: collection.Seq[PTypeSubstitution] = Seq()
 
-  override def forceSubstitution(ts: PTypeSubstitution): Unit = unit.forceSubstitution(ts)
+  override def forceSubstitution(ts: PTypeSubstitution): Unit = ()
 
   // Translate the parser node into an AST node
   override def translateExp(t: Translator): Exp = {
-    val opTranslated = t.exp(op)
-    val unitTranslated = t.exp(unit)
+    val opTranslated = t.exp(opUnit)
+//    val unitTranslated = t.exp(unit)
     val (mappingOpt, fieldString, receiverTranslated) = mappingFieldReceiver.translateTo(t)
     val filterTranslated = t.exp(filter)
 //    val mappingTranslated = mappingOpt.getOrElse(throw new Exception("Mapping should be defined."))
 
-    val tuple = AComprehension4Tuple(receiverTranslated, mappingOpt, opTranslated, unitTranslated)(pos._1)
+    val tuple = AComprehension4Tuple(receiverTranslated, mappingOpt, opTranslated)(pos._1)
     val snap = ASnapshotApp(tuple, filterTranslated, fieldString)(pos._1)
-    val f = snap.filter
+//    val f = snap.filter
     AEvalComp(tuple, snap)(pos._1)
   }
 
