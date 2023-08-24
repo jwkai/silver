@@ -20,6 +20,104 @@ object DomainsGeneratorPAST {
   final val mapDKey = "Mapping"
   final val opDKey = "Operator"
 
+  final val USER_D = "__DummyUserDomain"
+
+
+  private def makeFilterDef(pf: PFilter): (PDomainFunction, Seq[PAxiom]) = {
+    val fd = PDomainFunction(
+      idndef = pf.idndef,
+      formalArgs = pf.formalArgs,
+      resultType = pf.typ,
+      unique = false,
+      interpretation = None
+    )(PIdnUse(USER_D)(noPosTuple))(pf.pos,Seq())
+
+
+
+    (fd, Seq())
+  }
+
+  private def makeMappingDef(pm: PMapping): (PDomainFunction, Seq[PAxiom]) = {
+    val md = PDomainFunction(
+      idndef = pm.idndef,
+      formalArgs = pm.formalArgs,
+      resultType = pm.typ,
+      unique = false,
+      interpretation = None
+    )(PIdnUse(USER_D)(noPosTuple))(pm.pos,Seq())
+    (md, Seq())
+  }
+
+
+  private def makeRecDef(pr: PReceiver): (PDomainFunction, Seq[PAxiom]) = {
+    val rd = PDomainFunction(
+      idndef = pr.idndef,
+      formalArgs = pr.formalArgs,
+      resultType = pr.typ,
+      unique = false,
+      interpretation = None
+    )(PIdnUse(USER_D)(noPosTuple))(pr.pos, Seq())
+
+    PLogicalVarDecl(pr.formalArgs(0))
+
+    val ad = PAxiom(None,
+      PForall(Seq)
+
+    )
+
+    (rd, Seq())
+  }
+
+  private
+
+
+
+
+  private def makeOpDef(po: POperator): (PDomainFunction, Seq[PAxiom]) = {
+    val od = PDomainFunction(
+      idndef = po.idndef,
+      formalArgs = po.formalArgs,
+      resultType = po.typ,
+      unique = false,
+      interpretation = None
+    )(PIdnUse(USER_D)(noPosTuple))(po.pos, Seq())
+    (od, Seq())
+  }
+
+
+  def convertUserDefs(allDefs : Seq[PExtender]) : PDomain = {
+    var allDomainF : Seq[PDomainFunction] = Seq()
+    var allAxioms : Seq[PAxiom] = Seq()
+    allDefs.foreach( d => {
+      d match {
+        case pf : PFilter =>
+          val (fd, ax) = makeFilterDef(pf)
+          allDomainF = allDomainF :+ fd
+          allAxioms = allAxioms ++ ax
+        case pm : PMapping =>
+          val (md, ax) = makeMappingDef(pm)
+          allDomainF = allDomainF :+ md
+          allAxioms = allAxioms ++ ax
+        case pr : PReceiver =>
+          val (rd, ax) = makeRecDef(pr)
+          allDomainF = allDomainF :+ rd
+          allAxioms = allAxioms ++ ax
+        case po : POperator =>
+          val (od, ax) = makeOpDef(po)
+          allDomainF = allDomainF :+ od
+          allAxioms = allAxioms ++ ax
+        case _ =>
+      }
+    })
+    val userDomain = PDomain(
+      PIdnDef(USER_D)(noPosTuple),
+      Seq(),
+      allDomainF,
+      allAxioms,
+      None)(noPosTuple, Seq())
+    userDomain
+  }
+
 
   private def makeReceiverDomain(): PDomain = {
     val typVar0 = PTypeVarDecl(PIdnDef(compDTV0)(noPosTuple))(noPosTuple)
