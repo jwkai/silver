@@ -662,6 +662,10 @@ case class PCall(func: PIdnUse, args: Seq[PExp], typeAnnotated: Option[PType] = 
           args.indices.map(i => POpApp.pArg(i).domain.name -> pdf.formalArgs(i).typ.substitute(domainTypeRenaming.get)) :+
             (POpApp.pRes.domain.name -> pdf.typ.resultType.substitute(domainTypeRenaming.get)))
       )
+    case pf =>
+      List(
+        new PTypeSubstitution(args.indices.map(i => POpApp.pArg(i).domain.name -> pf.formalArgs(i).typ) :+ (POpApp.pRes.domain.name -> pf.typ.resultType))
+    )
 
   })
   else if (extfunction != null && extfunction.formalArgs.size == args.size) (extfunction match {
