@@ -9,13 +9,13 @@ case class AEvalComp(comp: AComprehension4Tuple, snap: ASnapshotApp)(val pos: Po
                                                      val errT: ErrorTrafo = NoTrafos) extends ExtensionExp {
 
   def toViper(input: Program) : Exp = {
-    DomainFuncApp("evalComp", Seq(comp.toViper(input), snap.toViper(input)), Map())(
-      pos, info, comp.tripleType._3 , "Comp" , errT
+    DomainFuncApp(DomainsGenerator.compEvalKey, Seq(comp.toViper(input), snap.toViper(input)), Map())(
+      pos, info, comp.tripleType._3 , DomainsGenerator.compDKey , errT
     )
   }
 
   override lazy val prettyPrint: PrettyPrintPrimitives#Cont =
-    text("evalComp") <+>  parens(ssep(Seq(show(comp), show(snap)), group(char (',') <> line)))
+    text(DomainsGenerator.compEvalKey) <+>  parens(ssep(Seq(show(comp), show(snap)), group(char (',') <> line)))
 
   override val extensionSubnodes: Seq[Node] = Seq(comp, snap)
 
