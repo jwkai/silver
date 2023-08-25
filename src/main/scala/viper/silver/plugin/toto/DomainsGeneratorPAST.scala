@@ -57,19 +57,8 @@ object DomainsGeneratorPAST {
       unique = false,
       interpretation = None
     )(PIdnUse(USER_D)(noPosTuple))(pr.pos, Seq())
-
-    PLogicalVarDecl(pr.formalArgs(0))
-
-    val ad = PAxiom(None,
-      PForall(Seq)
-
-    )
-
     (rd, Seq())
   }
-
-  private
-
 
 
 

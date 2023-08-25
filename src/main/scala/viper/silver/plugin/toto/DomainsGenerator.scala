@@ -15,7 +15,8 @@ object DomainsGenerator {
   final val compFKey = "comp"
   final val compEvalKey = "evalComp"
   final val recEvalKey = "eval"
-  final val opEvalKey = "oper"
+  final val opEvalKey = "operApply"
+  final val opUnitKey = "operGetUnit"
   final val mapEvalKey = "applyMap"
 
   final val recDKey = "Receiver"
@@ -51,6 +52,8 @@ object DomainsGenerator {
     val opOut =
       s"""domain $opDKey[$compDTV2] {
          |    function $opEvalKey(op: $opDKey[$compDTV2], val1:$compDTV2, val2:$compDTV2) : $compDTV2
+         |
+         |    function $opUnitKey(op: $opDKey[$compDTV2]) : $compDTV2
          |
          |    ${axioms.mkString("\n")}
          |}\n """.stripMargin
