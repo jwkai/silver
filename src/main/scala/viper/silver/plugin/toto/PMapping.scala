@@ -7,11 +7,11 @@ case class PMapping(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], body: PFun
                   (val pos: (Position, Position))
   extends PExtender with PAnyFunction with PCompComponentDecl  {
 
-  override val getSubnodes: Seq[PNode] = Seq(idndef) ++ formalArgs ++ Seq(body)
+//  override val getSubnodes: Seq[PNode] = Seq(idndef) ++ formalArgs ++ Seq(body)
 
-  var typToInfer: PType = null;
-
-  override def resultType(): PType = typToInfer;
+//  var typToInfer: PType = null;
+//
+//  override def resultType(): PType = typToInfer;
 
   override def typecheck(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] = {
     t.checkMember(this) {
@@ -35,14 +35,9 @@ case class PMapping(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], body: PFun
     PBinExp(lhs, "==", rhs)(posTuple)
   }
 
-
-
-
-  override def translateMember(t: Translator): Member = { ???
+  override def translateMember(t: Translator): Member = {
+    translateMemberWithName(t, Some(DomainsGenerator.mapEvalKey))
   }
-  override def translateMemberSignature(t: Translator): Member = super.translateMemberSignature(t)
-
-  override def annotations: Seq[(String, Seq[String])] = Seq()
 
 
 }

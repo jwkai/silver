@@ -1,17 +1,17 @@
 package viper.silver.plugin.toto
 
-import viper.silver.ast.{Member, Position}
+import viper.silver.ast.{AnonymousDomainAxiom, Domain, DomainFunc, DomainFuncApp, DomainType, EqCmp, Forall, LocalVar, Member, NoTrafos, Position}
 import viper.silver.parser.{PExp, _}
 
 case class POperator(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], opUnit: PExp, body : PFunInline)
                     (val pos: (Position, Position))
   extends PExtender with PAnyFunction with PCompComponentDecl {
 
-  override val getSubnodes: Seq[PNode] = Seq(idndef) ++ formalArgs ++ Seq(opUnit, body)
-
-  var typToInfer: PType = null;
-
-  override def resultType(): PType = typToInfer;
+//  override val getSubnodes: Seq[PNode] = Seq(idndef) ++ formalArgs ++ Seq(opUnit, body)
+//
+//  var typToInfer: PType = null;
+//
+//  override def resultType(): PType = typToInfer;
 
 
   override def typecheck(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] = {
@@ -26,9 +26,63 @@ case class POperator(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], opUnit: P
     None
   }
 
-  override def translateMember(t: Translator): Member = { ???
-  }
-  override def translateMemberSignature(t: Translator): Member = super.translateMemberSignature(t)
+  override def translateMember(t: Translator): Member = {
+    translateMemberWithName(t, Some(DomainsGenerator.opEvalKey))
+    // Gets the dummy domain
+    val d = t.getMembers()(genDomainName).asInstanceOf[Domain]
+    // Gets the evalRec function
+    val axiom = getOperUnitAxiom(t)
+    val dd = d.copy(
+      functions = d.functions,
+      axioms = d.axioms :+ axiom
+    )(d.pos, d.info, d.errT)
+    t.getMembers()(genDomainName) = dd
+    dd
 
-  override def annotations: Seq[(String, Seq[String])] = Seq()
+  }
+
+
+
+  def getOperUnitAxiom(t: Translator): AnonymousDomainAxiom = {
+    val getUnitFunc = t.getMembers()(DomainsGenerator.opUnitKey).asInstanceOf[DomainFunc]
+    val operFunc = t.getMembers()(idndef.name).asInstanceOf[DomainFunc]
+    val posInfoError = (t.liftPos(this), t.toInfo(this.annotations, this), NoTrafos)
+
+    val funcApp = (DomainFuncApp.apply(operFunc,
+      formalArgs.map(a => (LocalVar(a.idndef.name, t.ttyp(a.typ)) _).tupled(posInfoError)),
+      typVarMap = Map.empty) _).tupled(posInfoError)
+
+    val evalTypMap = operFunc.typ match {
+      case gt: DomainType =>
+        gt.typVarsMap
+      case _ =>
+        throw new Exception(s"Function ${operFunc} should be a generic/domain type.")
+    }
+
+    val getUnitApp = (DomainFuncApp.apply(getUnitFunc, Seq(funcApp),
+      typVarMap = evalTypMap) _).tupled(posInfoError)
+
+    val rhs = t.exp(opUnit)
+    val equal = (EqCmp(getUnitApp, rhs)_).tupled(posInfoError)
+
+    val triggers = Seq()
+
+    // all Vars
+    val allVarsForall = (this.formalArgs).map(a => t.liftArgDecl(a))
+    val forall = (Forall(allVarsForall, triggers, equal) _).tupled(posInfoError)
+    val axiom = AnonymousDomainAxiom(forall)(domainName = genDomainName)
+    axiom
+  }
+
+
+
+
+
+
+
+
+
+
+
+
 }

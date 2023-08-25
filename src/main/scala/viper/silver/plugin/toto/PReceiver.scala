@@ -8,10 +8,9 @@ case class PReceiver(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], body : PF
                                   (val pos: (Position, Position))
   extends PExtender with PAnyFunction with PCompComponentDecl {
 
-
-  override def annotations: Seq[(String, Seq[String])] = Seq()
-
-  override val getSubnodes: Seq[PNode] = Seq(idndef) ++ formalArgs ++ Seq(body)
+//  override def annotations: Seq[(String, Seq[String])] = Seq()
+//
+//  override val getSubnodes: Seq[PNode] = Seq(idndef) ++ formalArgs ++ Seq(body)
 
 
   override def typecheck(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] = {
@@ -43,19 +42,10 @@ case class PReceiver(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], body : PF
 
 
   override def translateMember(t: Translator): Member = {
-    // Gets the dummy domain
-    val d = t.getMembers()(genDomainName).asInstanceOf[Domain]
-    // Gets the evalRec function
-    val evalFunc = t.getMembers()(DomainsGenerator.recEvalKey).asInstanceOf[DomainFunc]
-    val (funct, axiom) = getEvalFuncAxiom(d, evalFunc, t)
-    val dd = d.copy(
-      functions = d.functions :+ funct,
-      axioms = d.axioms :+ axiom
-    )(d.pos, d.info, d.errT)
-    t.getMembers()(genDomainName) = dd
-    dd
-
+    translateMemberWithName(t, Some(DomainsGenerator.recEvalKey))
   }
+
+  // Moved to trait
 //  override def translateMemberSignature(t: Translator): Member = {
 ////    val pospos: Position = PDomain(null, null, null, null, null)(null, null)
 //    Domain(name = genDomainName, functions = Seq(), axioms = Seq())(
