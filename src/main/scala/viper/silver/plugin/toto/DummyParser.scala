@@ -1,7 +1,7 @@
 package viper.silver.plugin.toto
 
 import fastparse.P
-import viper.silver.ast.{FilePosition, HasLineColumn}
+import viper.silver.ast.FilePosition
 import viper.silver.parser.FastParser
 
 class DummyParser extends FastParser {

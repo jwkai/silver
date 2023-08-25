@@ -6,10 +6,9 @@ import viper.silver.ast.pretty.FastPrettyPrinter.pretty
 import viper.silver.ast.{FilePosition, NoPosition, Program}
 import viper.silver.parser.FastParserCompanion.whitespace
 import viper.silver.parser._
+import viper.silver.plugin.toto.DomainsGenerator._
 import viper.silver.plugin.{ParserPluginTemplate, SilverPlugin}
 import viper.silver.verifier.{AbstractError, VerificationResult}
-import viper.silver.plugin.toto.DomainsGenerator._
-import viper.silver.plugin.toto.DomainsGeneratorPAST.convertUserDefs
 
 import scala.annotation.unused
 

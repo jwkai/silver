@@ -1,7 +1,7 @@
 package viper.silver.plugin.toto
 
-import viper.silver.ast.{AnonymousDomainAxiom, AnySetContains, BuiltInType, Domain, DomainFunc, DomainFuncApp, DomainType, EqCmp, Exp, ExtensionType, Forall, GenericType, LocalVar, Member, NoTrafos, Position, TypeVar}
-import viper.silver.parser.{PAnyFunction, PBinExp, PExtender, PFormalArgDecl, PIdnDef, PNode, PType, Translator}
+import viper.silver.ast._
+import viper.silver.parser._
 
 trait PCompComponentDecl extends PExtender with PAnyFunction {
 

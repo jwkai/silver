@@ -1,7 +1,6 @@
 package viper.silver.plugin.toto
 
-import viper.silver.ast.pretty.Call
-import viper.silver.ast.{AnonymousDomainAxiom, Domain, DomainFunc, DomainFuncApp, EqCmp, Forall, LocalVar, Member, Position}
+import viper.silver.ast.{Member, Position}
 import viper.silver.parser._
 
 case class PReceiver(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], body : PFunInline)
