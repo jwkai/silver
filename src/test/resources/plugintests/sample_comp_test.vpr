@@ -1,3 +1,9 @@
+receiver das(a: Array) (fun i: Int :: loc(a,i))
+
+domain Array {
+    function loc(a: Array, i: Int): Ref
+}
+
 domain someR[A] {
     function getR(i: Int): Ref
 }
