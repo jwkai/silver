@@ -54,7 +54,7 @@ case class AComprehension4Tuple(receiver: Exp, mapping: Option[Exp], op: Exp)
 
 
   def toViper(input: Program) : DomainFuncApp = {
-    val typeVars = input.findDomain("Comp").typVars
+    val typeVars = input.findDomain(DomainsGenerator.compDKey).typVars
     if (typeVars.length != 3) {
       throw new Exception("Comp domain must have 3 type variables")
     }
@@ -64,7 +64,7 @@ case class AComprehension4Tuple(receiver: Exp, mapping: Option[Exp], op: Exp)
       typeVars(2) -> tripleType._3
     )
 //    val typViper = DomainType.apply(compDomain, typeVarMap)
-    val compFunc = input.findDomainFunction("comp")
+    val compFunc = input.findDomainFunction(DomainsGenerator.compConstructKey)
     DomainFuncApp.apply(compFunc, Seq(receiver, mapping.orNull, op), typeVarMap)(pos, info, errT)
 //    DomainFuncApp("comp", Seq(receiver, mapping.orNull, op, unit),typeVarMap)(
 //      pos, info, typViper , "Comp", errT
