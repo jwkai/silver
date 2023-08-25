@@ -652,6 +652,8 @@ case class TypeChecker(names: NameAnalyser) {
                             check(fd.typ)
                             fd.formalArgs foreach (a => check(a.typ))
                           }
+                          pfa.domainTypeRenaming = Some(new PTypeRenaming(Map.empty))
+                          pfa.domainSubstitution = Some(new PTypeSubstitution(Seq()))
                       }
                     case Some(ppa: PPredicate) =>
                       pfa.extfunction = ppa
