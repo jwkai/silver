@@ -1,8 +1,8 @@
 package viper.silver.plugin.toto
 
-import fastparse.{P, Parsed}
+import fastparse.Parsed
 import viper.silver.ast.{NoPosition, Position, VirtualPosition}
-import viper.silver.parser.{FastParser, FastParserCompanion, PDomain, PNode, ParseException}
+import viper.silver.parser.{PDomain, PNode, ParseException}
 
 
 object DomainsGenerator {
@@ -12,7 +12,7 @@ object DomainsGenerator {
   final val compDTV2 = "B"
 
 
-  final val compFKey = "comp"
+  final val compConstructKey = "comp"
   final val compEvalKey = "evalComp"
   final val recEvalKey = "eval"
   final val opEvalKey = "operApply"
@@ -64,8 +64,8 @@ object DomainsGenerator {
     val axioms: Seq[String] = Seq()
     val compOut =
       s"""domain $compDKey[$compDTV0,$compDTV1,$compDTV2] {
-         |    function $compFKey(r:$recDKey[$compDTV0], m: $mapDKey[$compDTV1,$compDTV2],
-         |        op: $opDKey[$compDTV2],u: $compDTV2) : $compDKey[$compDTV0,$compDTV1,$compDTV2]
+         |    function $compConstructKey(r:$recDKey[$compDTV0], m: $mapDKey[$compDTV1,$compDTV2],
+         |        op: $opDKey[$compDTV2]) : $compDKey[$compDTV0,$compDTV1,$compDTV2]
          |    function $compEvalKey(c: $compDKey[$compDTV0,$compDTV1,$compDTV2],
          |        snap: Map[$compDTV0,$compDTV2]) : $compDTV2
          |
