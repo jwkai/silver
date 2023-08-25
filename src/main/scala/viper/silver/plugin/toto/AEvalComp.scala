@@ -9,9 +9,18 @@ case class AEvalComp(comp: AComprehension4Tuple, snap: ASnapshotApp)(val pos: Po
                                                      val errT: ErrorTrafo = NoTrafos) extends ExtensionExp {
 
   def toViper(input: Program) : Exp = {
-    DomainFuncApp(DomainsGenerator.compEvalKey, Seq(comp.toViper(input), snap.toViper(input)), Map())(
-      pos, info, comp.tripleType._3 , DomainsGenerator.compDKey , errT
-    )
+
+    val compEvalFunc = input.findDomainFunction(DomainsGenerator.compEvalKey)
+    val compConstructed = comp.toViper(input)
+    val snapConstructed = snap.toViper(input)
+
+    DomainFuncApp(compEvalFunc,
+      Seq(comp.toViper(input), snap.toViper(input)), compConstructed.typVarMap
+    )(this.pos, this.info, this.errT)
+
+//    DomainFuncApp(DomainsGenerator.compEvalKey, Seq(comp.toViper(input), snap.toViper(input)), Map())(
+//      pos, info, comp.tripleType._3 , DomainsGenerator.compDKey , errT
+//    )
   }
 
   override lazy val prettyPrint: PrettyPrintPrimitives#Cont =
