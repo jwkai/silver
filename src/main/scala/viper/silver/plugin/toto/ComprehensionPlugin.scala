@@ -241,15 +241,6 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
 
 object ComprehensionPlugin {
 
-//  final val compDomainKeyword = "Comp"
-//  final val compFunctionKeyword = "comp"
-//
-//  final val receiverDomainKeyword = "Receiver"
-//  final val mappingDomainKeyword = "Mapping"
-//  final val operatorDomainKeyword = "Operator"
-
-
-
   def makeDomainType(name: String, typeArgs: Seq[PType]): PDomainType = {
     val noPosTuple = (NoPosition,NoPosition)
     val outType = PDomainType(PIdnUse(name)(noPosTuple), typeArgs)(noPosTuple)
