@@ -10,7 +10,7 @@ case class AEvalComp(comp: AComprehension4Tuple, snap: ASnapshotApp)(val pos: Po
 
   def toViper(input: Program) : Exp = {
 
-    val compEvalFunc = input.findDomainFunction(DomainsGenerator.compEvalKey)
+    val compEvalFunc = input.findDomainFunction(DomainsGenerator.compApplyKey)
     val compConstructed = comp.toViper(input)
     val snapConstructed = snap.toViper(input)
 
@@ -24,7 +24,7 @@ case class AEvalComp(comp: AComprehension4Tuple, snap: ASnapshotApp)(val pos: Po
   }
 
   override lazy val prettyPrint: PrettyPrintPrimitives#Cont =
-    text(DomainsGenerator.compEvalKey) <+>  parens(ssep(Seq(show(comp), show(snap)), group(char (',') <> line)))
+    text(DomainsGenerator.compApplyKey) <+>  parens(ssep(Seq(show(comp), show(snap)), group(char (',') <> line)))
 
   override val extensionSubnodes: Seq[Node] = Seq(comp, snap)
 

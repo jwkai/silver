@@ -28,7 +28,7 @@ case class PReceiver(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], body : PF
     val args1 = Seq(PCall(PIdnUse(idndef.name)(posTuple),
       formalArgs.map(a => PIdnUse(a.idndef.name)(posTuple)))(posTuple))
     val args2 = body.args.map(a => PIdnUse(a.idndef.name)(posTuple))
-    val lhs = PCall(PIdnUse(DomainsGenerator.recEvalKey)(posTuple), args1 ++ args2)(posTuple)
+    val lhs = PCall(PIdnUse(DomainsGenerator.recApplyKey)(posTuple), args1 ++ args2)(posTuple)
     val rhs = body.body
     PBinExp(lhs, "==", rhs)(posTuple)
   }
@@ -41,7 +41,7 @@ case class PReceiver(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], body : PF
 
 
   override def translateMember(t: Translator): Member = {
-    translateMemberWithName(t, Some(DomainsGenerator.recEvalKey))
+    translateMemberWithName(t, Some(DomainsGenerator.recApplyKey))
   }
 
   // Moved to trait

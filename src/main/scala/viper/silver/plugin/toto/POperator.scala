@@ -27,7 +27,7 @@ case class POperator(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], opUnit: P
   }
 
   override def translateMember(t: Translator): Member = {
-    translateMemberWithName(t, Some(DomainsGenerator.opEvalKey))
+    translateMemberWithName(t, Some(DomainsGenerator.opApplyKey))
     // Gets the dummy domain
     val d = t.getMembers()(genDomainName).asInstanceOf[Domain]
     // Gets the evalRec function

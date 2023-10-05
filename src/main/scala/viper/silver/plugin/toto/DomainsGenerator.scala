@@ -13,11 +13,12 @@ object DomainsGenerator {
 
 
   final val compConstructKey = "comp"
-  final val compEvalKey = "evalComp"
-  final val recEvalKey = "eval"
-  final val opEvalKey = "operApply"
-  final val opUnitKey = "operGetUnit"
-  final val mapEvalKey = "applyMap"
+  final val compApplyKey = "compApply"
+  final val recApplyKey = "recApply"
+  final val recInvKey = "recInv"
+  final val opApplyKey = "opApply"
+  final val opUnitKey = "opGetUnit"
+  final val mapApplyKey = "mapApply"
 
   final val recDKey = "Receiver"
   final val mapDKey = "Mapping"
@@ -27,8 +28,8 @@ object DomainsGenerator {
     val axioms: Seq[String] = Seq()
     val receiverOut =
       s"""domain $recDKey[$compDTV0] {
-         |    function $recEvalKey(r:$recDKey[$compDTV0], a:$compDTV0) : Ref
-         |    function invers$recEvalKey(rec:$recDKey[$compDTV0], ref:Ref) : $compDTV0
+         |    function $recApplyKey(r:$recDKey[$compDTV0], a:$compDTV0) : Ref
+         |    function $recInvKey(rec:$recDKey[$compDTV0], ref:Ref) : $compDTV0
          |    function filterReceiverGood(f: Set[$compDTV0], r: $recDKey[$compDTV0]) : Bool
          |
          |    ${axioms.mkString("\n")}
@@ -40,7 +41,7 @@ object DomainsGenerator {
     val axioms: Seq[String] = Seq()
     val mappingOut =
       s"""domain $mapDKey[$compDTV1,$compDTV2] {
-         |    function $mapEvalKey(m: $mapDKey[$compDTV1,$compDTV2], _mInput:$compDTV1) : $compDTV2
+         |    function $mapApplyKey(m: $mapDKey[$compDTV1,$compDTV2], _mInput:$compDTV1) : $compDTV2
          |
          |    ${axioms.mkString("\n")}
          |}\n """.stripMargin
@@ -51,7 +52,7 @@ object DomainsGenerator {
     val axioms: Seq[String] = Seq()
     val opOut =
       s"""domain $opDKey[$compDTV2] {
-         |    function $opEvalKey(op: $opDKey[$compDTV2], val1:$compDTV2, val2:$compDTV2) : $compDTV2
+         |    function $opApplyKey(op: $opDKey[$compDTV2], val1:$compDTV2, val2:$compDTV2) : $compDTV2
          |
          |    function $opUnitKey(op: $opDKey[$compDTV2]) : $compDTV2
          |
@@ -66,7 +67,7 @@ object DomainsGenerator {
       s"""domain $compDKey[$compDTV0,$compDTV1,$compDTV2] {
          |    function $compConstructKey(r:$recDKey[$compDTV0], m: $mapDKey[$compDTV1,$compDTV2],
          |        op: $opDKey[$compDTV2]) : $compDKey[$compDTV0,$compDTV1,$compDTV2]
-         |    function $compEvalKey(c: $compDKey[$compDTV0,$compDTV1,$compDTV2],
+         |    function $compApplyKey(c: $compDKey[$compDTV0,$compDTV1,$compDTV2],
          |        snap: Map[$compDTV0,$compDTV2]) : $compDTV2
          |
          |    ${axioms.mkString("\n")}

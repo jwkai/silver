@@ -30,13 +30,13 @@ case class PMapping(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], body: PFun
     val args1 = Seq(PCall(PIdnUse(idndef.name)(posTuple),
       formalArgs.map(a => PIdnUse(a.idndef.name)(posTuple)))(posTuple))
     val args2 = body.args.map(a => PIdnUse(a.idndef.name)(posTuple))
-    val lhs = PCall(PIdnUse(DomainsGenerator.mapEvalKey)(posTuple), args1 ++ args2)(posTuple)
+    val lhs = PCall(PIdnUse(DomainsGenerator.mapApplyKey)(posTuple), args1 ++ args2)(posTuple)
     val rhs = body.body
     PBinExp(lhs, "==", rhs)(posTuple)
   }
 
   override def translateMember(t: Translator): Member = {
-    translateMemberWithName(t, Some(DomainsGenerator.mapEvalKey))
+    translateMemberWithName(t, Some(DomainsGenerator.mapApplyKey))
   }
 
 
