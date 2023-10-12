@@ -36,11 +36,11 @@ case class PMappingFieldReceiver(mapping: PCall, fieldID: PIdnUse, receiver: PCa
     Some(Seq("Internal error: typecheck should only be called from PComprehension node."))
   }
 
-  def translateTo(t: Translator): (Option[Exp], String, Exp) = {
+  def translateTo(t: Translator): (Exp, String, Exp) = {
     val mappingOut = t.exp(mapping)
     val fieldOut = fieldID.name
     val receiverOut = t.exp(receiver)
-    (Some(mappingOut), fieldOut, receiverOut)
+    (mappingOut, fieldOut, receiverOut)
   }
 
 //  override def translateMember(t: Translator): Member = ???
