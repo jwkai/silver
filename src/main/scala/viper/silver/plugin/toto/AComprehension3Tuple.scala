@@ -6,7 +6,7 @@ import viper.silver.ast._
 import viper.silver.verifier.VerificationResult
 
 
-case class AComprehension4Tuple(receiver: Exp, mapping: Option[Exp], op: Exp)
+case class AComprehension3Tuple(receiver: Exp, mapping: Exp, op: Exp)
                                (val pos: Position = NoPosition, val info: Info = NoInfo,
                                                      val errT: ErrorTrafo = NoTrafos) extends ExtensionExp {
 
@@ -34,15 +34,11 @@ case class AComprehension4Tuple(receiver: Exp, mapping: Option[Exp], op: Exp)
       throw new Exception("Receiver must be a Receiver of 1 variable. Resolving should have failed.")
     }
     val A = recA.head
-    val VB = mapping match {
-      case Some(m) =>
-        m.typ match {
+    val VB = mapping.typ match {
           case d: DomainType if d.domainName == DomainsGenerator.mapDKey =>
             d.typVarsMap.values
           case _ => throw new Exception(s"Mapping must be a ${DomainsGenerator.mapDKey} type. " +
             s"Resolving should have failed.")
-        }
-      case None => Seq(typ, typ)
     }
     if (VB.size != 2) {
       throw new Exception("Mapping must be a mapping from 2 variables")
@@ -65,7 +61,7 @@ case class AComprehension4Tuple(receiver: Exp, mapping: Option[Exp], op: Exp)
     )
 //    val typViper = DomainType.apply(compDomain, typeVarMap)
     val compFunc = input.findDomainFunction(DomainsGenerator.compConstructKey)
-    DomainFuncApp.apply(compFunc, Seq(receiver, mapping.orNull, op), typeVarMap)(pos, info, errT)
+    DomainFuncApp.apply(compFunc, Seq(receiver, mapping, op), typeVarMap)(pos, info, errT)
 //    DomainFuncApp("comp", Seq(receiver, mapping.orNull, op, unit),typeVarMap)(
 //      pos, info, typViper , "Comp", errT
   }
