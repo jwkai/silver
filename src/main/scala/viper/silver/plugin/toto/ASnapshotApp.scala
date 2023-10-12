@@ -5,7 +5,7 @@ import viper.silver.ast.pretty.PrettyPrintPrimitives
 import viper.silver.ast._
 import viper.silver.verifier.VerificationResult
 
-case class ASnapshotApp(comprehension4Tuple: AComprehension4Tuple, filter: Exp, field: String)
+case class ASnapshotApp(comprehension4Tuple: AComprehension3Tuple, filter: Exp, field: String)
                        (val pos: Position = NoPosition, val info: Info = NoInfo,
                                            val errT: ErrorTrafo = NoTrafos) extends ExtensionExp {
 
@@ -37,6 +37,12 @@ case class ASnapshotApp(comprehension4Tuple: AComprehension4Tuple, filter: Exp, 
   override val extensionSubnodes: Seq[Node] = Seq(comprehension4Tuple, filter)
 
   override def extensionIsPure: Boolean = true
+
+
+  def findFieldInProgram(p: Program) : Field = {
+    p.findField(field)
+  }
+
 
   // TODO Correct?
   override def typ: Type = {
