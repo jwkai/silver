@@ -2,7 +2,7 @@ package viper.silver.plugin.toto
 
 import viper.silver.ast.NoPosition
 import viper.silver.parser._
-
+// No longer used. Strings instead.
 object DomainsGeneratorPAST {
   final val compDKey = "Comp"
   final val compDTV0 = "A"
