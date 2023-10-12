@@ -12,16 +12,36 @@ domain someR[A] {
 
 filter allInt(start: Int, end: Int) (fun i: Int :: i >= start && i < end )
 unitOp add(x: Int) (-x ,fun a: Int, b: Int :: a + b + x)
+unitOp and() (true, fun a: Bool, b: Bool :: a && b)
+
+
+
 receiver unitRec() (fun i: Int :: getR(i))
 mapping unitMap()  (fun a: Int :: a)
 
 
+method nothing(aha: Int)
+    requires aha != 0
+    ensures aha == 1
+
 field val: Int
+field taken: Bool
 
 method test1(i1: Int) {
+    var dum: Int
+
     var a: Bool := true
 
-    var b: Int := comp[add(1)]{unitMap(unitRec().val) | allInt(0,10)}
+    assert a == true
+    assume dum == 1
+    nothing(dum)
 
-    assert(a == true)
+
+
+    var b: Int := comp[add(1)]{unitMap(unitRec().val) | allInt(0,10)}
+    var c: Int := comp[add(1)]{unitRec().val | allInt(0,10)}
+    var d: Bool := comp[and()]{ unitRec().taken | allInt(0,4)}
+
+    assume false
+
 }
