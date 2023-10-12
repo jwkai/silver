@@ -3,6 +3,8 @@ package viper.silver.plugin.toto
 import viper.silver.ast._
 import viper.silver.parser._
 
+// Defines a component declaration. This is a PExtender node (extended as a plugin) and acts as a Function declaration,
+// hence the PAnyFunction.
 trait PCompComponentDecl extends PExtender with PAnyFunction {
 
   var typToInfer: PType = null;
@@ -33,15 +35,17 @@ trait PCompComponentDecl extends PExtender with PAnyFunction {
       pos = t.liftPos(this), info = t.toInfo(this.annotations, this), domain.name)
     val posInfoError = (t.liftPos(this), t.toInfo(this.annotations, this), NoTrafos)
 
-    // receiver(a)
+    // ex. receiver(a)
+    // Note: typVar can be empty here because user-defined comprehension components are not generic.
+    // i.e. Its always Receiver[Int], never Receiver[A]
     val funcApp = (DomainFuncApp.apply(funct,
       formalArgs.map(a =>(LocalVar(a.idndef.name, t.ttyp(a.typ)) _).tupled(posInfoError)),
       typVarMap = Map.empty) _).tupled(posInfoError)
 
-    // i
+    // ex. i or could be i1 i2 for opApply
     val iteratorVar = body.args.map(a => (LocalVar(a.idndef.name, t.ttyp(a.typ)) _).tupled(posInfoError))
 
-    // eval(receiver(a),i)
+    // ex. eval(receiver(a),i)
     val evalApp : Exp = evalFuncOpt match {
       case Some(evalFunc) => {
         val evalTypMap = funct.typ match {
@@ -55,19 +59,20 @@ trait PCompComponentDecl extends PExtender with PAnyFunction {
           typVarMap = evalTypMap) _).tupled(posInfoError)
       }
       case None =>
+        // This is for set contains, for filter definition axiom.i.e. i in filter(a,b)
         (AnySetContains(iteratorVar.head , funcApp)_).tupled(posInfoError)
     }
-//    val evalReceiverApp = evalReceiverAppDummy.copy()(
-//      evalReceiverAppDummy.pos,evalReceiverAppDummy.info,
-//    )
-    // loc(a,i)
+
+    // ex. loc(a,i)
     val rhs = t.exp(body.body)
+
+    // ex. eval(receiver(a),i) == loc(a,i)
     val equal = (EqCmp(evalApp, rhs)_).tupled(posInfoError)
 
     // Todo: make triggers
     val triggers = Seq()
 
-    // all Vars
+    // all Vars. ex. a and i
     val allVarsForall = (this.formalArgs ++ body.args).map(a => t.liftArgDecl(a))
     val forall = (Forall(allVarsForall, triggers, equal)_).tupled(posInfoError)
     val axiom = AnonymousDomainAxiom(forall)(domainName = domain.name)
