@@ -58,14 +58,14 @@ case class PComprehension(opUnit: PCall, mappingFieldReceiver: PMappingFieldRece
   override def translateExp(t: Translator): Exp = {
     val opTranslated = t.exp(opUnit)
 //    val unitTranslated = t.exp(unit)
-    val (mappingOpt, fieldString, receiverTranslated) = mappingFieldReceiver.translateTo(t)
+    val (mappingOut, fieldString, receiverTranslated) = mappingFieldReceiver.translateTo(t)
     val filterTranslated = t.exp(filter)
 //    val mappingTranslated = mappingOpt.getOrElse(throw new Exception("Mapping should be defined."))
 
-    val tuple = AComprehension4Tuple(receiverTranslated, mappingOpt, opTranslated)(pos._1)
+    val tuple = AComprehension3Tuple(receiverTranslated, mappingOut, opTranslated)(pos._1)
     val snap = ASnapshotApp(tuple, filterTranslated, fieldString)(pos._1)
 //    val f = snap.filter
-    AEvalComp(tuple, snap)(pos._1)
+    ACompApply(tuple, snap)(pos._1)
   }
 
 }
