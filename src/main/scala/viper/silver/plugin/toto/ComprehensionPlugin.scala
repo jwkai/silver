@@ -6,6 +6,7 @@ import viper.silver.ast.pretty.FastPrettyPrinter.pretty
 import viper.silver.ast.{FilePosition, NoPosition, Program}
 import viper.silver.parser.FastParserCompanion.whitespace
 import viper.silver.parser._
+import viper.silver.plugin.toto.ComprehensionPlugin.defaultMappingIden
 import viper.silver.plugin.toto.DomainsGenerator._
 import viper.silver.plugin.{ParserPluginTemplate, SilverPlugin}
 import viper.silver.verifier.{AbstractError, VerificationResult}
@@ -81,17 +82,19 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
 //      )(posTuple)
 //    }
 
+  // Parser without the mapping function
   def recVal[$: P]: P[PMappingFieldReceiver]   = {
     // Parse the mapping function with two possible syntaxes
     FP(fp.funcApp ~ "." ~ fp.idnuse).map{
       case (posTuple, (receiver, field)) => PMappingFieldReceiver(
-        null,
+        defaultMappingIden(posTuple),
         field,
         receiver
       )(posTuple)
     }
   }
 
+  // Parser with mapping
   def mapRecVal[$: P]: P[PMappingFieldReceiver] = {
     FP(fp.idnuse ~ fp.parens(recVal ~ (P(",") ~ fp.actualArgList).?)).map{
       case (posTuple, (mappingFunc, (pMappingFieldReceiver, mappingFuncArgs))) =>
@@ -100,7 +103,7 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
     }
   }
 
-
+  // Allow both with and without Mapping function
   def mapRecBoth[$: P]: P[PMappingFieldReceiver] = {
     recVal | mapRecVal
   }
@@ -197,12 +200,20 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
 //        c.toViper
 //    })
     newInput = newInput.transform( {
-      case c@ AEvalComp(_, _) =>
+      case c@ ACompApply(_, _) =>
         c.toViper(newInput)
     })
     print(pretty(newInput))
+
+    val currbody = newInput.findMethod("test1").body.get
+
+    val gen = new InlineAxiomGenerator(newInput, "test1")
+//    val newBody = currbody.ss.appended(gen.generateInhaleAxioms())
+    print(pretty(newInput))
     newInput
-//    ViperStrategy.Slim({
+
+
+    //    ViperStrategy.Slim({
 //      case c@Comprehension(exp) => exp
 //    }).execute(input)
   }
@@ -239,6 +250,10 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
 }
 
 object ComprehensionPlugin {
+
+  def defaultMappingIden(tuple: (FilePosition, FilePosition)): PCall = {
+    PCall(PIdnUse(mapIdenKey)(tuple), Seq())(tuple)
+  }
 
   def makeDomainType(name: String, typeArgs: Seq[PType]): PDomainType = {
     val noPosTuple = (NoPosition,NoPosition)
