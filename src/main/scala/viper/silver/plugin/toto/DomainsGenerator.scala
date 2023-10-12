@@ -19,6 +19,7 @@ object DomainsGenerator {
   final val opApplyKey = "opApply"
   final val opUnitKey = "opGetUnit"
   final val mapApplyKey = "mapApply"
+  final val mapIdenKey = "mapIdentity"
 
   final val recDKey = "Receiver"
   final val mapDKey = "Mapping"
@@ -38,12 +39,17 @@ object DomainsGenerator {
   }
 
   def mappingDomainString(): String = {
-    val axioms: Seq[String] = Seq()
+    val axiom: String =
+      s"""axiom {forall __v: $compDTV1 :: {$mapApplyKey($mapIdenKey() ,__v)}
+         |    $mapApplyKey($mapIdenKey() , __v) == __v
+         |    }""".stripMargin
     val mappingOut =
       s"""domain $mapDKey[$compDTV1,$compDTV2] {
          |    function $mapApplyKey(m: $mapDKey[$compDTV1,$compDTV2], _mInput:$compDTV1) : $compDTV2
          |
-         |    ${axioms.mkString("\n")}
+         |    function $mapIdenKey() : $mapDKey[$compDTV1,$compDTV1]
+         |
+         |    ${axiom}
          |}\n """.stripMargin
     mappingOut
   }
@@ -79,7 +85,7 @@ object DomainsGenerator {
   def parseDomainString(input: String): PDomain = {
     val fp = new DummyParser();
     fp._line_offset = Array();
-    fastparse.parse(input, fp.domainDecl(_)) match {
+    fastparse.parse[PDomain](input, fp.domainDecl(_)) match {
       case Parsed.Success(newDomain, index) =>
         changePosRecursive(newDomain,
           (VirtualPosition(s"Generated ${newDomain.idndef.name} domain start"),
