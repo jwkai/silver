@@ -5,8 +5,8 @@ import viper.silver.ast.pretty.FastPrettyPrinter._
 import viper.silver.ast.pretty.PrettyPrintPrimitives
 import viper.silver.verifier.VerificationResult
 
-case class AEvalComp(comp: AComprehension4Tuple, snap: ASnapshotApp)(val pos: Position = NoPosition, val info: Info = NoInfo,
-                                                     val errT: ErrorTrafo = NoTrafos) extends ExtensionExp {
+case class ACompApply(comp: AComprehension3Tuple, snap: ASnapshotApp)(val pos: Position = NoPosition, val info: Info = NoInfo,
+                                                                      val errT: ErrorTrafo = NoTrafos) extends ExtensionExp {
 
   def toViper(input: Program) : Exp = {
 
