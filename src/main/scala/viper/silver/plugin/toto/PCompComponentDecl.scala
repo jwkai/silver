@@ -8,7 +8,7 @@ import viper.silver.parser._
 trait PCompComponentDecl extends PExtender with PAnyFunction {
 
   var typToInfer: PType = null;
-  override def resultType(): PType = typToInfer;
+  override def resultType: PType = typToInfer;
   override def formalArgs: Seq[PFormalArgDecl]
   override val getSubnodes: Seq[PNode] = Seq(idndef) ++ formalArgs ++ Seq(body)
   override def annotations: Seq[(String, Seq[String])] = Seq()
@@ -31,7 +31,7 @@ trait PCompComponentDecl extends PExtender with PAnyFunction {
 
   def getEvalFuncAxiom(domain: Domain, evalFuncOpt: Option[DomainFunc],
                    t: Translator): (DomainFunc,AnonymousDomainAxiom) = {
-    val funct = DomainFunc(idndef.name, formalArgs.map(f => t.liftAnyArgDecl(f)), t.ttyp(resultType()), false, None)(
+    val funct = DomainFunc(idndef.name, formalArgs.map(f => t.liftAnyArgDecl(f)), t.ttyp(resultType), false, None)(
       pos = t.liftPos(this), info = t.toInfo(this.annotations, this), domain.name)
     val posInfoError = (t.liftPos(this), t.toInfo(this.annotations, this), NoTrafos)
 
