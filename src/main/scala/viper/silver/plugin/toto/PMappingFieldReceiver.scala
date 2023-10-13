@@ -13,7 +13,9 @@ case class PMappingFieldReceiver(mapping: PCall, fieldID: PIdnUse, receiver: PCa
 
     val correctReceiverType = ComprehensionPlugin.makeDomainType("Receiver", Seq(typeFilter))
     t.checkTopTyped(receiver, Some(correctReceiverType))
-    var field = n.definition(null)(fieldID, None)
+
+    // find the field in the program
+    val field = n.definition(null)(fieldID, None)
     field match {
       case Some(value) =>
         value match {
@@ -26,6 +28,7 @@ case class PMappingFieldReceiver(mapping: PCall, fieldID: PIdnUse, receiver: PCa
       case None => return errorSeq :+ "Field not found."
     }
 //    t.checkTopTyped(fieldID, None)
+    // Mapping must be from field's type to operator's type
     val correctMappingType = ComprehensionPlugin.makeDomainType("Mapping",
       Seq(fieldID.typ,typeUnit))
     t.checkTopTyped(mapping, Some(correctMappingType))
