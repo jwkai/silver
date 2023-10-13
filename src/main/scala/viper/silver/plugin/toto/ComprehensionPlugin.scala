@@ -3,10 +3,10 @@ package viper.silver.plugin.toto
 import fastparse.P
 import viper.silver.FastMessaging
 import viper.silver.ast.pretty.FastPrettyPrinter.pretty
-import viper.silver.ast.{FilePosition, NoPosition, Program}
+import viper.silver.ast.{Exhale, FilePosition, Inhale, Label, Method, MethodCall, NoPosition, Program, Seqn, Stmt}
 import viper.silver.parser.FastParserCompanion.whitespace
 import viper.silver.parser._
-import viper.silver.plugin.toto.ComprehensionPlugin.defaultMappingIden
+import viper.silver.plugin.toto.ComprehensionPlugin.{addInlinedAxioms, defaultMappingIden}
 import viper.silver.plugin.toto.DomainsGenerator._
 import viper.silver.plugin.{ParserPluginTemplate, SilverPlugin}
 import viper.silver.verifier.{AbstractError, VerificationResult}
@@ -199,16 +199,22 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
 //      case c@ AComprehension4Tuple(_, _, _, _) =>
 //        c.toViper
 //    })
-    newInput = newInput.transform( {
-      case c@ ACompApply(_, _) =>
-        c.toViper(newInput)
-    })
-    print(pretty(newInput))
+//    newInput = newInput.transform( {
+//      case c@ ACompApply(_, _) =>
+//        c.toViper(newInput)
+//    })
+//    print(pretty(newInput))
 
     val currbody = newInput.findMethod("test1").body.get
 
-    val gen = new InlineAxiomGenerator(newInput, "test1")
-//    val newBody = currbody.ss.appended(gen.generateInhaleAxioms())
+    currbody.transform()
+
+//    val gen = new InlineAxiomGenerator(newInput, "test1")
+//    val newBody = currbody.copy(ss = currbody.ss.appended(gen.generateExhaleAxioms()))(
+//      currbody.pos, currbody.info, currbody.errT
+//    )
+//    print(pretty(newBody))
+    newInput = addInlinedAxioms(newInput)
     print(pretty(newInput))
     newInput
 
@@ -304,6 +310,42 @@ object ComprehensionPlugin {
       }
     }
   }
+
+  def addInlinedAxioms(p: Program) : Program = {
+    def modifyMethod(m: Method) : Method = {
+      val axiomGenerator = new InlineAxiomGenerator(p, m.name)
+      var outM: Method = m.transform({
+        case e@MethodCall(_,_,_) =>
+          axiomGenerator.convertMethodToInhaleExhale(e)
+      })
+      outM = outM.body match {
+        case Some(bodyBody) =>
+          outM.copy(body = Some(bodyBody.copy(ss =
+            InlineAxiomGenerator.getStartLabel() +:
+              bodyBody.ss)(bodyBody.pos, bodyBody.info, bodyBody.errT)))(
+            outM.pos, outM.info, outM.errT)
+        case None => return m
+      }
+      outM = outM.transform({
+        case e@Exhale(_)//TODO: Commented for testing if axiomGenerator.checkExhaleImpure(e)
+          =>
+          axiomGenerator.generateExhaleAxioms(e)
+        case i@ Inhale(_) =>
+          axiomGenerator.generateInhaleAxioms(i)
+        case s: Stmt if s == s => // statement that contains read/write
+          s
+        case s: Stmt => // else
+          s
+      })
+      outM
+    }
+
+    val outMethods = p.methods.map(m => modifyMethod(m))
+    p.copy(methods = outMethods)(p.pos, p.info, p.errT)
+
+
+  }
+
 
 
 
