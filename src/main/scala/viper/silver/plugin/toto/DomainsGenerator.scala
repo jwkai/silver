@@ -33,6 +33,8 @@ object DomainsGenerator {
          |    function $recInvKey(rec:$recDKey[$compDTV0], ref:Ref) : $compDTV0
          |    function filterReceiverGood(f: Set[$compDTV0], r: $recDKey[$compDTV0]) : Bool
          |
+         |    function filterNotLost(f1: Set[$compDTV0], r: $recDKey[$compDTV0], lostR: Set[Ref]): Set[$compDTV0]
+         |
          |    ${axioms.mkString("\n")}
          |}\n """.stripMargin
     receiverOut
@@ -76,10 +78,30 @@ object DomainsGenerator {
          |    function $compApplyKey(c: $compDKey[$compDTV0,$compDTV1,$compDTV2],
          |        snap: Map[$compDTV0,$compDTV2]) : $compDTV2
          |
+         |    function getreceiver(c:$compDKey[$compDTV0,$compDTV1,$compDTV2]): $recDKey[$compDTV0]
+         |    function getoperator(c:$compDKey[$compDTV0,$compDTV1,$compDTV2]): $opDKey[$compDTV2]
+         |    function getmapping(c:$compDKey[$compDTV0,$compDTV1,$compDTV2]): $mapDKey[$compDTV1,$compDTV2]
+         |
+         |    function dummy1(a:$compDTV2): Bool
+         |    function triggerDeleteBlock(applyC: $compDTV2, block: Set[$compDTV0]): Bool
+         |
+         |    function exhaleCompFilter(c: $compDKey[$compDTV0,$compDTV1,$compDTV2], f: Set[$compDTV0]): Bool
+         |
          |    ${axioms.mkString("\n")}
          |}\n """.stripMargin
     compOut
   }
+
+//  def dummyDomainString(): String = {
+//    val axioms: Seq[String] = Seq()
+//    val dummyOut =
+//      s"""domain Dummy {
+//         |    function dummy() : Bool
+//         |
+//         |    ${axioms.mkString("\n")}
+//         |}\n """.stripMargin
+//    dummyOut
+//  }
 
 
   def parseDomainString(input: String): PDomain = {
