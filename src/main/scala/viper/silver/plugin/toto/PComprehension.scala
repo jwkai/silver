@@ -4,13 +4,14 @@ import viper.silver.ast.{Exp, Position}
 import viper.silver.parser._
 import viper.silver.plugin.toto.PComprehension.getNewTypeVariable
 
+// First representation, the user input of comprehension gets turned into this PAst Node
 case class PComprehension(opUnit: PCall, mappingFieldReceiver: PMappingFieldReceiver, filter: PExp)(val pos: (Position, Position)) extends PExtender with PExp {
   override val getSubnodes: Seq[PNode] = Seq(opUnit, mappingFieldReceiver, filter)
 
   override def typecheck(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] = {
     var messagesOut : Seq[String] = Seq()
 
-    // Check type of filter, must be a Set
+    // Check type of filter, must be a Set. Extract it out
     t.checkTopTyped(filter, Some(PSetType(getNewTypeVariable("CompSet"))()))
     val setType: PType = filter.typ match {
       case PSetType(e) => e
@@ -27,15 +28,18 @@ case class PComprehension(opUnit: PCall, mappingFieldReceiver: PMappingFieldRece
     t.checkTopTyped(opUnit, Some(ComprehensionPlugin.
       makeDomainType("Operator", Seq(getNewTypeVariable("CompOp")))))
 
+    // Look inside the operator type
     opUnit.typ match {
       case pd: PDomainType if pd.domain.name == DomainsGenerator.opDKey =>
+        // Set the type of this PComprehension to the Operator unit's type
         typ = pd.typeArguments.head
       case _ =>
         messagesOut = messagesOut :+ "Operator should of Operator[_] type."
         return Some(messagesOut)
     }
 
-    // Check type of mappingFieldReceiver
+    // Check type of mappingFieldReceiver. Receiver must take the element in the set
+    // Mapping must be from type of field to type of the operator (typ).
     mappingFieldReceiver.typecheckComp(t, n, typ, setType)
 
     // Set type of this node
@@ -78,7 +82,10 @@ object PComprehension {
   }
 
   private def getNewTypeVariable(name: String): PDomainType = {
-    PTypeVar(s"$name#" + increment())
+    val freeName = s"$name" + PTypeVar.sep + increment()
+    // new PTypeVar should be free
+    assert(PTypeVar.isFreePTVName(freeName))
+    PTypeVar(freeName)
   }
 
 }
