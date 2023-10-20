@@ -20,21 +20,31 @@ receiver unitRec() (fun i: Int :: getR(i))
 mapping unitMap()  (fun a: Int :: a)
 
 
-method nothing(aha: Int)
+method nothing(aha: Int) returns (res: Int)
     requires aha != 0
     ensures aha == 1
+    ensures res == 1
 
 field val: Int
 field taken: Bool
 
-method test1(i1: Int) {
+method test1(i1: Int, r: Ref)
+    requires acc(r.val)
+    requires acc(r.taken)
+{
     var dum: Int
 
     var a: Bool := true
 
     assert a == true
     assume dum == 1
-    nothing(dum)
+    dum := nothing(dum)
+
+    assume r.val == 2
+    assume r.taken == true
+
+    exhale acc(r.val)
+    inhale acc(r.val)
 
 
 
