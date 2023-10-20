@@ -1,9 +1,8 @@
 package viper.silver.plugin.toto
 
-import viper.silver.ast
-import viper.silver.ast.utility.Expressions
 import viper.silver.ast._
-import viper.silver.plugin.toto.InlineAxiomGenerator.{checkIfPure, labelPrefix}
+import viper.silver.ast.utility.Expressions
+import viper.silver.plugin.toto.util.AxiomHelper
 
 import scala.collection.mutable
 
@@ -15,6 +14,7 @@ import scala.collection.mutable
 class InlineAxiomGenerator(program: Program, methodName: String) {
 
   val method = program.findMethod(methodName)
+  val helper = new AxiomHelper(program)
 
   val fieldMaptoInt = program.fields.zipWithIndex.map(f => (f._1, f._2)).toMap
 
@@ -38,25 +38,30 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
 //  }
 
   private var currentLabelNum = 0
-  private var uniqueIDForVar = 0
+  private var uniqueIDMethodOut = 0
+  private var uniqueIDLost = 0
 
 //  private val trackAllRelavantSnapshotDefs = program.functions.filter(f => f.name.contains("snapshot"))
 
-  def getUniqueIDVar() : String = {
-    uniqueIDForVar += 1
-    s"$uniqueIDForVar"
+  private def getUniqueIDMethodOut() : String = {
+    uniqueIDMethodOut += 1
+    s"$uniqueIDMethodOut"
   }
 
-  def getCurrentLabel() : Label = {
-    Label(s"${labelPrefix}$currentLabelNum", Seq())()
+  private def getCurrentLabel() : Label = {
+    Label(s"${helper.labelPrefix}$currentLabelNum", Seq())()
   }
 
-  def labelIncrement() : Unit = {
+  private def getLabNumForLost() : String = {
+    s"l$currentLabelNum"
+  }
+
+  private def labelIncrement() : Unit = {
     currentLabelNum += 1
   }
 
-  def getLastLabel() : Label = {
-    Label(s"${labelPrefix}l${currentLabelNum-1}", Seq())()
+  private def getLastLabel() : Label = {
+    Label(s"${helper.labelPrefix}l${currentLabelNum-1}", Seq())()
   }
 
   def convertMethodToInhaleExhale(methodCall: MethodCall): Seqn = {
@@ -65,7 +70,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
 
     // LocalVarsDecls for temporary return values
     val returnDecls = methodDecl.formalReturns.map(r =>
-      LocalVarDecl(r.name ++ "_out_" ++ getUniqueIDVar(),r.typ)(r.pos, r.info, r.errT)
+      LocalVarDecl(r.name ++ "_out_" ++ getUniqueIDMethodOut(),r.typ)(r.pos, r.info, r.errT)
     )
 
     // LocalVars for temporary return values
@@ -95,15 +100,9 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     Seqn(exhales ++ inhales ++ assigns, returnDecls)(methodCall.pos, methodCall.info, methodCall.errT)
   }
 
-  def checkExhaleImpure(s: Stmt): Boolean = {
-    s match {
-      case Exhale(exp) => !exp.isPure
-      case other => false
-    }
-  }
 
 
-  def generateExhaleAxioms(e: Exhale, relevantField: Seq[Field]): Seqn = {
+  def generateExhaleAxioms(e: Exhale, relevantField: Set[Field]): Seqn = {
     labelIncrement()
     val declaredFieldVars = mutable.Set[LocalVarDecl]()
     val relevantSnapDecls = snapshotDeclsUsed.toSeq.filter(snapDecl =>
@@ -115,7 +114,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
       e.pos, e.info, e.errT)
   }
 
-  def generateInhaleAxioms(i: Inhale, relevantField: Seq[Field]): Seqn = {
+  def generateInhaleAxioms(i: Inhale, relevantField: Set[Field]): Seqn = {
     labelIncrement()
     val relevantSnapDecls = snapshotDeclsUsed.toSeq.filter(snapDecl =>
       relevantField.contains(snapDecl.findFieldInProgram(program)))
@@ -141,17 +140,28 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     Seqn(out :+ getCurrentLabel() :+ writeStmt, Seq())(writeStmt.pos, writeStmt.info, writeStmt.errT)
   }
 
-  def generateHeapReadAxioms(readStmt: Stmt): Seqn = {
-    // Do this to ignore LHS in case of a heap write tgt with heap read. Could cause redundancy.
-    val readStmtClean: Node = readStmt match {
-      case assign: AbstractAssign => assign.rhs
+  def generateHeapReadAxioms(readStmt: Stmt): Stmt = {
+    val releventPart = readStmt match {
+      case w : While =>
+        w.copy(body = Seqn(Seq(), Seq())())(w.pos, w.info, w.errT)
+      case i : If =>
+        i.copy(thn = Seqn(Seq(), Seq())(), els = Seqn(Seq(), Seq())())(i.pos, i.info, i.errT)
+      case out@ Seqn(ss, _) => return out
+      // Do this to ignore LHS in case of a heap write tgt with heap read. Could cause redundancy.
+      case a: AbstractAssign => a.rhs
+      case generated: Assume => return generated
       case _ => readStmt
     }
 
-    val reads = readStmtClean.shallowCollect({
+    val reads = releventPart.deepCollect({
       case fieldAccess: FieldAccess =>
         fieldAccess
     }).toSet
+
+    if (reads.isEmpty) {
+      return readStmt
+    }
+
     val snapsAndFields = reads.flatMap(r =>
       snapshotDeclsUsed.filter(sd => sd.findFieldInProgram(program) == r.field).zipAll(Seq(),null,r)
     ).toSeq
@@ -163,7 +173,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
 
   }
 
-  def generateHeapWriteAxiomPerSnap(snapADecl: ASnapshotDecl, writeTo: Exp) : Seq[Stmt] = {
+  private def generateHeapWriteAxiomPerSnap(snapADecl: ASnapshotDecl, writeTo: Exp) : Seq[Stmt] = {
     val field = program.findField(snapADecl.fieldName)
     // Extract the comp Domain type
     val compDType = snapADecl.compDType(program)
@@ -177,29 +187,29 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     // Filter Var decl
     val forallVarF = LocalVarDecl("__f", SetType(snapADecl.compType._1))()
     val trigger = Trigger(Seq(
-      LabelledOld(compApplySnapApply(compVar, snapDecl, forallVarF.localVar), getLastLabel().name)())
+      LabelledOld(helper.compApplySnapApply(compVar, snapDecl, forallVarF.localVar), getLastLabel().name)())
     )()
-    val fRGood = filterReceiverGood(forallVarF.localVar, compVar)
-    val fAccess = forallFilterHaveWriteAccess(forallVarF.localVar,
+    val fRGood = helper.filterReceiverGood(forallVarF.localVar, compVar)
+    val fAccess = helper.forallFilterHaveWriteAccess(forallVarF.localVar,
       compVar, field.name, None)
 
-    val receiverApp = applyDomainFunc("getreceiver", Seq(compVar), compDType.typVarsMap)
-    val invApp = applyDomainFunc(DomainsGenerator.recInvKey,
+    val receiverApp = helper.applyDomainFunc("getreceiver", Seq(compVar), compDType.typVarsMap)
+    val invApp = helper.applyDomainFunc(DomainsGenerator.recInvKey,
       Seq(receiverApp, writeTo),
       compDType.typVarsMap)
-    val triggerDeleteKeyNew = applyDomainFunc("_triggerDeleteKey1",
-      Seq(compApplySnapApply(compVar, snapDecl, forallVarF.localVar), writeTo),
+    val triggerDeleteKeyNew = helper.applyDomainFunc("_triggerDeleteKey1",
+      Seq(helper.compApplySnapApply(compVar, snapDecl, forallVarF.localVar), invApp),
       compDType.typVarsMap)
-    val triggerDeleteKeyOld = applyDomainFunc("_triggerDeleteKey1",
+    val triggerDeleteKeyOld = helper.applyDomainFunc("_triggerDeleteKey1",
       Seq(
-        LabelledOld(compApplySnapApply(compVar, snapDecl, forallVarF.localVar), getLastLabel().name)(),
-        writeTo),
+        LabelledOld(helper.compApplySnapApply(compVar, snapDecl, forallVarF.localVar), getLastLabel().name)(),
+        invApp),
       compDType.typVarsMap)
 
     val outForall = Forall(
       Seq(forallVarC, forallVarF),
       Seq(trigger),
-      andedImplies(
+      helper.andedImplies(
         Seq(fRGood, fAccess),
         Seq(fRGood, triggerDeleteKeyNew, triggerDeleteKeyOld),
       ))()
@@ -219,24 +229,24 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
 
     // Filter Var decl
     val forallVarF = LocalVarDecl("__f", SetType(snapADecl.compType._1))()
-    val trigger = Trigger(Seq(compApplySnapApply(compVar,
+    val trigger = Trigger(Seq(helper.compApplySnapApply(compVar,
       snapDecl, forallVarF.localVar)))()
-    val fRGood = filterReceiverGood(forallVarF.localVar, compVar)
-    val fAccess = forallFilterHaveWriteAccess(forallVarF.localVar,
+    val fRGood = helper.filterReceiverGood(forallVarF.localVar, compVar)
+    val fAccess = helper.forallFilterHaveWriteAccess(forallVarF.localVar,
       compVar, field.name, None)
 
-    val receiverApp = applyDomainFunc("getreceiver", Seq(compVar), compDType.typVarsMap)
-    val invApp = applyDomainFunc(DomainsGenerator.recInvKey,
+    val receiverApp = helper.applyDomainFunc("getreceiver", Seq(compVar), compDType.typVarsMap)
+    val invApp = helper.applyDomainFunc(DomainsGenerator.recInvKey,
       Seq(receiverApp, readFrom),
       compDType.typVarsMap)
-    val triggerDeleteKey = applyDomainFunc("_triggerDeleteKey1",
-      Seq(compApplySnapApply(compVar, snapDecl, forallVarF.localVar), readFrom),
+    val triggerDeleteKey = helper.applyDomainFunc("_triggerDeleteKey1",
+      Seq(helper.compApplySnapApply(compVar, snapDecl, forallVarF.localVar), invApp),
       compDType.typVarsMap)
 
     val outForall = Forall(
       Seq(forallVarC, forallVarF),
       Seq(trigger),
-      andedImplies(
+      helper.andedImplies(
         Seq(fRGood, fAccess),
         Seq(fRGood, triggerDeleteKey)
       ))()
@@ -255,7 +265,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
         Seqn(mainAxiom, Seq())()
       //  If not defined, generate lostP and exhale axiom
       case None =>
-        val declareLost = LocalVarDecl(s"lostP_${field.name}_${getUniqueIDVar()}", SetType(Ref))()
+        val declareLost = LocalVarDecl(s"lostP_${field.name}_${getLabNumForLost()}", SetType(Ref))()
         // Add this to the set
         declaredLosts.add(declareLost)
         //Forall(variables: Seq[LocalVarDecl], triggers: Seq[Trigger], exp: Exp)(val pos: Position = NoPosition, val info: Info = NoInfo, val errT: ErrorTrafo = NoTrafos)
@@ -299,43 +309,47 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     // Filter Var decl
     val forallVarFilter = LocalVarDecl("__filter", SetType(snapADecl.compType._1))()
     val trigger = Trigger(Seq(LabelledOld(
-      compApplySnapApply(compVar,
+      helper.compApplySnapApply(compVar,
         snapDecl,
         forallVarFilter.localVar),
       getLastLabel().name)()))()
 
     // ---------------Making the LHS---------------
     // FilterReceiverGood
-    val frGood = filterReceiverGood(forallVarFilter.localVar, compVar)
+    val frGood = helper.filterReceiverGood(forallVarFilter.localVar, compVar)
     // Have access to the big filter in old
-    val forallOldHasPerm = forallFilterHaveWriteAccess(forallVarFilter.localVar,
+    val forallOldHasPerm = helper.forallFilterHaveWriteAccess(forallVarFilter.localVar,
       compVar, field.name, Some(getLastLabel().name))
 
     // filterNotLost
-    val filterNotLostApplied = filterNotLost(forallVarFilter.localVar, compVar, lostPVal)
+    val filterNotLostApplied = helper.filterNotLost(forallVarFilter.localVar, compVar, lostPVal)
     // Have access to the remaining filter in new state
-    val forallNewStillHasPerm = forallFilterHaveWriteAccess(filterNotLostApplied,
+    val forallNewStillHasPerm = helper.forallFilterHaveWriteAccess(filterNotLostApplied,
       compVar, field.name, None)
 
     // ---------------Making the RHS---------------
-    val compApplyNotLost = compApplySnapApply(compVar,
+    val compApplyNotLost = helper.compApplySnapApply(compVar,
       snapDecl,
       filterNotLostApplied)
-    val compApplyF = compApplySnapApply(compVar,
+    val compApplyF = helper.compApplySnapApply(compVar,
       snapDecl,
       compVar)
-    val dummy1 = applyDomainFunc("dummy1", Seq(compApplyNotLost), compDType.typVarsMap)
-    val triggerDelete = applyDomainFunc("triggerDeleteBlock",
+    val dummy1 = helper.applyDomainFunc("dummy1", Seq(compApplyNotLost), compDType.typVarsMap)
+    val triggerDelete = helper.applyDomainFunc("_triggerDeleteBlock",
       Seq(LabelledOld(compApplyF, getLastLabel().name)(), filterNotLostApplied),
       compDType.typVarsMap)
-    val exhaleCF = applyDomainFunc("exhaleCompFilter",
-      Seq(compVar, forallVarFilter.localVar),
+    val exhaleCF = helper.applyDomainFunc("exhaleCompMap",
+      Seq(compVar, LabelledOld(
+        helper.compApplySnapApply(compVar,
+          snapDecl,
+          forallVarFilter.localVar),
+        getLastLabel().name)()),
       compDType.typVarsMap)
 
     val outForall = Forall(
       Seq(forallVarC, forallVarFilter),
       Seq(trigger),
-      andedImplies(
+      helper.andedImplies(
         Seq(frGood, forallOldHasPerm, forallNewStillHasPerm),
         Seq(frGood, triggerDelete, dummy1, exhaleCF)
     ))()
@@ -360,172 +374,35 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
 
     val trigger = Trigger(Seq(
       // First trigger
-      LabelledOld(compApplySnapApply(compVar,
+      LabelledOld(helper.compApplySnapApply(compVar,
         snapDecl,
         forallVarF1.localVar),
         getLastLabel().name)(),
       // Second trigger
-      applyDomainFunc("exhaleCompFilter",
+      helper.applyDomainFunc("exhaleCompMap",
         Seq(compVar, forallVarF2.localVar),
         compDType.typVarsMap)))()
 
-    val filter1ReceiverGood = filterReceiverGood(forallVarF1.localVar, compVar)
-    val filter2ReceiverGood = filterReceiverGood(forallVarF2.localVar, compVar)
+    val filter1ReceiverGood = helper.filterReceiverGood(forallVarF1.localVar, compVar)
+    val filter2ReceiverGood = helper.filterReceiverGood(forallVarF2.localVar, compVar)
     val f1subsetf2 = AnySetSubset(forallVarF1.localVar, forallVarF2.localVar)()
-    val f1access = forallFilterHaveWriteAccess(forallVarF1.localVar,
+    val f1access = helper.forallFilterHaveWriteAccess(forallVarF1.localVar,
       compVar, field.name, None)
-    val f2access = forallFilterHaveWriteAccess(forallVarF2.localVar,
+    val f2access = helper.forallFilterHaveWriteAccess(forallVarF2.localVar,
       compVar, field.name, None)
-    val triggerDelete = applyDomainFunc("triggerDeleteBlock",
-      Seq(compApplySnapApply(compVar, snapDecl, forallVarF2.localVar), forallVarF1.localVar),
+    val triggerDelete = helper.applyDomainFunc("_triggerDeleteBlock",
+      Seq(helper.compApplySnapApply(compVar, snapDecl, forallVarF2.localVar), forallVarF1.localVar),
       compDType.typVarsMap)
     val outForall = Forall(
       Seq(forallVarC, forallVarF1, forallVarF2),
       Seq(trigger),
-      andedImplies(
+      helper.andedImplies(
         Seq(filter1ReceiverGood, filter2ReceiverGood, f1subsetf2, f1access, f2access),
         Seq(filter1ReceiverGood, filter2ReceiverGood, f1subsetf2, triggerDelete)
       ))()
     Seq(Assume(outForall)())
   }
 
-
-
-  //-----------------------------------------------------------------
-  //-----------------------------------------------------------------
-  //-----------------------------------------------------------------
-  // Helper functions
-  def applyDomainFunc(domainFuncName: String, applyTo: Seq[Exp],
-                              typMap: Map[TypeVar, Type]): DomainFuncApp = {
-    val domainFunc = program.findDomainFunction(domainFuncName)
-    DomainFuncApp(domainFunc, applyTo, typMap)()
-  }
-
-  def compApplySnapApply(comp: Exp, snapFunc: ast.Function, filter: Exp) : DomainFuncApp = {
-    val compApply = program.findDomainFunction(DomainsGenerator.compApplyKey)
-    val snapApplyF = FuncApp(snapFunc,
-      Seq(comp, filter))()
-    DomainFuncApp(compApply,
-      Seq(comp, snapApplyF), comp.typ.asInstanceOf[DomainType].typVarsMap
-    )()
-  }
-
-
-  def andedImplies(lhsExps: Seq[Exp], rhsExps: Seq[Exp]): Exp = {
-    def andedBig(exps: Seq[Exp]): Exp = {
-      if (exps.length == 1) {
-        exps.head
-      }
-      if (exps.length == 2) {
-        And(exps(0), exps(1))()
-      }
-      else {
-        And(exps.head, andedBig(exps.tail))()
-      }
-    }
-    Implies(andedBig(lhsExps), andedBig(rhsExps))()
-  }
-
-
-  def filterReceiverGood(filter: Exp, compExp: Exp): DomainFuncApp = {
-    val compType = compExp.typ.asInstanceOf[DomainType]
-    val filterReceiverGoodFunc = program.findDomainFunction("filterReceiverGood")
-    val getreceiver = program.findDomainFunction("getreceiver")
-
-    // getreceiver($c)
-    val getreceiverApplied = DomainFuncApp(getreceiver, Seq(compExp),
-      compType.typVarsMap)()
-    DomainFuncApp(filterReceiverGoodFunc,
-      Seq(filter, getreceiverApplied),
-      compType.typVarsMap
-    )()
-  }
-
-  def filterNotLost(filter: Exp, compExp: Exp, lostPVal: LocalVar): DomainFuncApp = {
-    val compType = compExp.typ.asInstanceOf[DomainType]
-    val filterNotLostFunc = program.findDomainFunction("filterNotLost")
-    val getreceiver = program.findDomainFunction("getreceiver")
-
-    // getreceiver($c)
-    val getreceiverApplied = DomainFuncApp(getreceiver, Seq(compExp),
-      compType.typVarsMap)()
-
-    DomainFuncApp(filterNotLostFunc,
-      Seq(filter, getreceiverApplied, lostPVal),
-      compType.typVarsMap
-    )()
-  }
-
-
-  // generate a forall in the format:
-  // (forall $ind: Int :: {$ind in $f}  $ind in $f ==> perm(recApply(getreceiver($c), $ind).val) == write)
-  def forallFilterHaveWriteAccess(filter: Exp, compExp: Exp,
-                                  fieldName: String, oldOption: Option[String]): Forall = {
-    val forallVarInd = LocalVarDecl("__ind", ast.Int)()
-    val setContains = AnySetContains(forallVarInd.localVar, filter)()
-    val forallTrigger = Trigger(Seq(setContains))()
-    val compType = compExp.typ.asInstanceOf[DomainType]
-    var getreceiver = program.findDomainFunction("getreceiver")
-    var recApply = program.findDomainFunction(DomainsGenerator.recApplyKey)
-    val field = program.findField(fieldName)
-
-    // getreceiver($c)
-    val getreceiverApplied = DomainFuncApp(getreceiver, Seq(compExp),
-      compType.typVarsMap)()
-    val recApplied = DomainFuncApp(recApply,
-      Seq(getreceiverApplied, forallVarInd.localVar),
-      compType.typVarsMap
-    )()
-    val permFieldAccessed = CurrentPerm(FieldAccess(recApplied, field)())()
-    val permEqualsWrite = EqCmp(permFieldAccessed, FullPerm()())()
-    val oldApplied = oldOption match {
-      case Some(lbl) => LabelledOld(permEqualsWrite, lbl)()
-      case None => permEqualsWrite
-    }
-    val output = Forall(Seq(forallVarInd), Seq(forallTrigger), Implies(setContains, oldApplied)())()
-    output
-  }
-
-  def generateFieldReadAxioms(): Seq[Stmt] = ???
-
-  def generateFieldWriteAxioms(): Seq[Stmt] = ???
-
-
-}
-
-
-object InlineAxiomGenerator {
-
-  def getStartLabel(): Label = {
-    Label(s"${labelPrefix}0", Seq())()
-  }
-
-
-  def labelPrefix: String = {
-    "_compLabel"
-  }
-
-  def checkIfPure(stmt: Stmt): Boolean = {
-    stmt match {
-      case Exhale(exp) => Expressions.isPure(exp)
-      case Inhale(exp) => Expressions.isPure(exp)
-      case Assert(exp) => Expressions.isPure(exp)
-      case Assume(exp) => Expressions.isPure(exp)
-      case Seqn(ss, scopedSeqnDeclarations) => ss.forall(checkIfPure)
-      case If(cond, thn, els) =>
-        Expressions.isPure(cond) && checkIfPure(thn) && checkIfPure(els)
-      case While(cond, invs, body) =>
-        Expressions.isPure(cond) && invs.forall(Expressions.isPure) && checkIfPure(body)
-      case Label(name, invs) =>
-        invs.forall(Expressions.isPure)
-      case Goto(target) =>
-        true
-      case LocalVarDeclStmt(decl) =>
-        true
-      case _ =>
-        false
-    }
-  }
 
 
 
