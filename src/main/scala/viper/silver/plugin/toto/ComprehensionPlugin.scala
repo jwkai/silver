@@ -3,11 +3,13 @@ package viper.silver.plugin.toto
 import fastparse.P
 import viper.silver.FastMessaging
 import viper.silver.ast.pretty.FastPrettyPrinter.pretty
-import viper.silver.ast.{Exhale, FilePosition, Inhale, Label, Method, MethodCall, NoPosition, Program, Seqn, Stmt}
+import viper.silver.ast.utility.rewriter.Traverse
+import viper.silver.ast.{AbstractAssign, Exhale, FieldAccess, FieldAssign, FilePosition, Inhale, Label, Method, MethodCall, NoPosition, Program, Seqn, Stmt}
 import viper.silver.parser.FastParserCompanion.whitespace
 import viper.silver.parser._
 import viper.silver.plugin.toto.ComprehensionPlugin.{addInlinedAxioms, defaultMappingIden}
 import viper.silver.plugin.toto.DomainsGenerator._
+import viper.silver.plugin.toto.util.AxiomHelper
 import viper.silver.plugin.{ParserPluginTemplate, SilverPlugin}
 import viper.silver.verifier.{AbstractError, VerificationResult}
 
@@ -139,12 +141,23 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
     * @return Modified Parse AST
     */
   override def beforeResolve(input: PProgram) : PProgram = {
+
+
+
 //    errors
+//    val compDomain = parseDomainString(compDomainString())
+//    val receiverDomain  = parseDomainString(receiverDomainString())
+//    val opDomain = parseDomainString(opDomainString())
+//    val mappingDomain = parseDomainString(mappingDomainString())
+//    val domainsToAdd = Seq(compDomain, receiverDomain, opDomain, mappingDomain)
+
     val domainsToAdd = Seq(
       compDomainString(),
       receiverDomainString(),
       opDomainString(),
-      mappingDomainString()).map(parseDomainString(_))// :+ convertUserDefs(input.extensions)
+      mappingDomainString(),
+      mapCustomDomainString()
+    ).map(parseDomainString(_))// :+ convertUserDefs(input.extensions)
 
     val newInput = input.copy(
       domains = input.domains ++ domainsToAdd)(input.pos)
@@ -214,6 +227,7 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
 //      currbody.pos, currbody.info, currbody.errT
 //    )
 //    print(pretty(newBody))
+
     newInput = addInlinedAxioms(newInput)
     print(pretty(newInput))
     newInput
@@ -314,6 +328,7 @@ object ComprehensionPlugin {
   def addInlinedAxioms(p: Program) : Program = {
     def modifyMethod(m: Method) : Method = {
       val axiomGenerator = new InlineAxiomGenerator(p, m.name)
+      val helper = new AxiomHelper(p)
       var outM: Method = m.transform({
         case e@MethodCall(_,_,_) =>
           axiomGenerator.convertMethodToInhaleExhale(e)
@@ -321,22 +336,36 @@ object ComprehensionPlugin {
       outM = outM.body match {
         case Some(bodyBody) =>
           outM.copy(body = Some(bodyBody.copy(ss =
-            InlineAxiomGenerator.getStartLabel() +:
+            helper.getStartLabel() +:
               bodyBody.ss)(bodyBody.pos, bodyBody.info, bodyBody.errT)))(
             outM.pos, outM.info, outM.errT)
         case None => return m
       }
+      // add axioms for exhales inhales and heap writes.
       outM = outM.transform({
-        case e@Exhale(_)//TODO: Commented for testing if axiomGenerator.checkExhaleImpure(e)
-          =>
-          axiomGenerator.generateExhaleAxioms(e)
-        case i@ Inhale(_) =>
-          axiomGenerator.generateInhaleAxioms(i)
-        case s: Stmt if s == s => // statement that contains read/write
-          s
-        case s: Stmt => // else
-          s
+        case e : Exhale if !helper.checkIfPure(e) =>
+          val fields = helper.extractFieldAcc(e)
+          axiomGenerator.generateExhaleAxioms(e, fields)
+        case i@ Inhale(_) if !helper.checkIfPure(i) =>
+          val fields = helper.extractFieldAcc(i)
+          axiomGenerator.generateInhaleAxioms(i, fields)
+        case fa: FieldAssign =>
+          axiomGenerator.generateHeapWriteAxioms(fa)
       })
+      // add axioms for heap reads
+      outM = outM.transform({
+        case s: Stmt  =>
+          axiomGenerator.generateHeapReadAxioms(s)
+      }, recurse = Traverse.BottomUp)
+//      outM = outM.transform({
+//        case n: Exhale if n.exists(fa => fa.isInstanceOf[FieldAccess]) =>
+//          axiomGenerator.generateHeapReadAxioms(n)
+//        case n: Inhale if n.exists(fa => fa.isInstanceOf[FieldAccess]) =>
+//          axiomGenerator.generateHeapReadAxioms(n)
+//        case n: FieldAssign if n.exists(fa => fa.isInstanceOf[FieldAccess]) =>
+//          axiomGenerator.generateHeapReadAxioms(n)
+//        case n: IfThen
+//      }, recurse = Traverse.BottomUp)
       outM
     }
 
