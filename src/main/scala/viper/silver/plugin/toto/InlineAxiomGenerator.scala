@@ -257,6 +257,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val field = program.findField(snapDecl.fieldName)
     val fieldUniqueId = fieldMaptoInt(field)
     // Find if lostP already defined for this field
+    // Ignoring the label number because using the `contains` check
     val alreadyDeclaredLost = declaredLosts.find(l => l.name.contains(s"lostP_${field.name}"))
     alreadyDeclaredLost match {
       // If already defined, just generate exhale axiom
@@ -343,7 +344,8 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
         helper.compApplySnapApply(compVar,
           snapDecl,
           forallVarFilter.localVar),
-        getLastLabel().name)()),
+        getLastLabel().name)(),
+        IntLit(ASnapshotDecl.getFieldInt(field.name))()),
       compDType.typVarsMap)
 
     val outForall = Forall(
@@ -369,36 +371,56 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val compVar = forallVarC.localVar
 
     // Filter Var decl
-    val forallVarF1 = LocalVarDecl("__f1", SetType(snapADecl.compType._1))()
-    val forallVarF2 = LocalVarDecl("__f2", SetType(snapADecl.compType._1))()
+    val forallVarF = LocalVarDecl("__f", SetType(snapADecl.compType._1))()
+    val forallVarM = LocalVarDecl("__m", MapType(snapADecl.compType._1, snapADecl.compType._3))()
 
     val trigger = Trigger(Seq(
       // First trigger
       LabelledOld(helper.compApplySnapApply(compVar,
         snapDecl,
-        forallVarF1.localVar),
+        forallVarF.localVar),
         getLastLabel().name)(),
       // Second trigger
       helper.applyDomainFunc("exhaleCompMap",
-        Seq(compVar, forallVarF2.localVar),
+        Seq(compVar, forallVarM.localVar,
+          IntLit(ASnapshotDecl.getFieldInt(field.name))()
+        ),
         compDType.typVarsMap)))()
 
-    val filter1ReceiverGood = helper.filterReceiverGood(forallVarF1.localVar, compVar)
-    val filter2ReceiverGood = helper.filterReceiverGood(forallVarF2.localVar, compVar)
-    val f1subsetf2 = AnySetSubset(forallVarF1.localVar, forallVarF2.localVar)()
-    val f1access = helper.forallFilterHaveWriteAccess(forallVarF1.localVar,
+    val filter1ReceiverGood = helper.filterReceiverGood(forallVarF.localVar, compVar)
+    val mapDomain = MapDomain(forallVarM.localVar)()
+    val mapDomainReceiverGood = helper.filterReceiverGood(mapDomain, compVar)
+    val f1subsetM = AnySetSubset(forallVarF.localVar, mapDomain)()
+
+    val mapDAccess = helper.forallFilterHaveWriteAccess(mapDomain,
       compVar, field.name, None)
-    val f2access = helper.forallFilterHaveWriteAccess(forallVarF2.localVar,
-      compVar, field.name, None)
+
+    // // triggerDeleteBlock(
+    //    //     (compApply($c, snap_val_Int($c,domain(m1)))),
+    //    //     $f) &&
     val triggerDelete = helper.applyDomainFunc("_triggerDeleteBlock",
-      Seq(helper.compApplySnapApply(compVar, snapDecl, forallVarF2.localVar), forallVarF1.localVar),
+      Seq(helper.compApplySnapApply(compVar, snapDecl, mapDomain), forallVarF.localVar),
+      compDType.typVarsMap)
+
+
+
+    // // triggerDeleteBlock(
+    //    //     (compApply($c, m1)),
+    //    //     $f)
+    val compApply = program.findDomainFunction(DomainsGenerator.compApplyKey)
+    val compAppliedOldM =
+      DomainFuncApp(compApply,
+        Seq(compVar, forallVarM.localVar), compDType.typVarsMap
+    )()
+    val triggerDeleteOld = helper.applyDomainFunc("_triggerDeleteBlock",
+      Seq(compAppliedOldM, forallVarF.localVar),
       compDType.typVarsMap)
     val outForall = Forall(
-      Seq(forallVarC, forallVarF1, forallVarF2),
+      Seq(forallVarC, forallVarF, forallVarM),
       Seq(trigger),
       helper.andedImplies(
-        Seq(filter1ReceiverGood, filter2ReceiverGood, f1subsetf2, f1access, f2access),
-        Seq(filter1ReceiverGood, filter2ReceiverGood, f1subsetf2, triggerDelete)
+        Seq(filter1ReceiverGood, mapDomainReceiverGood, f1subsetM, mapDAccess),
+        Seq(filter1ReceiverGood, mapDomainReceiverGood, f1subsetM, triggerDelete, triggerDeleteOld)
       ))()
     Seq(Assume(outForall)())
   }
