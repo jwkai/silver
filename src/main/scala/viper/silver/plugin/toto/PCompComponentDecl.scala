@@ -1,6 +1,7 @@
 package viper.silver.plugin.toto
 
 import viper.silver.ast._
+import viper.silver.ast.utility.Triggers
 import viper.silver.parser._
 
 // Defines a component declaration. This is a PExtender node (extended as a plugin) and acts as a Function declaration,
@@ -70,7 +71,14 @@ trait PCompComponentDecl extends PExtender with PAnyFunction {
     val equal = (EqCmp(evalApp, rhs)_).tupled(posInfoError)
 
     // Todo: make triggers
-    val triggers = Seq()
+    var triggers = Seq(Trigger(Seq(evalApp))())
+
+    // If the rhs is a possible trigger, add it to the triggers seq. Useful for the `loc(a,i)` receiver case
+    rhs match {
+      case _: PossibleTrigger =>
+        triggers :+= Trigger(Seq(rhs))()
+      case _ => ()
+    }
 
     // all Vars. ex. a and i
     val allVarsForall = (this.formalArgs ++ body.args).map(a => t.liftArgDecl(a))

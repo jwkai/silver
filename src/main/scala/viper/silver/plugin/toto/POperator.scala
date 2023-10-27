@@ -1,6 +1,6 @@
 package viper.silver.plugin.toto
 
-import viper.silver.ast.{AnonymousDomainAxiom, Domain, DomainFunc, DomainFuncApp, DomainType, EqCmp, Exp, Forall, LocalVar, Member, NoTrafos, Position}
+import viper.silver.ast.{AnonymousDomainAxiom, Domain, DomainFunc, DomainFuncApp, DomainType, EqCmp, Exp, Forall, LocalVar, Member, NoTrafos, Position, Trigger}
 import viper.silver.parser.{PExp, _}
 
 case class POperator(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], opUnit: PExp, body : PFunInline)
@@ -65,7 +65,7 @@ case class POperator(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], opUnit: P
     val rhs = t.exp(opUnit)
     val equal = (EqCmp(getUnitApp, rhs)_).tupled(posInfoError)
 
-    val triggers = Seq()
+    val triggers = Seq(Trigger(Seq(getUnitApp))())
 
     // all Vars
     val allVarsForall = (this.formalArgs).map(a => t.liftArgDecl(a))
