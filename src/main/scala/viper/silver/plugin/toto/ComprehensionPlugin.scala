@@ -218,9 +218,7 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
 //    })
 //    print(pretty(newInput))
 
-    val currbody = newInput.findMethod("test1").body.get
-
-    currbody.transform()
+//    val currbody = newInput.findMethod("test1").body.get
 
 //    val gen = new InlineAxiomGenerator(newInput, "test1")
 //    val newBody = currbody.copy(ss = currbody.ss.appended(gen.generateExhaleAxioms()))(
@@ -229,6 +227,10 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
 //    print(pretty(newBody))
 
     newInput = addInlinedAxioms(newInput)
+    newInput = newInput.transform( {
+      case c@ ACompApply(_, _) =>
+        c.toViper(newInput)
+    })
     print(pretty(newInput))
     newInput
 
@@ -328,11 +330,19 @@ object ComprehensionPlugin {
   def addInlinedAxioms(p: Program) : Program = {
     def modifyMethod(m: Method) : Method = {
       val axiomGenerator = new InlineAxiomGenerator(p, m.name)
+      // If no comprehension is used in a method, keep the method the same
+      if (axiomGenerator.snapshotDeclsUsed.isEmpty) {
+        return m
+      }
       val helper = new AxiomHelper(p)
+
+      // Convert all method calls to inhales and exhales
       var outM: Method = m.transform({
         case e@MethodCall(_,_,_) =>
           axiomGenerator.convertMethodToInhaleExhale(e)
       })
+
+      // Add the start label to the body
       outM = outM.body match {
         case Some(bodyBody) =>
           outM.copy(body = Some(bodyBody.copy(ss =
@@ -352,24 +362,17 @@ object ComprehensionPlugin {
         case fa: FieldAssign =>
           axiomGenerator.generateHeapWriteAxioms(fa)
       })
-      // add axioms for heap reads
+      // add axioms for heap reads, using bottom up traversal
       outM = outM.transform({
         case s: Stmt  =>
           axiomGenerator.generateHeapReadAxioms(s)
       }, recurse = Traverse.BottomUp)
-//      outM = outM.transform({
-//        case n: Exhale if n.exists(fa => fa.isInstanceOf[FieldAccess]) =>
-//          axiomGenerator.generateHeapReadAxioms(n)
-//        case n: Inhale if n.exists(fa => fa.isInstanceOf[FieldAccess]) =>
-//          axiomGenerator.generateHeapReadAxioms(n)
-//        case n: FieldAssign if n.exists(fa => fa.isInstanceOf[FieldAccess]) =>
-//          axiomGenerator.generateHeapReadAxioms(n)
-//        case n: IfThen
-//      }, recurse = Traverse.BottomUp)
       outM
     }
 
+    // Modify all methods
     val outMethods = p.methods.map(m => modifyMethod(m))
+    // Modify the program
     p.copy(methods = outMethods)(p.pos, p.info, p.errT)
 
 
