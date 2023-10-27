@@ -134,12 +134,19 @@ case class ASnapshotDecl private(compType: (Type, Type, Type), fieldName: String
     // ensures domain(result) == indices
     val domainEqF = EqCmp(MapDomain(Result(outType)())(), f)()
 
+    // ensures getSnapFieldID(result) == int
+    val fieldIDApplied = helper.applyDomainFunc("getSnapFieldID",
+      Seq(Result(outType)()),
+      compType.typVarsMap)
+    val fieldIDEq = EqCmp(fieldIDApplied, IntLit(ASnapshotDecl.getFieldInt(fieldName))())()
+
 
     // ensures forall i: Int :: {result[i]}
     //        i in indices ==> result[i] ==
     //        mapApply(getmapping(c),recApply(getreceiver(c), i).val)
     val mapGetPost = helper.forallFilterResultMap(f, c, fieldName,
       Result(outType)())
+
 
 
     // mapDelete axiom
@@ -150,6 +157,9 @@ case class ASnapshotDecl private(compType: (Type, Type, Type), fieldName: String
     val mapSubmapPost = helper.forallMapSubmap(f,c, primeViperDecl(input),
       Result(outType)())
 
+    val disjPost = helper.forallDisjUnion(f,c, primeViperDecl(input),
+      Result(outType)())
+
     // extensional eq of set axiom
     val extensionalEqPost = helper.forallDummyExtensionality(f,c, primeViperDecl(input))
 
@@ -158,7 +168,9 @@ case class ASnapshotDecl private(compType: (Type, Type, Type), fieldName: String
       FuncApp(primeViperDecl(input), Seq(c, f))())()
 
     (Seq(inhaleExhaleExp, accessCheck),
-      Seq(reqFRGood, domainEqF, mapGetPost, mapDeletePost, mapSubmapPost, extensionalEqPost, eqPrime))
+      Seq(reqFRGood, domainEqF, mapGetPost, mapDeletePost, mapSubmapPost, disjPost,
+        extensionalEqPost, eqPrime,
+        fieldIDEq))
 
   }
 
@@ -175,13 +187,29 @@ object ASnapshotDecl {
 
   private val snapshotDecls: scala.collection.mutable.Map[String, ASnapshotDecl] = scala.collection.mutable.Map()
 
+  private var uniqueFieldInt = 0
+
+  private val fieldIDMap: scala.collection.mutable.Map[String, Int] = scala.collection.mutable.Map()
+
   private def getOrMakeNewSnapDecl(compType: (Type, Type, Type), fieldID: String): ASnapshotDecl = {
     val key = tupleFieldToString(compType, fieldID)
+    addFieldtoMap(fieldID)
     snapshotDecls.getOrElseUpdate(key, new ASnapshotDecl(compType, fieldID)(NoPosition))
   }
 
   def apply(compType: (Type, Type, Type), fieldID: String): ASnapshotDecl = {
     getOrMakeNewSnapDecl(compType, fieldID)
+  }
+
+  def addFieldtoMap(fieldName: String): Unit = {
+    if (!fieldIDMap.contains(fieldName)) {
+      fieldIDMap(fieldName) = uniqueFieldInt
+      uniqueFieldInt += 1
+    }
+  }
+
+  def getFieldInt(field: String): Int = {
+    fieldIDMap(field)
   }
 
   def tupleFieldToString(t: (Type, Type, Type), fieldID: String): String = {

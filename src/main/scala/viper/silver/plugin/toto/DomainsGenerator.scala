@@ -149,7 +149,10 @@ object DomainsGenerator {
          |    function _triggerDeleteKey1(applyC: $compDTV2, key: $compDTV0): Bool
          |
          |    function exhaleCompMap(c: $compDKey[$compDTV0,$compDTV1,$compDTV2],
-         |                           m: Map[$compDTV0, $compDTV2]): Bool
+         |                           m: Map[$compDTV0, $compDTV2],
+         |                           fieldID: Int): Bool
+         |
+         |    function getSnapFieldID(m: Map[$compDTV0, $compDTV2]): Int
          |
          |
          |
