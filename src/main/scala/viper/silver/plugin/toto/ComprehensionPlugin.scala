@@ -4,7 +4,7 @@ import fastparse.P
 import viper.silver.FastMessaging
 import viper.silver.ast.pretty.FastPrettyPrinter.pretty
 import viper.silver.ast.utility.rewriter.Traverse
-import viper.silver.ast.{AbstractAssign, Exhale, FieldAccess, FieldAssign, FilePosition, Inhale, Label, Method, MethodCall, NoPosition, Program, Seqn, Stmt}
+import viper.silver.ast._
 import viper.silver.parser.FastParserCompanion.whitespace
 import viper.silver.parser._
 import viper.silver.plugin.toto.ComprehensionPlugin.{addInlinedAxioms, defaultMappingIden}
@@ -23,11 +23,12 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
   import fp.{FP, ParserExtension, exp, keyword}
 
   private val comprehensionKeyword: String = "comp"
-
   private val recKeyword: String = "receiver"
-  private val opUnitKeyword: String = "unitOp"
+  private val opUnitKeyword: String = "identityOp"
   private val mapKeyword: String = "mapping"
   private val filterKeyword: String = "filter"
+  private var setOperators: Set[POperator] = Set()
+
 
   // Fix the FP somewhere else
   def compOp[$: P]: P[((FilePosition, FilePosition), PCall)] =
@@ -177,6 +178,10 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
 //        case _: PMapping => true
 //        case _ => false
 //      }))(input.pos)
+    setOperators = input.deepCollect({
+      case op: POperator =>
+        op
+    }).toSet
     input
   }
 
@@ -227,6 +232,7 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
 //    print(pretty(newBody))
 
     newInput = addInlinedAxioms(newInput)
+    newInput = addOpWelldefinednessMethods(newInput)
     newInput = newInput.transform( {
       case c@ ACompApply(_, _) =>
         c.toViper(newInput)
@@ -269,6 +275,12 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
   override def reportError(error: AbstractError): Unit = {
     super.reportError(error)
   }
+
+  def addOpWelldefinednessMethods(p: Program): Program = {
+    val opMethods = setOperators.map(o => o.generatedOpWelldefinednessCheck(p)).toSeq
+    p.copy(methods = opMethods ++ p.methods)(p.pos, p.info, p.errT)
+  }
+
 }
 
 object ComprehensionPlugin {
@@ -326,6 +338,7 @@ object ComprehensionPlugin {
       }
     }
   }
+
 
   def addInlinedAxioms(p: Program) : Program = {
     def modifyMethod(m: Method) : Method = {
