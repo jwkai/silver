@@ -18,7 +18,7 @@ object DomainsGenerator {
   final val recApplyKey = "recApply"
   final val recInvKey = "recInv"
   final val opApplyKey = "opApply"
-  final val opUnitKey = "opGetUnit"
+  final val opIdenKey = "opGetIden"
   final val mapApplyKey = "mapApply"
   final val mapIdenKey = "mapIdentity"
   final val disjUnionKey = "disjUnionEq"
@@ -111,7 +111,7 @@ object DomainsGenerator {
       s"""domain $opDKey[$compDTV2] {
          |    function $opApplyKey(op: $opDKey[$compDTV2], val1:$compDTV2, val2:$compDTV2) : $compDTV2
          |
-         |    function $opUnitKey(op: $opDKey[$compDTV2]) : $compDTV2
+         |    function $opIdenKey(op: $opDKey[$compDTV2]) : $compDTV2
          |
          |    ${axioms.mkString("\n")}
          |}\n """.stripMargin
