@@ -14,8 +14,10 @@ trait PCompComponentDecl extends PExtender with PAnyFunction {
   override val getSubnodes: Seq[PNode] = Seq(idndef) ++ formalArgs ++ Seq(body)
   override def annotations: Seq[(String, Seq[String])] = Seq()
 
+  val componentName: String
 
-  def genDomainName: String = "___" + idndef.name + "D"
+
+  def genDomainName: String = "___" + idndef.name + "_" + componentName + "_Domain"
   def body: PFunInline
 
   //  def pViperTranslation(posTuple: (Position, Position)): PBinExp

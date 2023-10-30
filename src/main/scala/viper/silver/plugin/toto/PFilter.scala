@@ -6,7 +6,11 @@ import viper.silver.parser._
 case class PFilter(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], body: PFunInline)
                   (val pos: (Position, Position))
   extends PExtender with PAnyFunction with PCompComponentDecl {
-//  override val getSubnodes: Seq[PNode] = Seq(idndef) ++ formalArgs ++ Seq(body)
+
+  override val componentName: String = "Filter"
+
+
+  //  override val getSubnodes: Seq[PNode] = Seq(idndef) ++ formalArgs ++ Seq(body)
 
 //  var typToInfer: PType = null;
 //  override def resultType(): PType = typToInfer;
@@ -35,4 +39,5 @@ case class PFilter(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], body: PFunI
   override def translateMember(t: Translator): Member = {
     translateMemberWithName(t, None)
   }
+
 }

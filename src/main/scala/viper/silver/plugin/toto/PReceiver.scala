@@ -7,6 +7,8 @@ case class PReceiver(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], body : PF
                                   (val pos: (Position, Position))
   extends PExtender with PAnyFunction with PCompComponentDecl {
 
+  override val componentName: String = "Receiver"
+
 //  override def annotations: Seq[(String, Seq[String])] = Seq()
 //
 //  override val getSubnodes: Seq[PNode] = Seq(idndef) ++ formalArgs ++ Seq(body)

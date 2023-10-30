@@ -7,6 +7,8 @@ case class PMapping(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], body: PFun
                   (val pos: (Position, Position))
   extends PExtender with PAnyFunction with PCompComponentDecl  {
 
+  override val componentName: String = "Mapping"
+
 //  override val getSubnodes: Seq[PNode] = Seq(idndef) ++ formalArgs ++ Seq(body)
 
 //  var typToInfer: PType = null;
