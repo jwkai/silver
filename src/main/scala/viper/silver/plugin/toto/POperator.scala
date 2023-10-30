@@ -1,11 +1,14 @@
 package viper.silver.plugin.toto
 
-import viper.silver.ast.{AnonymousDomainAxiom, Domain, DomainFunc, DomainFuncApp, DomainType, EqCmp, Exp, Forall, LocalVar, Member, NoTrafos, Position, Trigger}
+import viper.silver.ast.{AnonymousDomainAxiom, AnyLocalVarDecl, Assert, Domain, DomainFunc, DomainFuncApp, DomainType, EqCmp, Exp, Forall, LocalVar, LocalVarDecl, Member, Method, NoTrafos, Position, Program, Seqn, Trigger}
 import viper.silver.parser.{PExp, _}
+import viper.silver.plugin.toto.util.AxiomHelper
 
 case class POperator(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], opUnit: PExp, body : PFunInline)
                     (val pos: (Position, Position))
   extends PExtender with PAnyFunction with PCompComponentDecl {
+
+  override val componentName: String = "Operator"
 
 //  override val getSubnodes: Seq[PNode] = Seq(idndef) ++ formalArgs ++ Seq(opUnit, body)
 //
@@ -42,9 +45,75 @@ case class POperator(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], opUnit: P
   }
 
 
+  def generatedOpWelldefinednessCheck(program: Program): Method = {
+    val helper = new AxiomHelper(program)
+    // Find the domain function of the operator
+    val domainFuncAST = program.findDomainFunction(idndef.name)
+
+    // Operator domain type var map.
+    val opTypeVarMap = domainFuncAST.typ.asInstanceOf[DomainType].typVarsMap
+
+    // input type. So if Operator[Int], we want Int
+    val inputType = opTypeVarMap.values.head
+
+    // Outer args. So if add(i), we want i
+    val opOuterArgs : Seq[LocalVarDecl] =
+      domainFuncAST.formalArgs.flatMap{
+          case lv: LocalVarDecl => Seq(lv)
+          case _ => Seq()
+        }
+    val input1 = LocalVarDecl("_i1", inputType)()
+    val input2 = LocalVarDecl("_i2", inputType)()
+
+    // Add(i)
+    val opExp = DomainFuncApp(domainFuncAST, opOuterArgs.map(lv => lv.localVar),
+      typVarMap = opTypeVarMap)()
+    // opApply(add(i),i1,i2)
+    val opAppliedi1i2 = helper.applyDomainFunc(
+      DomainsGenerator.opApplyKey, Seq(opExp, input1.localVar, input2.localVar), opTypeVarMap)
+    // opApply(add(i),i2,i1)`
+    val opAppliedi2i1 = helper.applyDomainFunc(
+      DomainsGenerator.opApplyKey, Seq(opExp, input2.localVar, input1.localVar), opTypeVarMap)
+    // Communtativity + assertion
+    val forallComm = Forall(
+      opOuterArgs ++ Seq(input1, input2),
+      Seq(Trigger(Seq(opAppliedi1i2))()),
+      EqCmp(opAppliedi1i2, opAppliedi2i1)())()
+    val assert1 = Assert(forallComm)()
+
+    // 3rd var for associativity check
+    val input3 = LocalVarDecl("_i3", inputType)()
+    val opAppliedi2i3 = helper.applyDomainFunc(
+      DomainsGenerator.opApplyKey, Seq(opExp, input2.localVar, input3.localVar), opTypeVarMap)
+    val opAppliedAssocL = helper.applyDomainFunc(
+      DomainsGenerator.opApplyKey, Seq(opAppliedi1i2, input3.localVar), opTypeVarMap)
+    val opAppliedAssocR = helper.applyDomainFunc(
+      DomainsGenerator.opApplyKey, Seq(input1.localVar, opAppliedi2i3), opTypeVarMap)
+    val forallAssoc = Forall(
+      opOuterArgs ++ Seq(input1, input2, input3),
+      Seq(Trigger(Seq(opAppliedAssocL))()),
+      EqCmp(opAppliedAssocL, opAppliedAssocR)())()
+    val assert2 = Assert(forallAssoc)()
+
+    // Identity check
+    val opUnit = helper.applyDomainFunc(
+      DomainsGenerator.opIdenKey, Seq(opExp), opTypeVarMap)
+    val opAppliedUnit = helper.applyDomainFunc(
+      DomainsGenerator.opApplyKey, Seq(input1.localVar, opUnit), opTypeVarMap)
+    val forallIden = Forall(
+      opOuterArgs ++ Seq(input1),
+      Seq(Trigger(Seq(opAppliedUnit))()),
+      EqCmp(opAppliedUnit, input1.localVar)())()
+    val assert3 = Assert(forallIden)()
+
+    Method("operator_" + this.idndef.name + "_welldef_check", Seq(), Seq(),Seq(),Seq(),
+      Some(Seqn(Seq(assert1, assert2, assert3),Seq())()))()
+  }
+
+
 
   def getOperUnitAxiom(t: Translator): AnonymousDomainAxiom = {
-    val getUnitFunc = t.getMembers()(DomainsGenerator.opUnitKey).asInstanceOf[DomainFunc]
+    val getUnitFunc = t.getMembers()(DomainsGenerator.opIdenKey).asInstanceOf[DomainFunc]
     val operFunc = t.getMembers()(idndef.name).asInstanceOf[DomainFunc]
     val posInfoError = (t.liftPos(this), t.toInfo(this.annotations, this), NoTrafos)
 
