@@ -40,7 +40,7 @@ trait PCompComponentDecl extends PExtender with PAnyFunction {
 
     // ex. receiver(a)
     // Note: typVar can be empty here because user-defined comprehension components are not generic.
-    // i.e. Its always Receiver[Int], never Receiver[A]
+    // i.e. Its always Receiver[Int] defined in a domain without typeVars, never Receiver[A].
     val funcApp = (DomainFuncApp.apply(funct,
       formalArgs.map(a =>(LocalVar(a.idndef.name, t.ttyp(a.typ)) _).tupled(posInfoError)),
       typVarMap = Map.empty) _).tupled(posInfoError)
