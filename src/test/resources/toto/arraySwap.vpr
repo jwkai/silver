@@ -1,0 +1,52 @@
+field val: Int
+
+domain Array {
+  function loc(a: Array, i: Int): Ref
+  function len(a: Array): Int
+  function first(r: Ref): Array
+  function second(r: Ref): Int
+
+  axiom all_diff {
+    forall a: Array, i: Int :: {loc(a,i)}
+      first(loc(a,i)) == a && second(loc(a,i)) == i
+  }
+
+  axiom len_nonneg {
+    forall a: Array :: { len(a) }
+      len(a) >= 0
+  }
+}
+receiver arrayRec(a: Array) (fun i: Int :: loc(a,i))
+filter allInt(start: Int, end: Int) (fun i: Int :: i >= start && i < end )
+filter twoInts(i1: Int, i2: Int) (fun i: Int :: i == i1 || i == i2 )
+
+mapping singleM() (fun i: Int :: Multiset(i))
+identityOp mUnion() (Multiset[Int](), fun a: Multiset[Int], b: Multiset[Int] :: a union b )
+
+define access_array(a, i1, i2)
+    (forall j: Int :: {loc(a,j)} i1 <= j && j < i2 ==> acc(loc(a,j).val))
+
+method swapTest(a:Array, i1: Int, i2: Int)
+    requires acc(loc(a,i1).val) && acc(loc(a,i2).val)
+    requires i1 >= 0 && i1 < len(a) && i2 >= 0 && i2 < len(a)
+    ensures acc(loc(a,i1).val) && acc(loc(a,i2).val)
+    ensures hfold[mUnion()]{singleM(arrayRec(a).val) | twoInts(i1,i2)} ==
+       old(hfold[mUnion()]{singleM(arrayRec(a).val) | twoInts(i1,i2)})
+{
+    var temp: Int := loc(a,i1).val
+    loc(a,i1).val := loc(a,i2).val
+    loc(a,i2).val := temp
+}
+
+
+method swapTest2(a:Array, i1: Int, i2: Int)
+    requires acc(loc(a,i1).val) && acc(loc(a,i2).val)
+    requires i1 >= 0 && i1 < len(a) && i2 >= 0 && i2 < len(a)
+     ensures acc(loc(a,i1).val) && acc(loc(a,i2).val)
+     ensures hfold[mUnion()]{singleM(arrayRec(a).val) | twoInts(i1,i2)} ==
+            old(hfold[mUnion()]{singleM(arrayRec(a).val) | twoInts(i1,i2)})
+
+{
+    swapTest(a,i1,i2)
+    swapTest(a,i1,i2)
+}

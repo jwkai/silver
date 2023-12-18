@@ -1,0 +1,47 @@
+field val: Int
+
+domain Array {
+  function loc(a: Array, i: Int): Ref
+  function len(a: Array): Int
+  function first(r: Ref): Array
+  function second(r: Ref): Int
+
+  axiom all_diff {
+    forall a: Array, i: Int :: {loc(a,i)}
+      first(loc(a,i)) == a && second(loc(a,i)) == i
+  }
+
+  axiom len_nonneg {
+    forall a: Array :: { len(a) }
+      len(a) >= 0
+  }
+}
+
+receiver arrayRec(a: Array) (fun i: Int :: loc(a,i))
+filter allInt(start: Int, end: Int) (fun i: Int :: i >= start && i < end )
+identityOp add() (0 ,fun a: Int, b: Int :: a + b )
+
+define access_array(a, i1, i2)
+    (forall j: Int :: {loc(a,j)} i1 <= j && j < i2 ==> acc(loc(a,j).val))
+
+method test1(i0: Int, a:Array)
+    requires access_array(a, 0, 10)
+    requires len(a) > 10
+    requires i0 in allInt(0,2)
+{
+    exhale forall i: Int :: i in allInt(8,10) ==> acc(loc(a,i).val)
+    loc(a,i0).val := loc(a,i0).val + 1
+
+    exhale forall i: Int :: i in allInt(5,8) ==> acc(loc(a,i).val)
+    loc(a,i0).val := loc(a,i0).val + 1
+
+    inhale forall i: Int :: i in allInt(5,10) ==> acc(loc(a,i).val)
+    inhale forall i: Int :: i in allInt(5,10) ==> loc(a,i).val == old(loc(a,i).val)
+
+    // r.val := r.val + 1
+
+    assert comp[add()]{arrayRec(a).val | allInt(0,5)} == old(comp[add()]{arrayRec(a).val | allInt(0,5)}) + 2
+
+    assert comp[add()]{arrayRec(a).val | allInt(0,10)} == old(comp[add()]{arrayRec(a).val | allInt(0,10)}) + 2
+
+}

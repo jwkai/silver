@@ -1,0 +1,37 @@
+field val: Int
+field left: Ref
+field right: Ref
+
+define INV(nodes)
+	   !(null in nodes)
+	&& (forall n: Ref :: n in nodes ==> acc(n.val))
+	&& (forall n: Ref :: n in nodes ==> acc(n.left))
+	&& (forall n: Ref :: n in nodes ==> acc(n.right))
+	&& (forall n: Ref :: {n.left in nodes}{n in nodes, n.left}
+			 	n in nodes && n.left  != null ==> n.left in nodes)
+	&& (forall n: Ref :: {n.right in nodes}{n in nodes, n.right}
+				n in nodes && n.right != null ==> n.right in nodes)
+
+
+receiver idenRec() (fun r: Ref :: r)
+mapping singleM() (fun i: Int :: Multiset(i))
+identityOp add() (0 ,fun a: Int, b: Int :: a + b )
+
+method sumNodes(nodes : Set[Ref], node: Ref)
+    requires node in nodes
+    requires INV(nodes)
+    ensures  INV(nodes)
+    ensures hfold[add()](idenRec().val | nodes) ==
+               old(hfold[add()](idenRec().val | nodes)) +2
+{
+    node.val := node.val + 1
+    var node2: Ref
+
+    assume node2 in nodes
+    node2.val := node2.val + 1
+
+    var node3: Ref
+    assume !(node3 in nodes)
+    inhale acc(node3.val)
+    node3.val := node2.val + 1
+}
