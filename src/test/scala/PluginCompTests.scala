@@ -17,7 +17,10 @@ import java.nio.file.Paths
 
 
 class PluginCompTests extends AnyFunSuite {
-  val inputfile = "toto/sample_comp_test.vpr"
+  var inputfile = "toto/sample_comp_test.vpr"
+//  inputfile = "toto/arrayTestExhaleInhale.vpr"
+  inputfile = "toto/arrayTestExhaleExhale.vpr"
+  inputfile = "toto/graphSum.vpr"
 //  val inputfile = "all/inhale_exhale/loops.vpr"
 //  val inputfile = "examples/graph-copy/graph-copy.vpr"
   val plugins = Seq(
