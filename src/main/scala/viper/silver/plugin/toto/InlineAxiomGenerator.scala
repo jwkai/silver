@@ -39,6 +39,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
 
   private var currentLabelNum = 0
   private var uniqueIDMethodOut = 0
+  private var uniqueLabelMethod = 0
   private var uniqueIDLost = 0
 
 //  private val trackAllRelavantSnapshotDefs = program.functions.filter(f => f.name.contains("snapshot"))
@@ -48,8 +49,14 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     s"$uniqueIDMethodOut"
   }
 
+  // get unique method label
+  private def getUniqueLabelMethod() : Label = {
+    uniqueLabelMethod += 1
+    Label(s"${helper.methodLabelPrefix}l$uniqueLabelMethod", Seq())()
+  }
+
   private def getCurrentLabel() : Label = {
-    Label(s"${helper.labelPrefix}$currentLabelNum", Seq())()
+    Label(s"${helper.labelPrefix}l$currentLabelNum", Seq())()
   }
 
   private def getLabNumForLost() : String = {
@@ -66,6 +73,9 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
 
   def convertMethodToInhaleExhale(methodCall: MethodCall): Seqn = {
     // Get method declaration
+
+    val oldLabel = getUniqueLabelMethod()
+
     val methodDecl = program.findMethod(methodCall.methodName)
 
     // LocalVarsDecls for temporary return values
@@ -90,14 +100,23 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
 
     // Create inhales and exhales
     val exhales = newPres.map(p => Exhale(p)(p.pos, p.info, p.errT))
-    val inhales = newPost.map(p => Inhale(p)(p.pos, p.info, p.errT))
+    var inhales = newPost.map(p => Inhale(p)(p.pos, p.info, p.errT))
+
+    // change all old to the correct label
+    inhales = inhales.map(inhale => inhale.transform(
+      {
+        case old: Old =>
+          LabelledOld(old.exp, oldLabel.name)(old.pos, old.info, old.errT)
+      }
+    ))
 
     // Assign targets with temporary return values
     val assigns = methodCall.targets.zip(returnDeclVars).map(
       t => AbstractAssign(t._1, t._2)
       (t._1.pos, t._1.info, t._1.errT)
     )
-    Seqn(exhales ++ inhales ++ assigns, returnDecls)(methodCall.pos, methodCall.info, methodCall.errT)
+    Seqn(Seq(oldLabel) ++ exhales.reverse ++ inhales ++ assigns,
+      returnDecls)(methodCall.pos, methodCall.info, methodCall.errT)
   }
 
 
@@ -137,26 +156,54 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
       generateHeapWriteAxiomPerSnap(snapAndField._1,
         snapAndField._2.lhs.rcv)
     )
-    Seqn(out :+ getCurrentLabel() :+ writeStmt, Seq())(writeStmt.pos, writeStmt.info, writeStmt.errT)
+    Seqn(writeStmt +: getCurrentLabel() +: out, Seq())(writeStmt.pos, writeStmt.info, writeStmt.errT)
   }
 
   def generateHeapReadAxioms(readStmt: Stmt): Stmt = {
-    val releventPart = readStmt match {
+
+    var accLHS = Set[FieldAccess]()
+
+    val releventPart: Node = readStmt match {
       case w : While =>
         w.copy(body = Seqn(Seq(), Seq())())(w.pos, w.info, w.errT)
       case i : If =>
         i.copy(thn = Seqn(Seq(), Seq())(), els = Seqn(Seq(), Seq())())(i.pos, i.info, i.errT)
       case out@ Seqn(ss, _) => return out
       // Do this to ignore LHS in case of a heap write tgt with heap read. Could cause redundancy.
-      case a: AbstractAssign => a.rhs
+      case a: FieldAssign => {
+        accLHS = accLHS + a.lhs;
+        a.rhs
+      }
       case generated: Assume => return generated
       case _ => readStmt
     }
+    // remove accessibility predicate
 
-    val reads = releventPart.deepCollect({
+    // These reads cannot contained quantified vars
+    val allQuantifiedVars = releventPart.deepCollect({
+      case quanti: QuantifiedExp =>
+        quanti.variables
+    }).flatten
+
+
+    // TODO: remove stuff in accessibility predicate TOO!!
+    val ignoreAcc = releventPart.deepCollect({
+      case acc: FieldAccessPredicate =>
+        acc.loc
+    })
+
+    val allReads = releventPart.deepCollect({
       case fieldAccess: FieldAccess =>
         fieldAccess
-    }).toSet
+    })
+
+    // Filters things in ignoreAcc, using reference equality
+    // then convert ot Set
+    var reads = allReads.filterNot(r => ignoreAcc.exists(p => p eq r)).toSet
+    reads = reads.filterNot(r => allQuantifiedVars.exists(p =>  r.contains(p.localVar)))
+    reads = reads -- accLHS
+    // remove all reads with quantified var
+
 
     if (reads.isEmpty) {
       return readStmt
@@ -189,8 +236,12 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val trigger = Trigger(Seq(
       LabelledOld(helper.compApplySnapApply(compVar, snapDecl, forallVarF.localVar), getLastLabel().name)())
     )()
+    val trigger2 = Trigger(Seq(
+      helper.compApplySnapApply(compVar, snapDecl, forallVarF.localVar)
+    ))()
+
     val fRGood = helper.filterReceiverGood(forallVarF.localVar, compVar)
-    val fAccess = helper.forallFilterHaveWriteAccess(forallVarF.localVar,
+    val fAccess = helper.forallFilterHaveSomeAccess(forallVarF.localVar,
       compVar, field.name, None)
 
     val receiverApp = helper.applyDomainFunc("getreceiver", Seq(compVar), compDType.typVarsMap)
@@ -208,7 +259,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
 
     val outForall = Forall(
       Seq(forallVarC, forallVarF),
-      Seq(trigger),
+      Seq(trigger, trigger2),
       helper.andedImplies(
         Seq(fRGood, fAccess),
         Seq(fRGood, triggerDeleteKeyNew, triggerDeleteKeyOld),
@@ -232,7 +283,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val trigger = Trigger(Seq(helper.compApplySnapApply(compVar,
       snapDecl, forallVarF.localVar)))()
     val fRGood = helper.filterReceiverGood(forallVarF.localVar, compVar)
-    val fAccess = helper.forallFilterHaveWriteAccess(forallVarF.localVar,
+    val fAccess = helper.forallFilterHaveSomeAccess(forallVarF.localVar,
       compVar, field.name, None)
 
     val receiverApp = helper.applyDomainFunc("getreceiver", Seq(compVar), compDType.typVarsMap)
@@ -279,9 +330,9 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
         val insidePerm = CurrentPerm(FieldAccess(forallVars.localVar, field)())()
         val oldExp = LabelledOld(insidePerm, getLastLabel().name)()
         // (perm(iP.val) != write)
-        val permNotWrite = NeCmp(insidePerm, FullPerm()())()
+        val permNotWrite = EqCmp(insidePerm, NoPerm()())()
         // old[l0](perm(iP.val) == write)
-        val permOldWrite = EqCmp(oldExp, FullPerm()())()
+        val permOldWrite = GtCmp(oldExp, NoPerm()())()
         // (perm(iP.val) != write) && old[l0](perm(iP.val) == write)
         val Anded = And(permNotWrite, permOldWrite)()
         // iP in lostP_val <==> (perm(iP.val) != write) && old[l0](perm(iP.val) == write)
@@ -319,13 +370,13 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     // FilterReceiverGood
     val frGood = helper.filterReceiverGood(forallVarFilter.localVar, compVar)
     // Have access to the big filter in old
-    val forallOldHasPerm = helper.forallFilterHaveWriteAccess(forallVarFilter.localVar,
+    val forallOldHasPerm = helper.forallFilterHaveSomeAccess(forallVarFilter.localVar,
       compVar, field.name, Some(getLastLabel().name))
 
     // filterNotLost
     val filterNotLostApplied = helper.filterNotLost(forallVarFilter.localVar, compVar, lostPVal)
     // Have access to the remaining filter in new state
-    val forallNewStillHasPerm = helper.forallFilterHaveWriteAccess(filterNotLostApplied,
+    val forallNewStillHasPerm = helper.forallFilterHaveSomeAccess(filterNotLostApplied,
       compVar, field.name, None)
 
     // ---------------Making the RHS---------------
@@ -334,16 +385,15 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
       filterNotLostApplied)
     val compApplyF = helper.compApplySnapApply(compVar,
       snapDecl,
-      compVar)
+      forallVarFilter.localVar)
     val dummy1 = helper.applyDomainFunc("dummy1", Seq(compApplyNotLost), compDType.typVarsMap)
     val triggerDelete = helper.applyDomainFunc("_triggerDeleteBlock",
       Seq(LabelledOld(compApplyF, getLastLabel().name)(), filterNotLostApplied),
       compDType.typVarsMap)
     val exhaleCF = helper.applyDomainFunc("exhaleCompMap",
       Seq(compVar, LabelledOld(
-        helper.compApplySnapApply(compVar,
-          snapDecl,
-          forallVarFilter.localVar),
+        FuncApp(snapDecl,
+          Seq(compVar, forallVarFilter.localVar))(),
         getLastLabel().name)(),
         IntLit(ASnapshotDecl.getFieldInt(field.name))()),
       compDType.typVarsMap)
@@ -392,7 +442,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val mapDomainReceiverGood = helper.filterReceiverGood(mapDomain, compVar)
     val f1subsetM = AnySetSubset(forallVarF.localVar, mapDomain)()
 
-    val mapDAccess = helper.forallFilterHaveWriteAccess(mapDomain,
+    val mapDAccess = helper.forallFilterHaveSomeAccess(mapDomain,
       compVar, field.name, None)
 
     // // triggerDeleteBlock(
