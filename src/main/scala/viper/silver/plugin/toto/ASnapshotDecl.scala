@@ -56,7 +56,7 @@ case class ASnapshotDecl private(compType: (Type, Type, Type), fieldName: String
     val helper = new AxiomHelper(program)
     val reqFRGood = helper.filterReceiverGood(f, c)
     val accessCheck = helper.forallFilterHaveAccImpure(f, c, fieldName,
-      FractionalPerm(IntLit(1)(), IntLit(2)())())
+      FractionalPerm(IntLit(1)(), IntLit(10)())())
     (Seq(reqFRGood, accessCheck), Seq(reqFRGood))
   }
 
@@ -128,7 +128,7 @@ case class ASnapshotDecl private(compType: (Type, Type, Type), fieldName: String
 
     // Access pres
     val accessCheck = helper.forallFilterHaveAccImpure(f, c, fieldName,
-      FractionalPerm(IntLit(1)(), IntLit(2)())())
+      FractionalPerm(IntLit(1)(), IntLit(10)())())
 
     // ------ Now posts------
     // ensures domain(result) == indices
@@ -213,7 +213,9 @@ object ASnapshotDecl {
   }
 
   def tupleFieldToString(t: (Type, Type, Type), fieldID: String): String = {
-    "__snap_" + t._1.toString() + "_" + t._2.toString() + "_" + t._3.toString() + "_" + fieldID
+    // replace letters [ and ] with _
+    ("__snap_" + t._1.toString() + "_" + t._2.toString() + "_" + t._3.toString() + "_" + fieldID
+      ).replaceAll("[\\[\\]]", "_")
   }
 
 
