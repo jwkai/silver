@@ -9,12 +9,16 @@ class AxiomHelper(program: Program) {
 
 
   def getStartLabel(): Label = {
-    Label(s"${labelPrefix}0", Seq())()
+    Label(s"${labelPrefix}l0", Seq())()
   }
 
   def labelPrefix: String = {
     "_compLabel"
   }
+  def methodLabelPrefix : String = {
+    "_methodLabel"
+  }
+
   //  def checkExhaleImpure(s: Stmt): Boolean = {
   //    s match {
   //      case Exhale(exp) => !exp.isPure
@@ -118,8 +122,8 @@ class AxiomHelper(program: Program) {
 
   // generate a forall in the format:
   // (forall $ind: Int :: {$ind in $f}  $ind in $f ==> perm(recApply(getreceiver($c), $ind).val) == write)
-  def forallFilterHaveWriteAccess(filter: Exp, compExp: Exp,
-                                  fieldName: String, oldOption: Option[String]): Forall = {
+  def forallFilterHaveSomeAccess(filter: Exp, compExp: Exp,
+                                 fieldName: String, oldOption: Option[String]): Forall = {
     val fElemType = filter.typ match {
       case setType : SetType => setType.elementType
       case _ => throw new Exception("Filter must be a set")
@@ -140,10 +144,10 @@ class AxiomHelper(program: Program) {
       compType.typVarsMap
     )()
     val permFieldAccessed = CurrentPerm(FieldAccess(recApplied, field)())()
-    val permEqualsWrite = EqCmp(permFieldAccessed, FullPerm()())()
+    val permNonZero = GtCmp(permFieldAccessed, NoPerm()())()
     val oldApplied = oldOption match {
-      case Some(lbl) => LabelledOld(permEqualsWrite, lbl)()
-      case None => permEqualsWrite
+      case Some(lbl) => LabelledOld(permNonZero, lbl)()
+      case None => permNonZero
     }
     val output = Forall(Seq(forallVarInd), Seq(forallTrigger), Implies(setContains, oldApplied)())()
     output
