@@ -22,7 +22,7 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
 
   import fp.{FP, ParserExtension, exp, keyword}
 
-  private val comprehensionKeyword: String = "comp"
+  private val comprehensionKeyword: String = "hfold"
   private val recKeyword: String = "receiver"
   private val opUnitKeyword: String = "identityOp"
   private val mapKeyword: String = "mapping"
@@ -36,7 +36,7 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
 //    FP(keyword(comprehensionKeyword) ~/ "[" ~/ fp.funcApp ~ "," ~ exp ~/ "]")
 
   def compDef[$: P]: P[(PMappingFieldReceiver, PExp)] =
-    P("{") ~ mapRecBoth ~ "|" ~ exp ~ "}"
+    P("(") ~ mapRecBoth ~ "|" ~ exp ~ ")"
 
   def comp[$: P]: P[PComprehension] =
     (compOp ~ compDef).map{
@@ -157,7 +157,8 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
       receiverDomainString(),
       opDomainString(),
       mappingDomainString(),
-      mapCustomDomainString()
+      mapCustomDomainString(),
+      setFuncDomainString()
     ).map(parseDomainString(_))// :+ convertUserDefs(input.extensions)
 
     val newInput = input.copy(
