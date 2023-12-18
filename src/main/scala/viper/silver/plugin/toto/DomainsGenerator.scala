@@ -6,15 +6,15 @@ import viper.silver.parser.{PDomain, PNode, ParseException}
 
 
 object DomainsGenerator {
-  final val compDKey = "Comp"
+  final val compDKey = "Fold"
   final val compDTV0 = "A"
   final val compDTV1 = "V"
   final val compDTV2 = "B"
 
 
-  final val compConstructKey = "comp"
-  final val compApplyKey = "compApply"
-  final val compApplyPrimeKey = "compApply1"
+  final val compConstructKey = "hfold"
+  final val compApplyKey = "hfoldApply"
+  final val compApplyPrimeKey = "hfoldApply1"
   final val recApplyKey = "recApply"
   final val recInvKey = "recInv"
   final val opApplyKey = "opApply"
@@ -39,7 +39,7 @@ object DomainsGenerator {
          |
          |    axiom _inverse_receiver {
          |        forall a : $compDTV0, f: Set[$compDTV0], r: $recDKey[$compDTV0]
-         |        :: {$recApplyKey(r,a), filterReceiverGood(f,r)} // {filterReceiverGood(f,r), a in f}
+         |        :: {$recApplyKey(r,a), filterReceiverGood(f,r)} {filterReceiverGood(f,r), a in f}
          |        filterReceiverGood(f,r) && a in f ==> filterReceiverGood(f,r) &&
          |        a in f && $recInvKey(r,$recApplyKey(r,a)) == a
          |    }
@@ -109,6 +109,9 @@ object DomainsGenerator {
     val axioms: Seq[String] = Seq()
     val opOut =
       s"""domain $opDKey[$compDTV2] {
+         |
+         |    function _noTrigOp(out: $compDTV2): Bool
+         |
          |    function $opApplyKey(op: $opDKey[$compDTV2], val1:$compDTV2, val2:$compDTV2) : $compDTV2
          |
          |    function $opIdenKey(op: $opDKey[$compDTV2]) : $compDTV2
@@ -154,7 +157,24 @@ object DomainsGenerator {
          |
          |    function getSnapFieldID(m: Map[$compDTV0, $compDTV2]): Int
          |
+         |    axiom _invAxFold {
+         |      forall
+         |        r: $recDKey[$compDTV0],
+         |        m: $mapDKey[$compDTV1,$compDTV2],
+         |        o: $opDKey[$compDTV2]
+         |        :: {$compConstructKey(r,m,o)}
+         |        getreceiver($compConstructKey(r,m,o)) == r &&
+         |        getmapping($compConstructKey(r,m,o)) == m &&
+         |        getoperator($compConstructKey(r,m,o)) == o
+         |    }
          |
+         |    axiom _emptyFold {
+         |        forall c: $compDKey[$compDTV0,$compDTV1,$compDTV2],
+         |               snap: Map[$compDTV0, $compDTV2] ::
+         |        {$compApplyKey(c, snap)}
+         |            domain(snap) == Set() ==>  domain(snap) == Set() &&
+         |                $compApplyKey(c, snap) == $opIdenKey(getoperator(c))
+         |    }
          |
          |    axiom _singleton {
          |        forall c: $compDKey[$compDTV0,$compDTV1,$compDTV2],
@@ -167,7 +187,7 @@ object DomainsGenerator {
          |    axiom _dropOne1 {
          |        forall c:$compDKey[$compDTV0,$compDTV1,$compDTV2],
          |               snap1: Map[$compDTV0, $compDTV2], key: $compDTV0 ::
-         |        {_triggerDeleteKey1($compApplyKey(c,snap1),Set(key))}
+         |        {_triggerDeleteKey1($compApplyKey(c,snap1),key)}
          |            (key in domain(snap1)) ==>  (key in domain(snap1))  &&
          |               $compApplyKey(c,snap1) ==
          |               $opApplyKey(getoperator(c),$compApplyPrimeKey(c,
@@ -192,6 +212,33 @@ object DomainsGenerator {
          |
          |}\n """.stripMargin
     compOut
+  }
+
+  def setFuncDomainString(): String = {
+    val axioms: Seq[String] = Seq()
+    val setOut =
+      s"""domain setFunc[A] {
+         |
+         |    axiom setminusAssoc {
+         |        forall s1: Set[A], s2: Set[A], s3: Set[A] :: {(s1 setminus s2) setminus s3}
+         |            (s1 setminus s2) setminus s3 == (s1 setminus s3) setminus s2
+         |    }
+         |
+         |    axiom setminusRepeated {
+         |        forall s1: Set[A], s2: Set[A] :: {(s1 setminus s2) setminus s2}
+         |            (s1 setminus s2) setminus s2 == (s1 setminus s2)
+         |    }
+         |
+         |    axiom _emptySubset {
+         |        forall s1: Set[A], s2: Set[A] :: {s2 subset s1}
+         |            (s1 == Set()) ==>  ((s2 subset s1) <==> s2 == Set())
+         |    }
+         |}
+         |
+         |
+         |
+         |\n """.stripMargin
+    setOut
   }
 
   def mapCustomDomainString(): String = {
