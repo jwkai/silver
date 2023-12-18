@@ -75,9 +75,11 @@ case class POperator(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], opUnit: P
     val opAppliedi2i1 = helper.applyDomainFunc(
       DomainsGenerator.opApplyKey, Seq(opExp, input2.localVar, input1.localVar), opTypeVarMap)
     // Communtativity + assertion
+    val dummyTrigger0 = helper.applyDomainFunc(
+      "_noTrigOp",Seq(opAppliedi1i2), opTypeVarMap)
     val forallComm = Forall(
       opOuterArgs ++ Seq(input1, input2),
-      Seq(Trigger(Seq(opAppliedi1i2))()),
+      Seq(Trigger(Seq(dummyTrigger0))()),
       EqCmp(opAppliedi1i2, opAppliedi2i1)())()
     val assert1 = Assert(forallComm)()
 
@@ -86,12 +88,14 @@ case class POperator(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], opUnit: P
     val opAppliedi2i3 = helper.applyDomainFunc(
       DomainsGenerator.opApplyKey, Seq(opExp, input2.localVar, input3.localVar), opTypeVarMap)
     val opAppliedAssocL = helper.applyDomainFunc(
-      DomainsGenerator.opApplyKey, Seq(opAppliedi1i2, input3.localVar), opTypeVarMap)
+      DomainsGenerator.opApplyKey, Seq(opExp, opAppliedi1i2, input3.localVar), opTypeVarMap)
     val opAppliedAssocR = helper.applyDomainFunc(
-      DomainsGenerator.opApplyKey, Seq(input1.localVar, opAppliedi2i3), opTypeVarMap)
+      DomainsGenerator.opApplyKey, Seq(opExp, input1.localVar, opAppliedi2i3), opTypeVarMap)
+    val dummyTrigger1 = helper.applyDomainFunc(
+      "_noTrigOp",Seq(opAppliedAssocL), opTypeVarMap)
     val forallAssoc = Forall(
       opOuterArgs ++ Seq(input1, input2, input3),
-      Seq(Trigger(Seq(opAppliedAssocL))()),
+      Seq(Trigger(Seq(dummyTrigger1))()),
       EqCmp(opAppliedAssocL, opAppliedAssocR)())()
     val assert2 = Assert(forallAssoc)()
 
@@ -99,10 +103,12 @@ case class POperator(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], opUnit: P
     val opUnit = helper.applyDomainFunc(
       DomainsGenerator.opIdenKey, Seq(opExp), opTypeVarMap)
     val opAppliedUnit = helper.applyDomainFunc(
-      DomainsGenerator.opApplyKey, Seq(input1.localVar, opUnit), opTypeVarMap)
+      DomainsGenerator.opApplyKey, Seq(opExp, input1.localVar, opUnit), opTypeVarMap)
+    val dummyTrigger2 = helper.applyDomainFunc(
+      "_noTrigOp",Seq(opAppliedUnit), opTypeVarMap)
     val forallIden = Forall(
       opOuterArgs ++ Seq(input1),
-      Seq(Trigger(Seq(opAppliedUnit))()),
+      Seq(Trigger(Seq(dummyTrigger2))()),
       EqCmp(opAppliedUnit, input1.localVar)())()
     val assert3 = Assert(forallIden)()
 
