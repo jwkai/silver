@@ -1,0 +1,178 @@
+field val: Int
+
+domain Array {
+  function loc(a: Array, i: Int): Ref
+  function len(a: Array): Int
+  function first(r: Ref): Array
+  function second(r: Ref): Int
+
+  axiom all_diff {
+    forall a: Array, i: Int :: {loc(a,i)}
+      first(loc(a,i)) == a && second(loc(a,i)) == i
+  }
+
+  axiom len_nonneg {
+    forall a: Array :: { len(a) }
+      len(a) >= 0
+  }
+}
+receiver arrayRec(a: Array) (fun i: Int :: loc(a,i))
+filter allInt(start: Int, end: Int) (fun i: Int :: i >= start && i < end )
+filter twoInts(i1: Int, i2: Int) (fun i: Int :: i == i1 || i == i2 )
+
+mapping singleM() (fun i: Int :: Multiset(i))
+identityOp mUnion() (Multiset[Int](), fun a: Multiset[Int], b: Multiset[Int] :: a union b )
+
+define access_array(a, i1, i2)
+    (forall j: Int :: {j in allInt(i1,i2)} j in allInt(i1,i2) ==> acc(loc(a,j).val))
+
+define mUnionfold(a, f)
+    (hfold[mUnion()](singleM(arrayRec(a).val) | f))
+
+method swapTest(a:Array, i1: Int, i2: Int)
+    requires acc(loc(a,i1).val) && acc(loc(a,i2).val)
+    requires i1 >= 0 && i1 < len(a) && i2 >= 0 && i2 < len(a)
+    ensures acc(loc(a,i1).val) && acc(loc(a,i2).val)
+    ensures mUnionfold(a,twoInts(i1,i2)) ==
+       old(mUnionfold(a,twoInts(i1,i2)))
+{
+    var temp: Int := loc(a,i1).val
+    loc(a,i1).val := loc(a,i2).val
+    loc(a,i2).val := temp
+}
+
+
+method swapTest2(a:Array, i1: Int, i2: Int)
+    requires access_array(a,0,len(a))
+    requires i1 in allInt(0,len(a)) && i2 in allInt(0,len(a))
+    requires i1 != i2
+    ensures access_array(a,0,len(a))
+    ensures mUnionfold(a, allInt(0,len(a))) ==
+            old(mUnionfold(a, allInt(0,len(a))))
+{
+    swapTest(a,i1,i2)
+}
+
+
+// Problem 3 Core Goal
+// Extension 1 is given in quick_sort_parallel.vpr
+
+// checks if an arr is sorted
+define sorted(arr)
+  forall i: Int, j: Int :: {slot(arr,i).val, slot(arr,j).val} (0 <= i && 0 <= j && i < len(arr) && j < len(arr) && i < j) ==>
+    slot(arr, i).val <= slot(arr, j).val
+
+// checks that a subarray is sorted from indices [low,high]
+define sorted_sub(arr, low, high)
+  forall i: Int, j: Int :: {slot(arr,i), slot(arr,j)} (low <= i && low <= j && i <= high && j <= high && i < j) ==>
+    slot(arr, i).val <= slot(arr, j).val
+
+// checks that a subarray has values between a min and a max (inclusive)
+define between_min_max(arr, low, high, min, max)
+  forall i: Int :: {slot(arr, i).val } (low <= i && i <= high) ==>
+    (slot(arr, i).val >= min) && (slot(arr, i).val <= max)
+
+// swaps two values in an array given 2 indices, taken from lectures
+method swap(arr: Array, i: Int, j: Int)
+  requires 0 <= i && i < len(arr) && 0 <= j && j < len(arr)
+  requires acc(slot(arr, i).val) && (i != j ==> acc(slot(arr, j).val))
+
+  ensures acc(slot(arr, i).val) && (i != j ==> acc(slot(arr, j).val))
+  ensures slot(arr, i).val == old(slot(arr, j).val)
+  ensures slot(arr, j).val == old(slot(arr, i).val)
+{
+  var tmp: Int := slot(arr, i).val
+  slot(arr, i).val := slot(arr, j).val
+  slot(arr, j).val := tmp
+}
+
+// Helper method for quicksort
+// Takes an array, the low and high indices, and the min and max bounds for the values
+method quick_sort_helper(arr: Array, low: Int, high: Int, min : Int, max : Int)
+  // Describes the subarray indices and access to the elements
+  requires 0 <= low && low < high && high < len(arr)
+  requires access(arr, low, high)
+  // The subarray elements has bounded values
+  requires between_min_max(arr, low, high, min, max)
+
+  ensures access(arr, low, high) // Returns access
+  ensures between_min_max(arr, low, high, min, max) // Subarray remains bounded
+  ensures sorted_sub(arr, low, high) // Subarray is sorted
+  ensures len(arr) == old(len(arr)) // Subarray maintain length (given for free since len() is a function)
+{
+  var pivot: Int := slot(arr, high).val   // Value of the pivot
+  var pi: Int := low // A pivot index for swapping the pivot after
+  var index: Int := low // The index that iterates through the array
+  while (index < high)
+    invariant low <= index && index <= high    // Index remains within the subarray
+    invariant low <= pi && pi <= index // pivot index always follows behind the main iterator index
+    invariant access(arr, low, high)     // retain access
+    invariant pivot == slot(arr, high).val    // value of the last element remains the pivot value
+    invariant between_min_max(arr, low, high, min, max)     // Subarray still does not exceed the min and max bounds
+
+    // Everything to the left of the pivot index has values less than or equal to the pivot
+    invariant forall i: Int :: {slot(arr, i).val} low <= i && i < pi  ==> slot(arr, i).val <= pivot
+
+    // Everything to the right of the pivot index has values greater than the pivot
+    invariant forall i: Int :: {slot(arr, i).val} i >= pi && i < index ==> slot(arr, i).val > pivot
+  {
+    // Swap values and increment pivot indices as appropriate
+    if (slot(arr, index).val <= pivot) {
+        swap(arr, index, pi)
+        pi := pi + 1
+    }
+    index := index + 1
+  }
+
+  // Swaps the last element with the pivot index
+  swap(arr, pi, high)
+
+  // Everything to the left of the pivot index has values less than or equal to the pivot
+  assert forall i: Int :: {slot(arr, i).val} low <= i && i < pi  ==> slot(arr, i).val <= slot(arr, pi).val
+  // Everything to the right of the pivot index has values greater than the pivot
+  assert forall i: Int :: {slot(arr, i).val} i > pi && i < index ==> slot(arr, i).val > slot(arr, pi).val
+
+  // Sort the left if there is at least 2 elements in the subarray left of pivot index
+  if (low < pi - 1) {
+    // Sort, but remember that the left subarray is bounded maximally by the pivot value
+    quick_sort_helper(arr, low, pi - 1, min, slot(arr, pi).val)
+  }
+
+  // Sort the right if there is at least 2 elements in the subarray right of pivot index
+  if (high > pi + 1) {
+    // Sort, but remember that the right subarray is bounded minimally by the pivot value
+    quick_sort_helper(arr, pi + 1, high, slot(arr, pi).val, max)
+  }
+
+}
+
+// The main quicksort that takes an array
+method quick_sort_main(arr: Array)
+  // Gets and returns access to the entire array, ensuring it is sorted
+  requires access(arr, 0, len(arr) - 1)
+  ensures access(arr, 0, len(arr) - 1)
+  ensures sorted(arr)
+{
+  // We only need to sort if the array has length greater than 1
+  if (len(arr) - 1 > 0) {
+
+    // Define min_int to be some int less than or equal to any value in the array, like MIN_INT or negative infinity
+    // Represents unbounded minimum
+    var min_int : Int
+    assume forall i: Int :: {slot(arr, i).val} (0 <= i && i <= len(arr) - 1) ==> (slot(arr, i).val >= min_int)
+
+    // Define max_int to be some int greater or equal to any value in the array, like MAX_INT or infinity
+    // Represents unbounded maximum
+    var max_int : Int
+    assume forall i: Int :: {slot(arr, i).val} (0 <= i && i <= len(arr) - 1) ==> (slot(arr, i).val <= max_int)
+
+    // Sort the entire array with bounds min and max int
+    quick_sort_helper(arr, 0, len(arr) - 1, min_int, max_int)
+  }
+}
+
+field val: Int
+
+// Defines access to a subarray
+define access(a, low, high)
+  forall i : Int :: {slot(arr, i).val} low <= i && i <= high ==> acc(slot(a, i).val)

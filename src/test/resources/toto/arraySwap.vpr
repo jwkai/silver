@@ -16,10 +16,9 @@ domain Array {
       len(a) >= 0
   }
 }
-receiver arrayRec(a: Array) (fun i: Int :: loc(a,i))
-filter allInt(start: Int, end: Int) (fun i: Int :: i >= start && i < end )
-filter twoInts(i1: Int, i2: Int) (fun i: Int :: i == i1 || i == i2 )
 
+receiver arrayRec(a: Array) (fun i: Int :: loc(a,i))
+filter twoInts(i1: Int, i2: Int) (fun i: Int :: i == i1 || i == i2 )
 mapping singleM() (fun i: Int :: Multiset(i))
 identityOp mUnion() (Multiset[Int](), fun a: Multiset[Int], b: Multiset[Int] :: a union b )
 

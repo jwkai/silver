@@ -16,6 +16,7 @@ domain Array {
       len(a) >= 0
   }
 }
+
 receiver arrayRec(a: Array) (fun i: Int :: loc(a,i))
 filter allInt(start: Int, end: Int) (fun i: Int :: i >= start && i < end )
 filter twoInts(i1: Int, i2: Int) (fun i: Int :: i == i1 || i == i2 )
@@ -27,26 +28,40 @@ define access_array(a, i1, i2)
 define mUnionfold(a, f)
     (hfold[mUnion()](singleM(arrayRec(a).val) | f))
 
-method swapTest(a:Array, i1: Int, i2: Int)
+method swap(a:Array, i1: Int, i2: Int)
     requires acc(loc(a,i1).val) && acc(loc(a,i2).val)
     requires i1 >= 0 && i1 < len(a) && i2 >= 0 && i2 < len(a)
     ensures acc(loc(a,i1).val) && acc(loc(a,i2).val)
     ensures mUnionfold(a,twoInts(i1,i2)) ==
-       old(mUnionfold(a,twoInts(i1,i2)))
+           old(mUnionfold(a,twoInts(i1,i2)))
 {
+
     var temp: Int := loc(a,i1).val
     loc(a,i1).val := loc(a,i2).val
     loc(a,i2).val := temp
 }
 
-method sortArray(a:Array, i1: Int, i2: Int)
-    requires access_array(a,0,len(a))
-    requires i1 in allInt(0,len(a)) && i2 in allInt(0,len(a))
-    requires i1 != i2
-    ensures access_array(a,0,len(a))
-    ensures mUnionfold(a, allInt(0,len(a))) ==
-            old(mUnionfold(a, allInt(0,len(a))))
+method bubbleSort(a: Array)
+    requires access_array(a, 0, len(a))
+    ensures access_array(a, 0, len(a))
+    ensures mUnionfold(a, allInt(0,len(a))) == old(mUnionfold(a, allInt(0,len(a))))
 {
-    swapTest(a,i1,i2)
-    swapTest(a,i1,i2)
+    var n : Int := len(a)
+    var swapped : Bool := true
+    while(swapped)
+        invariant access_array(a, 0, len(a))
+        invariant mUnionfold(a, allInt(0,len(a))) == old(mUnionfold(a, allInt(0,len(a))))
+    {
+        swapped := false
+        var i : Int := 1
+        while(i < len(a))
+            invariant access_array(a, 0, len(a))
+            invariant mUnionfold(a, allInt(0,len(a))) == old(mUnionfold(a, allInt(0,len(a))))
+        {
+            if (loc(a,i - 1).val > loc(a,i).val) {
+                swap(a, i-1, i)
+                swapped := true
+            }
+        }
+    }
 }

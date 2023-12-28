@@ -39,7 +39,7 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
     P("(") ~ mapRecBoth ~ "|" ~ exp ~ ")"
 
   def comp[$: P]: P[PComprehension] =
-    (compOp ~ compDef).map{
+    (compOp ~/ compDef).map{
       case (pos, unitOp, (mRF, parsedFilter)) =>
         PComprehension(unitOp,mRF,parsedFilter)(pos)
     }

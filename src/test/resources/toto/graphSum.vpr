@@ -12,9 +12,7 @@ define INV(nodes)
 	&& (forall n: Ref :: {n.right in nodes}{n in nodes, n.right}
 				n in nodes && n.right != null ==> n.right in nodes)
 
-
 receiver idenRec() (fun r: Ref :: r)
-mapping singleM() (fun i: Int :: Multiset(i))
 identityOp add() (0 ,fun a: Int, b: Int :: a + b )
 
 method sumNodes(nodes : Set[Ref], node: Ref)
@@ -25,8 +23,8 @@ method sumNodes(nodes : Set[Ref], node: Ref)
                old(hfold[add()](idenRec().val | nodes)) +2
 {
     node.val := node.val + 1
-    var node2: Ref
 
+    var node2: Ref
     assume node2 in nodes
     node2.val := node2.val + 1
 
