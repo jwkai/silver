@@ -1,8 +1,9 @@
 package viper.silver.plugin.toto
 
-import viper.silver.ast.{Exp, Position}
+import viper.silver.ast.{ErrTrafo, Exp, Position}
 import viper.silver.parser._
 import viper.silver.plugin.toto.PComprehension.getNewTypeVariable
+import viper.silver.verifier.errors
 
 // First representation, the user input of comprehension gets turned into this PAst Node
 case class PComprehension(opUnit: PCall, mappingFieldReceiver: PMappingFieldReceiver, filter: PExp)(val pos: (Position, Position)) extends PExtender with PExp {
@@ -66,10 +67,20 @@ case class PComprehension(opUnit: PCall, mappingFieldReceiver: PMappingFieldRece
     val filterTranslated = t.exp(filter)
 //    val mappingTranslated = mappingOpt.getOrElse(throw new Exception("Mapping should be defined."))
 
-    val tuple = AComprehension3Tuple(receiverTranslated, mappingOut, opTranslated)(pos._1)
-    val snap = ASnapshotApp(tuple, filterTranslated, fieldString)(pos._1)
-//    val f = snap.filter
-    ACompApply(tuple, snap)(pos._1)
+
+
+    val tuple = AComprehension3Tuple(receiverTranslated, mappingOut, opTranslated)(t.liftPos(this))
+    val snap = ASnapshotApp(tuple, filterTranslated, fieldString)(t.liftPos(this))
+    val compApply = ACompApply(tuple, snap)(t.liftPos(this))
+
+    val errT = ErrTrafo( {
+      case errors.PreconditionInAppFalse(offendingNode, reason, cached) =>
+        FoldErrors.FoldApplyError(offendingNode, compApply, reason, cached)
+    })
+    ACompApply(tuple.copy()(pos = t.liftPos(this), errT = errT),
+      snap.copy()(pos = t.liftPos(this), errT = errT))(
+      pos = t.liftPos(this), errT = errT)
+
   }
 
 }
