@@ -3,6 +3,7 @@ package viper.silver.plugin.toto
 import viper.silver.ast.{DomainFuncApp, ErrorTrafo, Exp, ExtensionExp, Info, NoInfo, NoPosition, NoTrafos, Node, Position, Program, Type}
 import viper.silver.ast.pretty.FastPrettyPrinter._
 import viper.silver.ast.pretty.PrettyPrintPrimitives
+import viper.silver.parser.PCall
 import viper.silver.verifier.VerificationResult
 
 case class ACompApply(comp: AComprehension3Tuple, snap: ASnapshotApp)(val pos: Position = NoPosition, val info: Info = NoInfo,
@@ -15,7 +16,7 @@ case class ACompApply(comp: AComprehension3Tuple, snap: ASnapshotApp)(val pos: P
     val snapConstructed = snap.toViper(input)
 
     DomainFuncApp(compEvalFunc,
-      Seq(comp.toViper(input), snap.toViper(input)), compConstructed.typVarMap
+      Seq(compConstructed, snapConstructed), compConstructed.typVarMap
     )(this.pos, this.info, this.errT)
 
 //    DomainFuncApp(DomainsGenerator.compEvalKey, Seq(comp.toViper(input), snap.toViper(input)), Map())(
@@ -23,8 +24,21 @@ case class ACompApply(comp: AComprehension3Tuple, snap: ASnapshotApp)(val pos: P
 //    )
   }
 
+  def includeMapping(inside: Cont, mapping: Exp): Cont = {
+    val mapApplied = mapping.asInstanceOf[DomainFuncApp]
+    if (mapApplied.funcname == "mapIdenKey") {
+      inside
+    } else {
+      text(mapApplied.funcname) <> parens(ssep(inside +: (mapApplied.args map show), group(char (',') <> line)))
+    }
+  }
+
+
   override lazy val prettyPrint: PrettyPrintPrimitives#Cont =
-    text(DomainsGenerator.compApplyKey) <+>  parens(ssep(Seq(show(comp), show(snap)), group(char (',') <> line)))
+    text(DomainsGenerator.compConstructKey) <> brackets(show(comp.op)) <>
+      parens(includeMapping(show(comp.receiver) <> char('.') <> text(snap.field), comp.mapping) <+>
+        char('|') <+> show(snap.filter))
+  //parens(ssep(Seq(show(comp), show(snap)), group(char (',') <> line)))
 
   override val extensionSubnodes: Seq[Node] = Seq(comp, snap)
 
