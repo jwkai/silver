@@ -1,14 +1,16 @@
 package viper.silver.plugin.toto
 
-import viper.silver.ast.{AnonymousDomainAxiom, AnyLocalVarDecl, Assert, Domain, DomainFunc, DomainFuncApp, DomainType, EqCmp, Exp, Forall, LocalVar, LocalVarDecl, Member, Method, NoTrafos, Position, Program, Seqn, Trigger}
+import viper.silver.ast.{AnonymousDomainAxiom, AnyLocalVarDecl, Assert, Domain, DomainFunc, DomainFuncApp, DomainType, EqCmp, ErrTrafo, Exp, Forall, LocalVar, LocalVarDecl, Member, Method, NoTrafos, Position, Program, Seqn, Trigger}
 import viper.silver.parser.{PExp, _}
 import viper.silver.plugin.toto.util.AxiomHelper
+import viper.silver.verifier.errors.AssertFailed
 
 case class POperator(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], opUnit: PExp, body : PFunInline)
                     (val pos: (Position, Position))
   extends PExtender with PAnyFunction with PCompComponentDecl {
 
   override val componentName: String = "Operator"
+  var sourcePos : Position = null;
 
 //  override val getSubnodes: Seq[PNode] = Seq(idndef) ++ formalArgs ++ Seq(opUnit, body)
 //
@@ -39,6 +41,7 @@ case class POperator(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], opUnit: P
       functions = d.functions,
       axioms = d.axioms :+ axiom
     )(d.pos, d.info, d.errT)
+    sourcePos = t.liftPos(this)
     t.getMembers()(genDomainName) = dd
     dd
 
@@ -81,7 +84,15 @@ case class POperator(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], opUnit: P
       opOuterArgs ++ Seq(input1, input2),
       Seq(Trigger(Seq(dummyTrigger0))()),
       EqCmp(opAppliedi1i2, opAppliedi2i1)())()
-    val assert1 = Assert(forallComm)()
+
+    val errComm = ErrTrafo({
+      case AssertFailed(offendingNode, _, cached) => {
+        val reason = FoldReasons.NotCommutative(offendingNode, this)
+        FoldErrors.OpWellDefinednessError(offendingNode, this, reason, cached)
+      }
+    })
+
+    val assert1 = Assert(forallComm)(errT = errComm)
 
     // 3rd var for associativity check
     val input3 = LocalVarDecl("_i3", inputType)()
@@ -97,7 +108,14 @@ case class POperator(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], opUnit: P
       opOuterArgs ++ Seq(input1, input2, input3),
       Seq(Trigger(Seq(dummyTrigger1))()),
       EqCmp(opAppliedAssocL, opAppliedAssocR)())()
-    val assert2 = Assert(forallAssoc)()
+
+    val errAssoc = ErrTrafo({
+      case AssertFailed(offendingNode, _, cached) => {
+        val reason = FoldReasons.NotAssociative(offendingNode, this)
+        FoldErrors.OpWellDefinednessError(offendingNode, this, reason, cached)
+      }
+    })
+    val assert2 = Assert(forallAssoc)(errT = errAssoc)
 
     // Identity check
     val opUnit = helper.applyDomainFunc(
@@ -110,7 +128,14 @@ case class POperator(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], opUnit: P
       opOuterArgs ++ Seq(input1),
       Seq(Trigger(Seq(dummyTrigger2))()),
       EqCmp(opAppliedUnit, input1.localVar)())()
-    val assert3 = Assert(forallIden)()
+
+    val errIden = ErrTrafo({
+      case AssertFailed(offendingNode, _, cached) => {
+        val reason = FoldReasons.IncorrectIdentity(offendingNode, this)
+        FoldErrors.OpWellDefinednessError(offendingNode, this, reason, cached)
+      }
+    })
+    val assert3 = Assert(forallIden)(errT = errIden)
 
     Method("operator_" + this.idndef.name + "_welldef_check", Seq(), Seq(),Seq(),Seq(),
       Some(Seqn(Seq(assert1, assert2, assert3),Seq())()))()
