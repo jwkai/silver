@@ -5,13 +5,13 @@ import viper.silver.ast.pretty.FastPrettyPrinter.text
 import viper.silver.ast.pretty.PrettyPrintPrimitives
 import viper.silver.plugin.toto.ASnapshotDecl.tupleFieldToString
 import viper.silver.plugin.toto.util.AxiomHelper
+import viper.silver.verifier.reasons
 
 // Constructor should not be called directly, use getOrMakeNewSnapDecl
 case class ASnapshotDecl private(compType: (Type, Type, Type), fieldName: String)(val pos : Position = NoPosition)
   extends ExtensionMember
 {
   def key: String = tupleFieldToString(compType, fieldName)
-
 
   override def name: String = key
   override def extensionSubnodes: Seq[Node] = ???
@@ -124,11 +124,21 @@ case class ASnapshotDecl private(compType: (Type, Type, Type), fieldName: String
     // requires [filterReceiverGood(indices, getreceiver(c)),
     // filterReceiverGood(indices, getreceiver(c)) || forall $i1: Int, $i2: Int ::
     val inhaleExhaleExp = InhaleExhaleExp(reqFRGood,
-      Or(reqFRGood, injectiveFullCheck)())()
+      Or(reqFRGood, injectiveFullCheck)())(
+      errT =
+        ReTrafo({
+          case reasons.AssertionFalse(a) => FoldReasons.InjectivityError(a)
+        })
+    )
 
     // Access pres
     val accessCheck = helper.forallFilterHaveAccImpure(f, c, fieldName,
-      FractionalPerm(IntLit(1)(), IntLit(10)())())
+      FractionalPerm(IntLit(1)(), IntLit(10)())()).copy()(
+      errT =
+        ReTrafo({
+          case reasons.InsufficientPermission(a) => FoldReasons.PermissionsError(a, fieldName)
+        })
+    )
 
     // ------ Now posts------
     // ensures domain(result) == indices
