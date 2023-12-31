@@ -40,8 +40,8 @@ method test1(i0: Int, a:Array)
 
     // r.val := r.val + 1
 
-    assert comp[add()]{arrayRec(a).val | allInt(0,5)} == old(comp[add()]{arrayRec(a).val | allInt(0,5)}) + 2
+    assert hfold[add()](arrayRec(a).val | allInt(0,5)) == old(hfold[add()](arrayRec(a).val | allInt(0,5))) + 2
 
-    assert comp[add()]{arrayRec(a).val | allInt(0,10)} == old(comp[add()]{arrayRec(a).val | allInt(0,10)}) + 2
+    assert hfold[add()](arrayRec(a).val | allInt(0,10)) == old(hfold[add()](arrayRec(a).val | allInt(0,10))) + 2
 
 }

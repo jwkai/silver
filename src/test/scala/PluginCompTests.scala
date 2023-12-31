@@ -20,7 +20,7 @@ class PluginCompTests extends AnyFunSuite {
   var inputfile = "toto/sample_comp_test.vpr"
   inputfile = "toto/arrayTestExhaleInhale.vpr"
 //  inputfile = "toto/arrayTestExhaleExhale.vpr"
-  inputfile = "toto/arrayBubbleSort.vpr"
+//  inputfile = "toto/arrayBubbleSort.vpr"
 //  inputfile = "toto/arrayTestChain.vpr"
 //  val inputfile = "all/inhale_exhale/loops.vpr"
 //  val inputfile = "examples/graph-copy/graph-copy.vpr"
