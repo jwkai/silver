@@ -2,11 +2,11 @@ package viper.silver.plugin.toto
 
 import viper.silver.ast.{Exp, Position}
 import viper.silver.verifier.errors.ErrorNode
-import viper.silver.verifier.{AbstractErrorReason, AbstractVerificationError, ErrorMessage, ErrorReason, PartialVerificationError}
+import viper.silver.verifier._
 
 object FoldErrors {
 
-  case class OpWellDefinednessError(offendingNode: ErrorNode, op: POperator, reason: ErrorReason, override val cached: Boolean = false) extends AbstractVerificationError {
+  case class OpWellDefinednessError(offendingNode: ErrorNode, op: POperator, reason: ErrorReason, override val cached: Boolean = false) extends ExtensionAbstractVerificationError {
 
     val id = "op.welldefined"
     val text = s"Fold operator ${offendingNode} might not be well-defined."
@@ -18,7 +18,7 @@ object FoldErrors {
       OpWellDefinednessError(offendingNode, op, reason, cached)
   }
 
-  case class FoldApplyError(offendingNode: ErrorNode, foldNode: ACompApply, reason: ErrorReason, override val cached: Boolean = false) extends AbstractVerificationError {
+  case class FoldApplyError(offendingNode: ErrorNode, foldNode: ACompApply, reason: ErrorReason, override val cached: Boolean = false) extends ExtensionAbstractVerificationError {
 
     val id = "fold.apply"
     val text = s"Fold evaluation might not be well-defined."
@@ -49,21 +49,21 @@ object FoldErrors {
 
 object FoldReasons {
 
-  case class NotCommutative(offendingNode: ErrorNode, op: POperator) extends AbstractErrorReason {
+  case class NotCommutative(offendingNode: ErrorNode, op: POperator) extends ExtensionAbstractErrorReason {
     override def id: String = "op.commutative"
     override def readableMessage: String = s"Operator ${op.idndef.name} may not be commutative."
     override def pos: Position = op.sourcePos
     override def withNode(offendingNode: ErrorNode): ErrorMessage = NotCommutative(offendingNode, op)
   }
 
-  case class NotAssociative(offendingNode: ErrorNode, op: POperator) extends AbstractErrorReason {
+  case class NotAssociative(offendingNode: ErrorNode, op: POperator) extends ExtensionAbstractErrorReason {
     override def id: String = "op.associative"
     override def readableMessage: String = s"Operator ${op.idndef.name} may not be associative."
     override def pos: Position = op.sourcePos
     override def withNode(offendingNode: ErrorNode): ErrorMessage = NotAssociative(offendingNode, op)
   }
 
-  case class IncorrectIdentity(offendingNode: ErrorNode, op: POperator) extends AbstractErrorReason {
+  case class IncorrectIdentity(offendingNode: ErrorNode, op: POperator) extends ExtensionAbstractErrorReason {
     override def id: String = "op.identity"
     override def readableMessage: String = s"Operator ${op.idndef.name} may not have the right identity."
     override def pos: Position = op.sourcePos
@@ -71,7 +71,7 @@ object FoldReasons {
   }
 
 
-  case class InjectivityError(offendingNode: ErrorNode) extends AbstractErrorReason {
+  case class InjectivityError(offendingNode: ErrorNode) extends ExtensionAbstractErrorReason {
 
     var filter : Exp = null;
     var rec : Exp = null;
@@ -85,7 +85,7 @@ object FoldReasons {
     override def withNode(offendingNode: ErrorNode): ErrorMessage = InjectivityError(offendingNode)
   }
 
-  case class PermissionsError(offendingNode: ErrorNode, field: String) extends AbstractErrorReason {
+  case class PermissionsError(offendingNode: ErrorNode, field: String) extends ExtensionAbstractErrorReason {
 
     var filter : Exp = null;
     var rec : Exp = null;
