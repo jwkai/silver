@@ -673,7 +673,7 @@ case class TypeChecker(names: NameAnalyser) {
                           pfa.domainTypeRenaming = Some(fdtv)
                           pfa._extraLocalTypeVariables = (domain.typVars map (tv => PTypeVar(tv.idndef.name))).toSet
                           extraReturnTypeConstraint = explicitType
-
+                          // Add extra case for (extension) functions that are neither PFunction or PDomainFunction
                         case _ =>
                           checkMember(fd) {
                             check(fd.typ)
