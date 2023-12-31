@@ -1,9 +1,8 @@
 package viper.silver.plugin.toto
 
-import viper.silver.ast.{DomainFuncApp, ErrorTrafo, Exp, ExtensionExp, Info, NoInfo, NoPosition, NoTrafos, Node, Position, Program, Type}
 import viper.silver.ast.pretty.FastPrettyPrinter._
 import viper.silver.ast.pretty.PrettyPrintPrimitives
-import viper.silver.parser.PCall
+import viper.silver.ast.{Position, _}
 import viper.silver.verifier.VerificationResult
 
 case class ACompApply(comp: AComprehension3Tuple, snap: ASnapshotApp)(val pos: Position = NoPosition, val info: Info = NoInfo,

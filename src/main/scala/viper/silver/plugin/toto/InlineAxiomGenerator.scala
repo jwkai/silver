@@ -4,7 +4,7 @@ import viper.silver.ast._
 import viper.silver.ast.utility.Expressions
 import viper.silver.plugin.toto.util.AxiomHelper
 import viper.silver.verifier.errors
-import viper.silver.verifier.errors.{AssertFailed, PreconditionInAppFalse}
+import viper.silver.verifier.errors.AssertFailed
 
 import scala.collection.mutable
 
@@ -18,7 +18,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
   val method = program.findMethod(methodName)
   val helper = new AxiomHelper(program)
 
-  val fieldMaptoInt = program.fields.zipWithIndex.map(f => (f._1, f._2)).toMap
+//  val fieldMaptoInt = program.fields.zipWithIndex.map(f => (f._1, f._2)).toMap
 
   val snapshotDeclsUsed = {
     method.deepCollect( {
@@ -42,7 +42,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
   private var currentLabelNum = 0
   private var uniqueIDMethodOut = 0
   private var uniqueLabelMethod = 0
-  private var uniqueIDLost = 0
+//  private var uniqueIDLost = 0
 
 //  private val trackAllRelavantSnapshotDefs = program.functions.filter(f => f.name.contains("snapshot"))
 
@@ -103,7 +103,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     // Create inhales and exhales
     val exhales = newPres.map(p => Exhale(p)(p.pos, p.info,
       ErrTrafo({
-        case AssertFailed(offendingNode, reason, cached) =>
+        case AssertFailed(_, reason, cached) =>
           errors.PreconditionInCallFalse(methodCall, reason, cached)
       })
     ))
@@ -175,7 +175,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
         w.copy(body = Seqn(Seq(), Seq())())(w.pos, w.info, w.errT)
       case i : If =>
         i.copy(thn = Seqn(Seq(), Seq())(), els = Seqn(Seq(), Seq())())(i.pos, i.info, i.errT)
-      case out@ Seqn(ss, _) => return out
+      case out@ Seqn(_, _) => return out
       // Do this to ignore LHS in case of a heap write tgt with heap read. Could cause redundancy.
       case a: FieldAssign => {
         accLHS = accLHS + a.lhs;
@@ -313,7 +313,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
 
   private def generateExhaleAxiomsPerSnap(snapDecl: ASnapshotDecl, declaredLosts: mutable.Set[LocalVarDecl]): Seqn =  {
     val field = program.findField(snapDecl.fieldName)
-    val fieldUniqueId = fieldMaptoInt(field)
+//    val fieldUniqueId = fieldMaptoInt(field)
     // Find if lostP already defined for this field
     // Ignoring the label number because using the `contains` check
     val alreadyDeclaredLost = declaredLosts.find(l => l.name.contains(s"lostP_${field.name}"))
@@ -343,7 +343,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
         // (perm(iP.val) != write) && old[l0](perm(iP.val) == write)
         val Anded = And(permNotWrite, permOldWrite)()
         // iP in lostP_val <==> (perm(iP.val) != write) && old[l0](perm(iP.val) == write)
-        var forallBody = EqCmp(AnySetContains(forallVars.localVar, declareLost.localVar)(),
+        val forallBody = EqCmp(AnySetContains(forallVars.localVar, declareLost.localVar)(),
           Anded)()
         // forall iP : Ref:: {iP in lostP_val} ...
         val lostAxiom = Assume(Forall(Seq(forallVars), Seq(forallTriggers), forallBody)())()
