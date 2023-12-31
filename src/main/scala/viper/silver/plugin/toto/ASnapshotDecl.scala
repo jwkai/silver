@@ -132,8 +132,12 @@ case class ASnapshotDecl private(compType: (Type, Type, Type), fieldName: String
     )
 
     // Access pres
-    val accessCheck = helper.forallFilterHaveAccImpure(f, c, fieldName,
-      FractionalPerm(IntLit(1)(), IntLit(10)())()).copy()(
+    val accessCheckWithoutErr = helper.forallFilterHaveAccImpure(f, c, fieldName,
+      FractionalPerm(IntLit(1)(), IntLit(10)())())
+
+    val accessCheck = accessCheckWithoutErr.copy()(
+      pos  = accessCheckWithoutErr.pos,
+      info = accessCheckWithoutErr.info,
       errT =
         ReTrafo({
           case reasons.InsufficientPermission(a) => FoldReasons.PermissionsError(a, fieldName)

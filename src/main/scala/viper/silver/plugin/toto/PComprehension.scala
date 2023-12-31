@@ -73,13 +73,13 @@ case class PComprehension(opUnit: PCall, mappingFieldReceiver: PMappingFieldRece
     val snap = ASnapshotApp(tuple, filterTranslated, fieldString)(t.liftPos(this))
     val compApply = ACompApply(tuple, snap)(t.liftPos(this))
 
-    val errT = ErrTrafo( {
+    val errTFoldApply = ErrTrafo( {
       case errors.PreconditionInAppFalse(offendingNode, reason, cached) =>
         FoldErrors.FoldApplyError(offendingNode, compApply, reason, cached)
     })
-    ACompApply(tuple.copy()(pos = t.liftPos(this), errT = errT),
-      snap.copy()(pos = t.liftPos(this), errT = errT))(
-      pos = t.liftPos(this), errT = errT)
+    ACompApply(tuple.copy()(pos = t.liftPos(this), info = tuple.info, errT = errTFoldApply),
+      snap.copy()(pos = t.liftPos(this), info = snap.info, errT = errTFoldApply))(
+      pos = t.liftPos(this), info = compApply.info, errT = errTFoldApply)
 
   }
 
