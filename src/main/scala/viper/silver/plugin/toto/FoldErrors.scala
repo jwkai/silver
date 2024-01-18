@@ -74,8 +74,8 @@ object FoldReasons {
   case class InjectivityError(offendingNode: ErrorNode) extends ExtensionAbstractErrorReason {
 
     // To be reassigned by the withReason of foldErrors
-    var filter : Exp = null;
-    var rec : Exp = null;
+    var filter : Exp = null
+    var rec : Exp = null
 
     // Pos does not really matter for reason.
 //    override def pos: Position = null;
@@ -88,8 +88,8 @@ object FoldReasons {
 
   case class PermissionsError(offendingNode: ErrorNode, field: String) extends ExtensionAbstractErrorReason {
 
-    var filter : Exp = null;
-    var rec : Exp = null;
+    var filter : Exp = null
+    var rec : Exp = null
 
     // Pos does not really matter for reason.
     //    override def pos: Position = null;

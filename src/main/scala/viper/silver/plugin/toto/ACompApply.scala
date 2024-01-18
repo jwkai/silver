@@ -49,6 +49,6 @@ case class ACompApply(comp: AComprehension3Tuple, snap: ASnapshotApp)(val pos: P
 
   // Does not get used, transform to ordinary Viper before verification
   override def verifyExtExp(): VerificationResult = {
-    throw new Exception("Not implemented");
+    throw new Exception("Not implemented")
   }
 }
