@@ -238,7 +238,12 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
       case c@ ACompApply(_, _) =>
         c.toViper(newInput)
     })
+    newInput = newInput.transform ( {
+      case ori @ Assume(a) => Inhale(a)(ori.pos, ori.info, ori.errT)
+//      case ori @ Assert(a) => Exhale(a)(ori.pos, ori.info, ori.errT)
+    })
     print(pretty(newInput))
+
     newInput
 
 
