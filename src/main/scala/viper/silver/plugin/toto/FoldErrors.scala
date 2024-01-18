@@ -9,7 +9,7 @@ object FoldErrors {
   case class OpWellDefinednessError(offendingNode: ErrorNode, op: POperator, reason: ErrorReason, override val cached: Boolean = false) extends ExtensionAbstractVerificationError {
 
     val id = "op.welldefined"
-    val text = s"Fold operator ${offendingNode} might not be well-defined."
+    val text = s"Fold operator might not be well-defined."
     override def pos: Position = op.sourcePos
     override def withReason(reason: ErrorReason): AbstractVerificationError =
       OpWellDefinednessError(offendingNode, op,  reason, cached)
@@ -51,21 +51,21 @@ object FoldReasons {
 
   case class NotCommutative(offendingNode: ErrorNode, op: POperator) extends ExtensionAbstractErrorReason {
     override def id: String = "op.commutative"
-    override def readableMessage: String = s"Operator ${op.idndef.name} may not be commutative."
+    override def readableMessage: String = s"Operator ${op.idndef.name} might not be commutative."
     override def pos: Position = op.sourcePos
     override def withNode(offendingNode: ErrorNode): ErrorMessage = NotCommutative(offendingNode, op)
   }
 
   case class NotAssociative(offendingNode: ErrorNode, op: POperator) extends ExtensionAbstractErrorReason {
     override def id: String = "op.associative"
-    override def readableMessage: String = s"Operator ${op.idndef.name} may not be associative."
+    override def readableMessage: String = s"Operator ${op.idndef.name} might not be associative."
     override def pos: Position = op.sourcePos
     override def withNode(offendingNode: ErrorNode): ErrorMessage = NotAssociative(offendingNode, op)
   }
 
   case class IncorrectIdentity(offendingNode: ErrorNode, op: POperator) extends ExtensionAbstractErrorReason {
     override def id: String = "op.identity"
-    override def readableMessage: String = s"Operator ${op.idndef.name} may not have the right identity."
+    override def readableMessage: String = s"Operator ${op.idndef.name} might not have the correct identity."
     override def pos: Position = op.sourcePos
     override def withNode(offendingNode: ErrorNode): ErrorMessage = IncorrectIdentity(offendingNode, op)
   }
@@ -73,6 +73,7 @@ object FoldReasons {
 
   case class InjectivityError(offendingNode: ErrorNode) extends ExtensionAbstractErrorReason {
 
+    // To be reassigned by the withReason of foldErrors
     var filter : Exp = null;
     var rec : Exp = null;
 
