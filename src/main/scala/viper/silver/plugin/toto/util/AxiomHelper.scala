@@ -3,7 +3,8 @@ package viper.silver.plugin.toto.util
 import viper.silver.ast
 import viper.silver.ast.utility.Expressions
 import viper.silver.ast._
-import viper.silver.plugin.toto.DomainsGenerator
+import viper.silver.plugin.toto.{DomainsGenerator, FoldReasons}
+import viper.silver.verifier.reasons
 
 class AxiomHelper(program: Program) {
 
@@ -177,7 +178,14 @@ class AxiomHelper(program: Program) {
       Seq(getreceiverApplied, forallVarInd.localVar),
       compType.typVarsMap
     )()
-    val accExp = FieldAccessPredicate(FieldAccess(recApplied, field)(), acc)()
+
+    val fieldAcc = FieldAccess(recApplied, field)(
+      errT =
+        ReTrafo({
+          case reasons.InsufficientPermission(a) => FoldReasons.PermissionsError(a, fieldName)
+        })
+    )
+    val accExp = FieldAccessPredicate(fieldAcc, acc)()
     val output = Forall(Seq(forallVarInd), Seq(forallTrigger), Implies(setContains, accExp)())()
     output
   }
