@@ -16,7 +16,9 @@ case class ACompApply(comp: AComprehension3Tuple, snap: ASnapshotApp)(val pos: P
 
     DomainFuncApp(compEvalFunc,
       Seq(compConstructed, snapConstructed), compConstructed.typVarMap
-    )(this.pos, this.info, this.errT)
+    )(this.pos,
+      this.info,
+      this.errT + NodeTrafo(this))
 
 //    DomainFuncApp(DomainsGenerator.compEvalKey, Seq(comp.toViper(input), snap.toViper(input)), Map())(
 //      pos, info, comp.tripleType._3 , DomainsGenerator.compDKey , errT
