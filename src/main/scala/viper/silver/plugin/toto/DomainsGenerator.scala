@@ -1,7 +1,7 @@
 package viper.silver.plugin.toto
 
 import fastparse.Parsed
-import viper.silver.ast.{NoPosition, Position, VirtualPosition}
+import viper.silver.ast.{FilePosition, NoPosition, Position, VirtualPosition}
 import viper.silver.parser.{PDomain, PNode, ParseException}
 
 
@@ -28,7 +28,7 @@ object DomainsGenerator {
   final val opDKey = "Operator"
 
   def receiverDomainString(): String = {
-    val axioms: Seq[String] = Seq()
+//    val axioms: Seq[String] = Seq()
     val receiverOut =
       s"""domain $recDKey[$compDTV0] {
          |    function $recApplyKey(r:$recDKey[$compDTV0], a:$compDTV0) : Ref
@@ -273,11 +273,12 @@ object DomainsGenerator {
   def parseDomainString(input: String): PDomain = {
     val fp = new DummyParser();
     fp._line_offset = Array();
-    fastparse.parse[PDomain](input, fp.domainDecl(_)) match {
+    fastparse.parse(input, fp.domainDecl(_)) match {
       case Parsed.Success(newDomain, index) =>
         changePosRecursive(newDomain,
-          (VirtualPosition(s"Generated ${newDomain.idndef.name} domain start"),
-          VirtualPosition(s"Generated ${newDomain.idndef.name} domain end"))).asInstanceOf[PDomain]
+          (FilePosition(null, 0, 0), FilePosition(null, 0, 0))).asInstanceOf[PDomain]
+//          (VirtualPosition(s"Generated ${newDomain.idndef.name} domain start"),
+//          VirtualPosition(s"Generated ${newDomain.idndef.name} domain end"))).asInstanceOf[PDomain]
       case fail: Parsed.Failure =>
         // This should not happen
         val trace = fail.trace()
