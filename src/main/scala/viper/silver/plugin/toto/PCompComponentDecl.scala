@@ -1,7 +1,6 @@
 package viper.silver.plugin.toto
 
 import viper.silver.ast._
-import viper.silver.ast.utility.Triggers
 import viper.silver.parser._
 
 // Defines a component declaration. This is a PExtender node (extended as a plugin) and acts as a Function declaration,
