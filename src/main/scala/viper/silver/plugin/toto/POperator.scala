@@ -1,7 +1,7 @@
 package viper.silver.plugin.toto
 
-import viper.silver.ast.{AnonymousDomainAxiom, AnyLocalVarDecl, Assert, Domain, DomainFunc, DomainFuncApp, DomainType, EqCmp, ErrTrafo, Exp, Forall, LocalVar, LocalVarDecl, Member, Method, NoTrafos, Position, Program, Seqn, Trigger}
-import viper.silver.parser.{PExp, _}
+import viper.silver.ast._
+import viper.silver.parser._
 import viper.silver.plugin.toto.util.AxiomHelper
 import viper.silver.verifier.errors.AssertFailed
 
@@ -134,6 +134,10 @@ case class POperator(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], opUnit: P
         val reason = FoldReasons.IncorrectIdentity(offendingNode, this)
         FoldErrors.OpWellDefinednessError(offendingNode, this, reason, cached)
       }
+//      case ExhaleFailed(offendingNode, _, cached) => {
+//        val reason = FoldReasons.IncorrectIdentity(offendingNode, this)
+//        FoldErrors.OpWellDefinednessError(offendingNode, this, reason, cached)
+//      }
     })
     val assert3 = Assert(forallIden)(errT = errIden)
 
