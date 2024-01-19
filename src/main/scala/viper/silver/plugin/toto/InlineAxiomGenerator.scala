@@ -4,7 +4,7 @@ import viper.silver.ast._
 import viper.silver.ast.utility.Expressions
 import viper.silver.plugin.toto.util.AxiomHelper
 import viper.silver.verifier.errors
-import viper.silver.verifier.errors.AssertFailed
+import viper.silver.verifier.errors.ExhaleFailed
 
 import scala.collection.mutable
 
@@ -103,7 +103,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     // Create inhales and exhales
     val exhales = newPres.map(p => Exhale(p)(p.pos, p.info,
       ErrTrafo({
-        case AssertFailed(_, reason, cached) =>
+        case ExhaleFailed(_, reason, cached) =>
           errors.PreconditionInCallFalse(methodCall, reason, cached)
       })
     ))
