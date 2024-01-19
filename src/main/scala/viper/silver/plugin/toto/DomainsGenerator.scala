@@ -10,6 +10,7 @@ object DomainsGenerator {
   final val compDTV0 = "A"
   final val compDTV1 = "V"
   final val compDTV2 = "B"
+  final val prefix = "__fold_"
 
 
   final val compConstructKey = "hfold"
@@ -38,49 +39,57 @@ object DomainsGenerator {
          |    function filterNotLost(f1: Set[$compDTV0], r: $recDKey[$compDTV0], lostR: Set[Ref]): Set[$compDTV0]
          |
          |    axiom _inverse_receiver {
-         |        forall a : $compDTV0, f: Set[$compDTV0], r: $recDKey[$compDTV0]
-         |        :: {$recApplyKey(r,a), filterReceiverGood(f,r)} {filterReceiverGood(f,r), a in f}
-         |        filterReceiverGood(f,r) && a in f ==> filterReceiverGood(f,r) &&
-         |        a in f && $recInvKey(r,$recApplyKey(r,a)) == a
+         |        forall ${prefix}a : $compDTV0, ${prefix}f: Set[$compDTV0], ${prefix}r: $recDKey[$compDTV0]
+         |        :: {$recApplyKey(${prefix}r,${prefix}a), filterReceiverGood(${prefix}f,${prefix}r)}
+         |          {filterReceiverGood(${prefix}f,${prefix}r), ${prefix}a in ${prefix}f}
+         |        filterReceiverGood(${prefix}f,${prefix}r) && ${prefix}a in ${prefix}f ==>
+         |        filterReceiverGood(${prefix}f,${prefix}r) &&
+         |        ${prefix}a in ${prefix}f && $recInvKey(${prefix}r,$recApplyKey(${prefix}r,${prefix}a)) == ${prefix}a
          |    }
          |
          |    axiom _inverse_receiver1 {
-         |        forall ref: Ref, f: Set[$compDTV0], r:$recDKey[$compDTV0]
-         |        ::{filterReceiverGood(f,r), $recInvKey(r,ref)}
-         |        filterReceiverGood(f,r) && $recInvKey(r,ref) in f ==>
-         |        filterReceiverGood(f,r) && $recInvKey(r,ref) in f && $recApplyKey(r,$recInvKey(r,ref)) == ref
+         |        forall ${prefix}ref: Ref, ${prefix}f: Set[$compDTV0], ${prefix}r:$recDKey[$compDTV0]
+         |        ::{filterReceiverGood(${prefix}f, ${prefix}r), $recInvKey(${prefix}r, ${prefix}ref)}
+         |        filterReceiverGood(${prefix}f, ${prefix}r) && $recInvKey(${prefix}r, ${prefix}ref) in ${prefix}f ==>
+         |        filterReceiverGood(${prefix}f, ${prefix}r) && $recInvKey(${prefix}r, ${prefix}ref) in ${prefix}f &&
+         |        $recApplyKey(${prefix}r,$recInvKey(${prefix}r,${prefix}ref)) == ${prefix}ref
          |    }
          |
          |    axiom smallerF {
-         |        forall f1: Set[$compDTV0], f2: Set[$compDTV0], r:$recDKey[$compDTV0] ::
-         |        {f2 subset f1, filterReceiverGood(f1,r)}
-         |        filterReceiverGood(f1,r) && f2 subset f1 ==>
-         |        filterReceiverGood(f1,r) && f2 subset f1 && filterReceiverGood(f2,r)
+         |        forall ${prefix}f1: Set[$compDTV0], ${prefix}f2: Set[$compDTV0], ${prefix}r:$recDKey[$compDTV0] ::
+         |        {${prefix}f2 subset ${prefix}f1, filterReceiverGood(${prefix}f1,${prefix}r)}
+         |        filterReceiverGood(${prefix}f1,${prefix}r) && ${prefix}f2 subset ${prefix}f1 ==>
+         |        filterReceiverGood(${prefix}f1,${prefix}r) &&
+         |          ${prefix}f2 subset ${prefix}f1 && filterReceiverGood(${prefix}f2,${prefix}r)
          |    }
          |
          |    axiom smallerFDelete {
-         |        forall f1: Set[$compDTV0], f2: Set[$compDTV0], r:$recDKey[$compDTV0] ::
-         |        {filterReceiverGood(f1,r), f1 setminus f2}
-         |        filterReceiverGood(f1,r) ==> filterReceiverGood(f1,r) && filterReceiverGood(f1 setminus f2,r)
+         |        forall ${prefix}f1: Set[$compDTV0], ${prefix}f2: Set[$compDTV0], ${prefix}r:$recDKey[$compDTV0] ::
+         |        {filterReceiverGood(${prefix}f1,${prefix}r), ${prefix}f1 setminus ${prefix}f2}
+         |        filterReceiverGood(${prefix}f1,${prefix}r) ==> filterReceiverGood(${prefix}f1,${prefix}r) &&
+         |        filterReceiverGood(${prefix}f1 setminus ${prefix}f2,${prefix}r)
          |    }
          |
          |    axiom unionF {
-         |        forall f1: Set[$compDTV0], f2: Set[$compDTV0], r:$recDKey[$compDTV0] ::
-         |        {filterReceiverGood(f1 union f2,r)}
-         |        filterReceiverGood(f1 union f2,r) ==>
-         |        filterReceiverGood(f1 union f2,r) &&  filterReceiverGood(f1,r) && filterReceiverGood(f2,r)
+         |        forall ${prefix}f1: Set[$compDTV0], ${prefix}f2: Set[$compDTV0], ${prefix}r:$recDKey[$compDTV0] ::
+         |        {filterReceiverGood(${prefix}f1 union ${prefix}f2,${prefix}r)}
+         |        filterReceiverGood(${prefix}f1 union ${prefix}f2,${prefix}r) ==>
+         |        filterReceiverGood(${prefix}f1 union ${prefix}f2,${prefix}r) &&
+         |        filterReceiverGood(${prefix}f1,${prefix}r) && filterReceiverGood(${prefix}f2,${prefix}r)
          |    }
          |
          |    axiom _filterNotLostAxiom {
-         |        forall a: $compDTV0, fs: Set[$compDTV0], r: $recDKey[$compDTV0], lostR: Set[Ref] ::
-         |        {a in filterNotLost(fs, r, lostR)}
-         |            a in filterNotLost(fs, r, lostR) <==>
-         |                (a in fs && !($recApplyKey(r, a) in lostR))
+         |        forall ${prefix}a: $compDTV0, ${prefix}fs: Set[$compDTV0], ${prefix}r: $recDKey[$compDTV0],
+         |          ${prefix}lostR: Set[Ref] ::
+         |        {${prefix}a in filterNotLost(${prefix}fs, ${prefix}r, ${prefix}lostR)}
+         |            ${prefix}a in filterNotLost(${prefix}fs, ${prefix}r, ${prefix}lostR) <==>
+         |                (${prefix}a in ${prefix}fs && !($recApplyKey(${prefix}r, ${prefix}a) in ${prefix}lostR))
          |    }
          |
          |    axiom _filterNotLostSubset {
-         |        forall fs: Set[$compDTV0], r: $recDKey[$compDTV0], lostR: Set[Ref] :: {filterNotLost(fs, r, lostR)}
-         |        filterNotLost(fs, r, lostR) subset fs
+         |        forall ${prefix}fs: Set[$compDTV0], ${prefix}r: $recDKey[$compDTV0], ${prefix}lostR: Set[Ref] ::
+         |          {filterNotLost(${prefix}fs, ${prefix}r, ${prefix}lostR)}
+         |        filterNotLost(${prefix}fs, ${prefix}r, ${prefix}lostR) subset ${prefix}fs
          |    }
          |
          |
@@ -137,9 +146,11 @@ object DomainsGenerator {
          |
          |
          |    axiom applyComp1Eq {
-         |        forall c: $compDKey[$compDTV0,$compDTV1,$compDTV2], snap: Map[$compDTV0,$compDTV2] ::
-         |        {$compApplyKey(c, snap)}
-         |        $compApplyKey(c, snap) == $compApplyPrimeKey(c,snap)
+         |        forall
+         |        ${prefix}c: $compDKey[$compDTV0,$compDTV1,$compDTV2],
+         |        ${prefix}snap: Map[$compDTV0,$compDTV2] ::
+         |        {$compApplyKey(${prefix}c, ${prefix}snap)}
+         |        $compApplyKey(${prefix}c, ${prefix}snap) == $compApplyPrimeKey(${prefix}c,${prefix}snap)
          |    }
          |
          |
@@ -159,49 +170,56 @@ object DomainsGenerator {
          |
          |    axiom _invAxFold {
          |      forall
-         |        r: $recDKey[$compDTV0],
-         |        m: $mapDKey[$compDTV1,$compDTV2],
-         |        o: $opDKey[$compDTV2]
-         |        :: {$compConstructKey(r,m,o)}
-         |        getreceiver($compConstructKey(r,m,o)) == r &&
-         |        getmapping($compConstructKey(r,m,o)) == m &&
-         |        getoperator($compConstructKey(r,m,o)) == o
+         |        ${prefix}r: $recDKey[$compDTV0],
+         |        ${prefix}m: $mapDKey[$compDTV1,$compDTV2],
+         |        ${prefix}o: $opDKey[$compDTV2]
+         |        :: {$compConstructKey(${prefix}r,${prefix}m,${prefix}o)}
+         |        getreceiver($compConstructKey(${prefix}r,${prefix}m,${prefix}o)) == ${prefix}r &&
+         |        getmapping($compConstructKey(${prefix}r,${prefix}m,${prefix}o)) == ${prefix}m &&
+         |        getoperator($compConstructKey(${prefix}r,${prefix}m,${prefix}o)) == ${prefix}o
          |    }
          |
          |    axiom _emptyFold {
-         |        forall c: $compDKey[$compDTV0,$compDTV1,$compDTV2],
-         |               snap: Map[$compDTV0, $compDTV2] ::
-         |        {$compApplyKey(c, snap)}
-         |            domain(snap) == Set() ==>  domain(snap) == Set() &&
-         |                $compApplyKey(c, snap) == $opIdenKey(getoperator(c))
+         |        forall ${prefix}c: $compDKey[$compDTV0,$compDTV1,$compDTV2],
+         |               ${prefix}snap: Map[$compDTV0, $compDTV2] ::
+         |        {$compApplyKey(${prefix}c, ${prefix}snap)}
+         |            domain(${prefix}snap) == Set() ==>  domain(${prefix}snap) == Set() &&
+         |                $compApplyKey(${prefix}c, ${prefix}snap) == $opIdenKey(getoperator(${prefix}c))
          |    }
          |
          |    axiom _singleton {
-         |        forall c: $compDKey[$compDTV0,$compDTV1,$compDTV2],
-         |               snap: Map[$compDTV0, $compDTV2], elem: $compDTV0 ::
-         |        {$compApplyKey(c, snap), Set(elem)}
-         |            domain(snap) == Set(elem) ==>  domain(snap) == Set(elem) &&
-         |                $compApplyKey(c, snap) == snap[elem]
+         |        forall ${prefix}c: $compDKey[$compDTV0,$compDTV1,$compDTV2],
+         |               ${prefix}snap: Map[$compDTV0, $compDTV2],
+         |               ${prefix}elem: $compDTV0 ::
+         |        {$compApplyKey(${prefix}c, ${prefix}snap), Set(${prefix}elem)}
+         |            domain(${prefix}snap) == Set(${prefix}elem) ==>
+         |            domain(${prefix}snap) == Set(${prefix}elem) &&
+         |                $compApplyKey(${prefix}c, ${prefix}snap) == ${prefix}snap[${prefix}elem]
          |    }
          |
          |    axiom _dropOne1 {
-         |        forall c:$compDKey[$compDTV0,$compDTV1,$compDTV2],
-         |               snap1: Map[$compDTV0, $compDTV2], key: $compDTV0 ::
-         |        {_triggerDeleteKey1($compApplyKey(c,snap1),key)}
-         |            (key in domain(snap1)) ==>  (key in domain(snap1))  &&
-         |               $compApplyKey(c,snap1) ==
-         |               $opApplyKey(getoperator(c),$compApplyPrimeKey(c,
-         |                                            mapDelete(snap1, Set(key))), snap1[key])
+         |        forall ${prefix}c:$compDKey[$compDTV0,$compDTV1,$compDTV2],
+         |               ${prefix}snap1: Map[$compDTV0, $compDTV2],
+         |               ${prefix}key: $compDTV0 ::
+         |        {_triggerDeleteKey1($compApplyKey(${prefix}c,${prefix}snap1),${prefix}key)}
+         |            (${prefix}key in domain(${prefix}snap1)) ==>
+         |            (${prefix}key in domain(${prefix}snap1))  &&
+         |               $compApplyKey(${prefix}c,${prefix}snap1) ==
+         |               $opApplyKey(getoperator(${prefix}c),
+         |                $compApplyPrimeKey(${prefix}c,
+         |                mapDelete(${prefix}snap1, Set(${prefix}key))), ${prefix}snap1[${prefix}key])
          |    }
          |
          |    axiom loseMany {
-         |        forall c:$compDKey[$compDTV0,$compDTV1,$compDTV2],
-         |               snap1:Map[$compDTV0, $compDTV2], keys: Set[$compDTV0] ::
-         |        {_triggerDeleteBlock($compApplyKey(c,snap1),keys)}
-         |            (keys subset domain(snap1)) ==>  (keys subset domain(snap1)) &&
-         |               $compApplyKey(c,snap1) == $opApplyKey(getoperator(c),
-         |                    $compApplyPrimeKey(c,mapDelete(snap1, keys)),
-         |                    $compApplyPrimeKey(c,mapSubmap(snap1,keys)))
+         |        forall ${prefix}c:$compDKey[$compDTV0,$compDTV1,$compDTV2],
+         |               ${prefix}snap1:Map[$compDTV0, $compDTV2],
+         |               ${prefix}keys: Set[$compDTV0] ::
+         |        {_triggerDeleteBlock($compApplyKey(${prefix}c,${prefix}snap1),${prefix}keys)}
+         |            (${prefix}keys subset domain(${prefix}snap1)) ==>
+         |            (${prefix}keys subset domain(${prefix}snap1)) &&
+         |               $compApplyKey(${prefix}c,${prefix}snap1) == $opApplyKey(getoperator(${prefix}c),
+         |                    $compApplyPrimeKey(${prefix}c,mapDelete(${prefix}snap1, ${prefix}keys)),
+         |                    $compApplyPrimeKey(${prefix}c,mapSubmap(${prefix}snap1, ${prefix}keys)))
          |    }
          |
          |
@@ -220,18 +238,21 @@ object DomainsGenerator {
       s"""domain setFunc[A] {
          |
          |    axiom setminusAssoc {
-         |        forall s1: Set[A], s2: Set[A], s3: Set[A] :: {(s1 setminus s2) setminus s3}
-         |            (s1 setminus s2) setminus s3 == (s1 setminus s3) setminus s2
+         |        forall ${prefix}s1: Set[A], ${prefix}s2: Set[A], ${prefix}s3: Set[A] ::
+         |        {(${prefix}s1 setminus ${prefix}s2) setminus ${prefix}s3}
+         |            (${prefix}s1 setminus ${prefix}s2) setminus ${prefix}s3 ==
+         |            (${prefix}s1 setminus ${prefix}s3) setminus ${prefix}s2
          |    }
          |
          |    axiom setminusRepeated {
-         |        forall s1: Set[A], s2: Set[A] :: {(s1 setminus s2) setminus s2}
-         |            (s1 setminus s2) setminus s2 == (s1 setminus s2)
+         |        forall ${prefix}s1: Set[A], ${prefix}s2: Set[A] ::
+         |        {(${prefix}s1 setminus ${prefix}s2) setminus ${prefix}s2}
+         |            (${prefix}s1 setminus ${prefix}s2) setminus ${prefix}s2 == (${prefix}s1 setminus ${prefix}s2)
          |    }
          |
          |    axiom _emptySubset {
-         |        forall s1: Set[A], s2: Set[A] :: {s2 subset s1}
-         |            (s1 == Set()) ==>  ((s2 subset s1) <==> s2 == Set())
+         |        forall ${prefix}s1: Set[A], ${prefix}s2: Set[A] :: {${prefix}s2 subset ${prefix}s1}
+         |            (${prefix}s1 == Set()) ==>  ((${prefix}s2 subset ${prefix}s1) <==> ${prefix}s2 == Set())
          |    }
          |}
          |
@@ -250,8 +271,10 @@ object DomainsGenerator {
          |
          |    function $disjUnionKey(s1: Set[$compDTV0], s2: Set[$compDTV0], s3: Set[$compDTV0]) : Bool
          |    axiom disjUnionEqDef {
-         |        forall s1: Set[$compDTV0], s2: Set[$compDTV0], s3: Set[$compDTV0] :: {$disjUnionKey(s1,s2,s3)}
-         |        $disjUnionKey(s1,s2,s3) <==>  s1 intersection s2 == Set() && s1 union s2  == s3
+         |        forall ${prefix}s1: Set[$compDTV0], ${prefix}s2: Set[$compDTV0], ${prefix}s3: Set[$compDTV0] ::
+         |        {$disjUnionKey(${prefix}s1,${prefix}s2,${prefix}s3)}
+         |        $disjUnionKey(${prefix}s1,${prefix}s2,${prefix}s3) <==>
+         |        ${prefix}s1 intersection ${prefix}s2 == Set() && ${prefix}s1 union ${prefix}s2  == ${prefix}s3
          |    }
          |
          |}\n """.stripMargin
