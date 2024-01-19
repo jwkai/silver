@@ -45,7 +45,7 @@ trait PCompComponentDecl extends PExtender with PAnyFunction {
       typVarMap = Map.empty) _).tupled(posInfoError)
 
     // ex. i or could be i1 i2 for opApply
-    val iteratorVar = body.args.map(a => (LocalVar(a.idndef.name, t.ttyp(a.typ)) _).tupled(posInfoError))
+    val iteratorVar = body.getArgs.map(a => (LocalVar(a.idndef.name, t.ttyp(a.typ)) _).tupled(posInfoError))
 
     // ex. eval(receiver(a),i)
     val evalApp : Exp = evalFuncOpt match {
@@ -82,7 +82,7 @@ trait PCompComponentDecl extends PExtender with PAnyFunction {
     }
 
     // all Vars. ex. a and i
-    val allVarsForall = (this.formalArgs ++ body.args).map(a => t.liftArgDecl(a))
+    val allVarsForall = (this.formalArgs ++ body.getArgs).map(a => t.liftArgDecl(a))
     val forall = (Forall(allVarsForall, triggers, equal)_).tupled(posInfoError)
     val axiom = AnonymousDomainAxiom(forall)(domainName = domain.name)
     (funct, axiom)

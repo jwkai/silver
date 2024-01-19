@@ -21,7 +21,7 @@ case class PMapping(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], body: PFun
       body.typecheckMapping(t, n) match {
         case out @ Some(_) => return out
         case None => typToInfer = ComprehensionPlugin.makeDomainType(DomainsGenerator.mapDKey,
-          Seq(body.args(0).typ, body.body.typ))
+          Seq(body.getArgs.head.typ, body.body.typ))
       }
     }
     None

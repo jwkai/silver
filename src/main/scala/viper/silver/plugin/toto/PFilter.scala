@@ -20,7 +20,7 @@ case class PFilter(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], body: PFunI
       formalArgs.foreach(a => t.check(a.typ))
       body.typecheckFilter(t, n) match {
         case out @ Some(_) => return out
-        case None => typToInfer = ComprehensionPlugin.makeSetType(body.args(0).typ)
+        case None => typToInfer = ComprehensionPlugin.makeSetType(body.getArgs.head.typ)
       }
     }
     None

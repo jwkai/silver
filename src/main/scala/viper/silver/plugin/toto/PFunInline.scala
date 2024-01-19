@@ -7,7 +7,12 @@ case class PFunInline(args: Seq[PFormalArgDecl], body: PExp)
                      (val pos : (Position, Position)) extends PExtender {
 
 
-  override def getSubnodes(): Seq[PNode] = args ++ Seq(body)
+  override def getSubnodes(): Seq[PNode] = getArgs ++ Seq(body)
+
+//  def getArgs: Seq[PFormalArgDecl] = args.map(a => a.copy(
+//    idndef = a.idndef.copy(name = DomainsGenerator.prefix + a.idndef.name)(a.idndef.pos))(a.pos))
+
+  def getArgs: Seq[PFormalArgDecl] = args
 
   def typecheckReceiver(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] = {
     // this calls t.checkTopTyped, which will call checkInternal, which calls the above typecheck

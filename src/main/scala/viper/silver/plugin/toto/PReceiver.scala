@@ -20,7 +20,7 @@ case class PReceiver(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], body : PF
       body.typecheckReceiver(t, n) match {
         case out @ Some(_) => return out
         case None => typToInfer = ComprehensionPlugin.makeDomainType(DomainsGenerator.recDKey,
-          Seq(body.args(0).typ))
+          Seq(body.getArgs.head.typ))
       }
     }
     None
