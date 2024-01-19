@@ -4,7 +4,7 @@ import viper.silver.ast._
 import viper.silver.ast.utility.Expressions
 import viper.silver.plugin.toto.util.AxiomHelper
 import viper.silver.verifier.errors
-import viper.silver.verifier.errors.ExhaleFailed
+import viper.silver.verifier.errors.{ExhaleFailed, InhaleFailed}
 
 import scala.collection.mutable
 
@@ -20,7 +20,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
 
 //  val fieldMaptoInt = program.fields.zipWithIndex.map(f => (f._1, f._2)).toMap
 
-  val snapshotDeclsUsed = {
+  val snapshotDeclsUsed: Set[ASnapshotDecl] = {
     method.deepCollect( {
       case fa: ASnapshotApp =>
         fa.snapshotFunctionDeclaration
@@ -86,7 +86,10 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     )
 
     // LocalVars for temporary return values
-    val returnDeclVars = returnDecls.map(td => td.localVar)
+    val returnDeclVars = methodDecl.formalReturns.zip(returnDecls).map{
+      case (old, newVar) => newVar.localVar.copy()(old.pos, old.info, old.errT + NodeTrafo(old.localVar))
+    }
+//    val returnDeclVars = returnDecls.map(td => td.localVar)
 
     // Replace precondition and postcondition variables with actual arguments and return values
     val newPres = methodDecl.pres.map(p => Expressions.instantiateVariables(p,
@@ -102,12 +105,19 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
 
     // Create inhales and exhales
     val exhales = newPres.map(p => Exhale(p)(p.pos, p.info,
-      ErrTrafo({
+      p.errT + ErrTrafo({
         case ExhaleFailed(_, reason, cached) =>
           errors.PreconditionInCallFalse(methodCall, reason, cached)
       })
     ))
-    var inhales = newPost.map(p => Inhale(p)(p.pos, p.info, p.errT))
+    // Todo, remove the inhale failure, and make the error disappear (Carbon)
+    // For silicon this is correct
+    var inhales = newPost.map(p => Inhale(p)(p.pos, p.info,
+      p.errT + ErrTrafo({
+        case InhaleFailed(_, reason, cached) =>
+          errors.CallFailed(methodCall, reason, cached)
+      }))
+    )
 
     // change all old to the correct label
     inhales = inhales.map(inhale => inhale.transform(
