@@ -193,7 +193,9 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
     * @return Modified AST
     */
   override def beforeMethodFilter(input: Program) : Program = {
-    input
+    // Move new methods to here
+    val newInput = addOpWelldefinednessMethods(input)
+    newInput
   }
 
   /** Called after methods are filtered but before the verification by the backend happens.
@@ -230,16 +232,15 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
 //    val newBody = currbody.copy(ss = currbody.ss.appended(gen.generateExhaleAxioms()))(
 //      currbody.pos, currbody.info, currbody.errT
 //    )
-//    print(pretty(newBody))
 
     newInput = addInlinedAxioms(newInput)
-    newInput = addOpWelldefinednessMethods(newInput)
     newInput = newInput.transform( {
       case c@ ACompApply(_, _) =>
         c.toViper(newInput)
     })
     newInput = newInput.transform ( {
       case ori @ Assume(a) => Inhale(a)(ori.pos, ori.info, ori.errT)
+          // Dont need to transform asserts
 //      case ori @ Assert(a) => Exhale(a)(ori.pos, ori.info, ori.errT)
     })
 //    print(pretty(newInput))
