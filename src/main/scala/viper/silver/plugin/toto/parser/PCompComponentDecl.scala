@@ -1,4 +1,4 @@
-package viper.silver.plugin.toto
+package viper.silver.plugin.toto.parser
 
 import viper.silver.ast._
 import viper.silver.parser._

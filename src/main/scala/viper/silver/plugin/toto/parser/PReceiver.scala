@@ -1,7 +1,8 @@
-package viper.silver.plugin.toto
+package viper.silver.plugin.toto.parser
 
 import viper.silver.ast.{Member, Position}
 import viper.silver.parser._
+import viper.silver.plugin.toto.{ComprehensionPlugin, DomainsGenerator}
 
 case class PReceiver(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], body : PFunInline)
                                   (val pos: (Position, Position))

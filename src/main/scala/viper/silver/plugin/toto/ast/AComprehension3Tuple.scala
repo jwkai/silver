@@ -1,8 +1,9 @@
-package viper.silver.plugin.toto
+package viper.silver.plugin.toto.ast
 
+import viper.silver.ast._
 import viper.silver.ast.pretty.FastPrettyPrinter.{ContOps, text, toParenDoc}
 import viper.silver.ast.pretty.PrettyPrintPrimitives
-import viper.silver.ast._
+import viper.silver.plugin.toto.DomainsGenerator
 import viper.silver.verifier.VerificationResult
 
 

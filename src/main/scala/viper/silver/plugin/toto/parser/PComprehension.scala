@@ -1,8 +1,9 @@
-package viper.silver.plugin.toto
+package viper.silver.plugin.toto.parser
 
 import viper.silver.ast.{ErrTrafo, Exp, Position}
 import viper.silver.parser._
-import viper.silver.plugin.toto.PComprehension.getNewTypeVariable
+import viper.silver.plugin.toto._
+import viper.silver.plugin.toto.ast.{ACompApply, AComprehension3Tuple, ASnapshotApp}
 import viper.silver.verifier.errors
 
 // First representation, the user input of comprehension gets turned into this PAst Node

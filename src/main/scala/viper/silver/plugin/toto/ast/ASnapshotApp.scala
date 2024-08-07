@@ -1,8 +1,8 @@
-package viper.silver.plugin.toto
+package viper.silver.plugin.toto.ast
 
+import viper.silver.ast._
 import viper.silver.ast.pretty.FastPrettyPrinter.{ContOps, text}
 import viper.silver.ast.pretty.PrettyPrintPrimitives
-import viper.silver.ast._
 import viper.silver.verifier.VerificationResult
 
 case class ASnapshotApp(comprehension4Tuple: AComprehension3Tuple, filter: Exp, field: String)

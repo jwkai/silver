@@ -9,6 +9,8 @@ import viper.silver.parser.FastParserCompanion.whitespace
 import viper.silver.parser._
 import viper.silver.plugin.toto.ComprehensionPlugin.{addInlinedAxioms, defaultMappingIden}
 import viper.silver.plugin.toto.DomainsGenerator._
+import viper.silver.plugin.toto.ast.{ACompApply, ASnapshotDecl}
+import viper.silver.plugin.toto.parser.{PComprehension, PFilter, PFunInline, PMapping, PMappingFieldReceiver, POperator, PReceiver}
 import viper.silver.plugin.toto.util.AxiomHelper
 import viper.silver.plugin.{ParserPluginTemplate, SilverPlugin}
 import viper.silver.verifier.{AbstractError, VerificationResult}
@@ -41,7 +43,7 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
   def comp[$: P]: P[PComprehension] =
     (compOp ~/ compDef).map{
       case (pos, unitOp, (mRF, parsedFilter)) =>
-        PComprehension(unitOp,mRF,parsedFilter)(pos)
+        parser.PComprehension(unitOp,mRF,parsedFilter)(pos)
     }
 
 

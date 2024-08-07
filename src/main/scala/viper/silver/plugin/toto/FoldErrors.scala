@@ -1,6 +1,8 @@
 package viper.silver.plugin.toto
 
 import viper.silver.ast.{Exp, Position}
+import viper.silver.plugin.toto.ast.ACompApply
+import viper.silver.plugin.toto.parser.POperator
 import viper.silver.verifier.errors.ErrorNode
 import viper.silver.verifier._
 

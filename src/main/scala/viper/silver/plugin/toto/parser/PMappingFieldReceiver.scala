@@ -1,7 +1,8 @@
-package viper.silver.plugin.toto
+package viper.silver.plugin.toto.parser
 
 import viper.silver.ast.{Exp, Position}
 import viper.silver.parser._
+import viper.silver.plugin.toto.ComprehensionPlugin
 
 case class PMappingFieldReceiver(mapping: PCall, fieldID: PIdnUse, receiver: PCall)(val pos: (Position, Position))
   extends PExtender {

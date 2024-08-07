@@ -1,8 +1,9 @@
-package viper.silver.plugin.toto
+package viper.silver.plugin.toto.parser
 
 import viper.silver.ast._
 import viper.silver.parser._
 import viper.silver.plugin.toto.util.AxiomHelper
+import viper.silver.plugin.toto.{ComprehensionPlugin, DomainsGenerator, FoldErrors, FoldReasons}
 import viper.silver.verifier.errors.AssertFailed
 
 case class POperator(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], opUnit: PExp, body : PFunInline)

@@ -1,4 +1,4 @@
-package viper.silver.plugin.toto
+package viper.silver.plugin.toto.parser
 
 import viper.silver.ast.Position
 import viper.silver.parser._

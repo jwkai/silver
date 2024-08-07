@@ -2,6 +2,7 @@ package viper.silver.plugin.toto
 
 import viper.silver.ast._
 import viper.silver.ast.utility.Expressions
+import viper.silver.plugin.toto.ast.{ASnapshotApp, ASnapshotDecl}
 import viper.silver.plugin.toto.util.AxiomHelper
 import viper.silver.verifier.errors
 import viper.silver.verifier.errors.{ExhaleFailed, InhaleFailed}

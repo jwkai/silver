@@ -1,8 +1,9 @@
-package viper.silver.plugin.toto
+package viper.silver.plugin.toto.ast
 
 import viper.silver.ast.pretty.FastPrettyPrinter._
 import viper.silver.ast.pretty.PrettyPrintPrimitives
 import viper.silver.ast.{Position, _}
+import viper.silver.plugin.toto.DomainsGenerator
 import viper.silver.verifier.VerificationResult
 
 case class ACompApply(comp: AComprehension3Tuple, snap: ASnapshotApp)(val pos: Position = NoPosition, val info: Info = NoInfo,
