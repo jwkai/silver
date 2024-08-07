@@ -1,22 +1,25 @@
 package viper.silver.plugin.toto.parser
 
-import viper.silver.ast.{ErrTrafo, Exp, Position}
+import viper.silver.ast.{ErrTrafo, Exp, NoPosition, Position}
 import viper.silver.parser._
+import viper.silver.plugin.toto.parser.PComprehension.getNewTypeVariable
 import viper.silver.plugin.toto._
 import viper.silver.plugin.toto.ast.{ACompApply, AComprehension3Tuple, ASnapshotApp}
 import viper.silver.verifier.errors
 
 // First representation, the user input of comprehension gets turned into this PAst Node
 case class PComprehension(opUnit: PCall, mappingFieldReceiver: PMappingFieldReceiver, filter: PExp)(val pos: (Position, Position)) extends PExtender with PExp {
-  override val getSubnodes: Seq[PNode] = Seq(opUnit, mappingFieldReceiver, filter)
+
+  override val subnodes: Seq[PNode] = Seq(opUnit, mappingFieldReceiver, filter)
 
   override def typecheck(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] = {
     var messagesOut : Seq[String] = Seq()
 
     // Check type of filter, must be a Set. Extract it out
-    t.checkTopTyped(filter, Some(PSetType(getNewTypeVariable("CompSet"))()))
+    t.checkTopTyped(filter, Some(PSetType(PReserved.implied(PKw.Set),
+      PGrouped.impliedBracket(getNewTypeVariable("CompSet")))(NoPosition, NoPosition)))
     val setType: PType = filter.typ match {
-      case PSetType(e) => e
+      case PSetType(_, bTyp) => bTyp.inner
       case _ =>
         messagesOut = messagesOut :+ "Filter should of Set[...] type."
         return Some(messagesOut)

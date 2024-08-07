@@ -7,7 +7,7 @@ case class PFunInline(args: Seq[PFormalArgDecl], body: PExp)
                      (val pos : (Position, Position)) extends PExtender {
 
 
-  override def getSubnodes(): Seq[PNode] = getArgs ++ Seq(body)
+  override def subnodes(): Seq[PNode] = getArgs ++ Seq(body)
 
 //  def getArgs: Seq[PFormalArgDecl] = args.map(a => a.copy(
 //    idndef = a.idndef.copy(name = DomainsGenerator.prefix + a.idndef.name)(a.idndef.pos))(a.pos))

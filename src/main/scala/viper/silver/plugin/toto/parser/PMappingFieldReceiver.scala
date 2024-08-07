@@ -7,7 +7,7 @@ import viper.silver.plugin.toto.ComprehensionPlugin
 case class PMappingFieldReceiver(mapping: PCall, fieldID: PIdnUse, receiver: PCall)(val pos: (Position, Position))
   extends PExtender {
 
-  override val getSubnodes: Seq[PNode] = Seq(mapping, fieldID, receiver)
+  override val subnodes: Seq[PNode] = Seq(mapping, fieldID, receiver)
 
   def typecheckComp(t: TypeChecker, n: NameAnalyser, typeUnit: PType, typeFilter: PType): Seq[String] = {
     var errorSeq : Seq[String] = Seq()

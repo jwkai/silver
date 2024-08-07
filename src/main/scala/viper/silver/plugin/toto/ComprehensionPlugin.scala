@@ -5,9 +5,10 @@ import viper.silver.FastMessaging
 import viper.silver.ast.pretty.FastPrettyPrinter.pretty
 import viper.silver.ast.utility.rewriter.Traverse
 import viper.silver.ast._
-import viper.silver.parser.FastParserCompanion.whitespace
+import viper.silver.parser.FastParserCompanion
+import viper.silver.parser.FastParser
 import viper.silver.parser._
-import viper.silver.plugin.toto.ComprehensionPlugin.{addInlinedAxioms, defaultMappingIden}
+import viper.silver.plugin.toto.ComprehensionPlugin.{addInlinedAxioms, defaultMappingIden, makeDomainType}
 import viper.silver.plugin.toto.DomainsGenerator._
 import viper.silver.plugin.toto.ast.{ACompApply, ASnapshotDecl}
 import viper.silver.plugin.toto.parser.{PComprehension, PFilter, PFunInline, PMapping, PMappingFieldReceiver, POperator, PReceiver}
@@ -22,7 +23,8 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
                           @unused config: viper.silver.frontend.SilFrontendConfig,
                           fp: FastParser) extends SilverPlugin with ParserPluginTemplate {
 
-  import fp.{FP, ParserExtension, exp, keyword}
+  import fp.{ParserExtension, funcApp, exp, argList, formalArg, idndef, idnuse, lineCol, _file}
+  import FastParserCompanion.{ExtendedParsing, PositionParsing, reservedKw, whitespace}
 
   private val comprehensionKeyword: String = "hfold"
   private val recKeyword: String = "receiver"
@@ -31,76 +33,71 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
   private val filterKeyword: String = "filter"
   private var setOperators: Set[POperator] = Set()
 
-
-  // Fix the FP somewhere else
-  def compOp[$: P]: P[((FilePosition, FilePosition), PCall)] =
-    FP(keyword(comprehensionKeyword) ~/ "[" ~/ fp.funcApp ~/ "]")
-//    FP(keyword(comprehensionKeyword) ~/ "[" ~/ fp.funcApp ~ "," ~ exp ~/ "]")
+  /** Parser for comprehension statements. */
+  def compOp[$: P]: P[PCall] =
+    P(P(comprehensionKeyword) ~/ "[" ~ funcApp ~ "]")
 
   def compDef[$: P]: P[(PMappingFieldReceiver, PExp)] =
     P("(") ~ mapRecBoth ~ "|" ~ exp ~ ")"
 
   def comp[$: P]: P[PComprehension] =
-    (compOp ~/ compDef).map{
-      case (pos, unitOp, (mRF, parsedFilter)) =>
-        parser.PComprehension(unitOp,mRF,parsedFilter)(pos)
-    }
-
+    P(
+      (compOp ~/ compDef) map {
+        case (op, (mRf, f)) => (op, mRf, f)
+      } map (PComprehension.apply _).tupled
+    ).pos
 
   def funDef[$:P]: P[PFunInline] =
-    FP(keyword("fun") ~ fp.formalArgList ~ "::" ~ fp.exp).map{
-      case (pos, (args, body)) => PFunInline(args, body)(pos)
-    }
+    P(
+      (P("fun") ~ argList(formalArg) ~ "::" ~ exp) map {
+        case (args, body) => (args.inner.toSeq, body)
+      } map (PFunInline.apply _).tupled
+    ).pos
 
   def recDef[$:P]: P[PReceiver] =
-    FP(keyword(recKeyword) ~ fp.idndef ~ fp.parens(fp.formalArgList) ~ fp.parens(funDef)).map {
-      case (pos, (name, args, body)) => PReceiver(name, args, body)(pos)
-    }
+    P(
+      (P(recKeyword) ~ idndef ~ argList(formalArg) ~ funDef.parens) map {
+        case (name, args, body) => (name, args.inner.toSeq, body.inner)
+      } map (PReceiver.apply _).tupled
+    ).pos
 
   def opUnitDef[$:P]: P[POperator] =
-    FP(keyword(opUnitKeyword) ~ fp.idndef ~ fp.parens(fp.formalArgList) ~ fp.parens(
-      exp ~ "," ~ funDef)).map {
-      case (pos, (name, args, (unitdef, fundef))) => POperator(name, args, unitdef, fundef)(pos)
-    }
+    P(
+      (P(opUnitKeyword) ~ idndef ~ argList(formalArg) ~/ "(" ~ exp ~ "," ~ funDef ~ ")") map {
+        case (name, args, unitdef, fundef) => (name, args.inner.toSeq, unitdef, fundef)
+      } map (POperator.apply _).tupled
+    ).pos
 
   def mappingDef[$:P]: P[PMapping] =
-    FP(keyword(mapKeyword) ~ fp.idndef ~ fp.parens(fp.formalArgList) ~ fp.parens(funDef)).map {
-      case (pos, (name, args, body)) => PMapping(name, args, body)(pos)
-    }
+    P(
+      (P(mapKeyword) ~ idndef ~ argList(formalArg) ~ funDef.parens) map {
+        case (name, args, body) => (name, args.inner.toSeq, body.inner)
+      } map (PMapping.apply _).tupled
+    ).pos
 
   def filterDef[$:P]: P[PFilter] =
-    FP(keyword(filterKeyword) ~ fp.idndef ~ fp.parens(fp.formalArgList) ~ fp.parens(funDef)).map {
-      case (pos, (name, args, body)) => PFilter(name, args, body)(pos)
-    }
-
-
-
-
-
-
-//  def mapRecVal[_:P]: P[PMappingFieldReceiver] =
-//    FP(fp.idnuse ~  "(" ~ fp.funcApp ~ "." ~ fp.idnuse ~ (P(",") ~ fp.actualArgList).? ~ ")").map{
-//      case (posTuple, (mappingFunc, receiverApp, field, mappingFuncArgs)) => PMappingFieldReceiver(
-//        PCall(mappingFunc, mappingFuncArgs.getOrElse(Seq()))(posTuple),
-//        field,
-//        receiverApp
-//      )(posTuple)
-//    }
+  P(
+    (P(filterKeyword) ~ idndef ~ argList(formalArg) ~ funDef.parens) map {
+      case (name, args, body) => (name, args.inner.toSeq, body.inner)
+    } map (PFilter.apply _).tupled
+  ).pos
 
   // Parser without the mapping function
-  def recVal[$: P]: P[PMappingFieldReceiver]   = {
+  def recVal[$: P]: P[PMappingFieldReceiver] =
     // Parse the mapping function with two possible syntaxes
-    FP(fp.funcApp ~ "." ~ fp.idnuse).map{
-      case (posTuple, (receiver, field)) => PMappingFieldReceiver(
-        defaultMappingIden(posTuple),
-        field,
-        receiver
-      )(posTuple)
-    }
-  }
+    P(
+      (funcApp ~ "." ~ idnuse) map {
+        case (receiver, field) => (
+          defaultMappingIden(receiver.pos),
+          field,
+          receiver
+        )
+      } map (PMappingFieldReceiver.apply _).tupled
+    ).pos
 
   // Parser with mapping
-  def mapRecVal[$: P]: P[PMappingFieldReceiver] = {
+  def mapRecVal[$: P]: P[PMappingFieldReceiver] =
+    {
     FP(fp.idnuse ~ fp.parens(recVal ~ (P(",") ~ fp.actualArgList).?)).map{
       case (posTuple, (mappingFunc, (pMappingFieldReceiver, mappingFuncArgs))) =>
         pMappingFieldReceiver.copy(mapping =
@@ -161,7 +158,7 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
       mappingDomainString(),
       mapCustomDomainString(),
       setFuncDomainString()
-    ).map(parseDomainString(_))// :+ convertUserDefs(input.extensions)
+    ).map(parseDomainString)// :+ convertUserDefs(input.extensions)
 
     val newInput = input.copy(
       domains = input.domains ++ domainsToAdd)(input.pos)
@@ -294,7 +291,7 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
 
 object ComprehensionPlugin {
 
-  def defaultMappingIden(tuple: (FilePosition, FilePosition)): PCall = {
+  def defaultMappingIden(tuple: (Position, Position)): PCall = {
     PCall(PIdnUse(mapIdenKey)(tuple), Seq())(tuple)
   }
 
@@ -336,10 +333,10 @@ object ComprehensionPlugin {
             }
             if (customMessage.nonEmpty) {
               t.messages ++= FastMessaging.message(exp, customMessage.get +
-                s"Expected ${expected.toString}, but found ${reportedActual}")
+                s"Expected ${expected.toString()}, but found ${reportedActual}")
             } else {
               t.messages ++= FastMessaging.message(exp,
-                s"Expected type ${expected.toString}, but found ${reportedActual} at the expression at ${exp.pos._1}")
+                s"Expected type ${expected.toString()}, but found ${reportedActual} at the expression at ${exp.pos._1}")
             }
           case None =>
             t.typeError(exp)
