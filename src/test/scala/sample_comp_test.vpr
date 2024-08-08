@@ -1,0 +1,11 @@
+domain Dom {
+    function doNothing(i: Int): Int
+}
+
+method test1(i1: Int) {
+    var a: Bool := true
+
+    var b: Int := Comp(a + 5)
+
+    assert(b == 15)
+}

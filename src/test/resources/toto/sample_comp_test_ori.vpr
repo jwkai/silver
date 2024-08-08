@@ -1,0 +1,36 @@
+domain Receiver[A] {
+    function eval(r:Receiver[A], a:A): Ref
+    function inverseval(re:Receiver[A], r:Ref): A
+    function filterReceiverGood(f: Set[A], r: Receiver[A]) : Bool
+    function anyReceiver(): Receiver[Int]
+}
+
+domain Operator[A] {
+    function oper(op: Operator[A], a1: A, a2: A) : A
+    function and() : Operator[A]
+}
+
+
+domain Mapping[V,B] {
+    function applyMap(m: Mapping[V,B], val: V) : B
+    function identityMap(a : Int): Mapping[V,V]
+
+}
+
+domain Comp[A,V,B] {
+    function comp(r:Receiver[A], m: Mapping[V,B],
+        op: Operator[B],u: B) : Comp[A,V,B]
+    function evalComp(c: Comp[A,V,B], snap: Map[A,B]) : B
+}
+
+function filter1(start: Int, end: Int): Set[Int]
+
+field val: Int
+
+method test1(i1: Int) {
+    var a: Bool := true
+
+    var b: Int := comp[and(),0]{identityMap(anyReceiver().val, 1) | filter1(0,10)}
+
+    assert(b == 5)
+}
