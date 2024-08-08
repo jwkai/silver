@@ -19,7 +19,6 @@ case class POperator(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], opUnit: P
 //
 //  override def resultType(): PType = typToInfer;
 
-
   override def typecheck(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] = {
     t.checkMember(this){
       formalArgs.foreach(a => t.check(a.typ))
@@ -47,7 +46,6 @@ case class POperator(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], opUnit: P
     dd
 
   }
-
 
   def generatedOpWelldefinednessCheck(program: Program): Method = {
     val helper = new AxiomHelper(program)
@@ -151,7 +149,7 @@ case class POperator(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], opUnit: P
   def getOperUnitAxiom(t: Translator): AnonymousDomainAxiom = {
     val getUnitFunc = t.getMembers()(DomainsGenerator.opIdenKey).asInstanceOf[DomainFunc]
     val operFunc = t.getMembers()(idndef.name).asInstanceOf[DomainFunc]
-    val posInfoError = (t.liftPos(this), t.toInfo(this.annotations, this), NoTrafos)
+    val posInfoError = (t.liftPos(this), Translator.toInfo(this.annotations, this), NoTrafos)
 
     val funcApp = (DomainFuncApp.apply(operFunc,
       formalArgs.map(a => (LocalVar(a.idndef.name, t.ttyp(a.typ)) _).tupled(posInfoError)),

@@ -1,19 +1,19 @@
 package viper.silver.plugin.toto.parser
 
 import viper.silver.ast.{Member, Position}
+import viper.silver.parser.PSym.Colon
 import viper.silver.parser._
 import viper.silver.plugin.toto.{ComprehensionPlugin, DomainsGenerator}
 
-case class PReceiver(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], body : PFunInline)
-                                  (val pos: (Position, Position))
-  extends PExtender with PAnyFunction with PCompComponentDecl {
+case class PReceiver(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], body : PFunInline)(val pos: (Position, Position))
+  extends PExtender with PCompComponentDecl {
 
+  override def c: Colon = super.c
   override val componentName: String = "Receiver"
 
 //  override def annotations: Seq[(String, Seq[String])] = Seq()
 //
 //  override val getSubnodes: Seq[PNode] = Seq(idndef) ++ formalArgs ++ Seq(body)
-
 
   override def typecheck(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] = {
     t.checkMember(this) {
@@ -28,20 +28,21 @@ case class PReceiver(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], body : PF
   }
 
   def pViperTranslation(posTuple: (Position, Position)): PBinExp = {
-    val args1 = Seq(PCall(PIdnUse(idndef.name)(posTuple),
-      formalArgs.map(a => PIdnUse(a.idndef.name)(posTuple)))(posTuple))
-    val args2 = body.args.map(a => PIdnUse(a.idndef.name)(posTuple))
-    val lhs = PCall(PIdnUse(DomainsGenerator.recApplyKey)(posTuple), args1 ++ args2)(posTuple)
+    val args1 = Seq(PCall(PIdnRef(idndef.name)(posTuple),
+      PDelimited.impliedParenComma(formalArgs.map(a => PIdnUseExp(a.idndef.name)(posTuple))),
+      Some(new Colon(PSym.Colon)(posTuple), TypeHelper.Ref))(posTuple))
+    val args2 = body.args.map(a => PIdnUseExp(a.idndef.name)(posTuple))
+    val lhs = PCall(PIdnRef(DomainsGenerator.recApplyKey)(posTuple),
+      PDelimited.impliedParenComma(args1 ++ args2),
+      Some(new Colon(PSym.Colon)(posTuple), TypeHelper.Ref))(posTuple))
     val rhs = body.body
-    PBinExp(lhs, "==", rhs)(posTuple)
+    PBinExp(lhs, PReserved[PSymOp.EqEq.type], rhs)(posTuple)
   }
-
 
   override def typecheck(t: TypeChecker, n: NameAnalyser, expected: PType): Option[Seq[String]] = {
     // There is no expected type. This is a declaration.
     typecheck(t, n)
   }
-
 
   override def translateMember(t: Translator): Member = {
     translateMemberWithName(t, Some(DomainsGenerator.recApplyKey))
@@ -54,7 +55,4 @@ case class PReceiver(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], body : PF
 //      pos = t.liftPos(this), info = t.toInfo(this.annotations, this)
 //    )
 //  }
-
-
-
 }

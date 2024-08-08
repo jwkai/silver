@@ -1,23 +1,27 @@
 package viper.silver.plugin.toto.parser
 
 import viper.silver.ast._
-import viper.silver.parser._
+import viper.silver.parser.{PAnyFunction, PGlobalCallableNamedArgs, Translator, _}
 
 // Defines a component declaration. This is a PExtender node (extended as a plugin) and acts as a Function declaration,
 // hence the PAnyFunction.
-trait PCompComponentDecl extends PExtender with PAnyFunction {
+trait PCompComponentDecl extends PExtender with PAnyFunction with PGlobalCallableNamedArgs {
 
   var typToInfer: PType = null;
   override def resultType: PType = typToInfer;
-  override def formalArgs: Seq[PFormalArgDecl]
-  override val getSubnodes: Seq[PNode] = Seq(idndef) ++ formalArgs ++ Seq(body)
-  override def annotations: Seq[(String, Seq[String])] = Seq()
+  override def body: Some[PFunInline]
+  override def annotations: Seq[PAnnotation] = Seq()
+
+  override val subnodes: Seq[PNode] = Seq(idndef) ++ formalArgs ++ {
+    body match {
+      case Some(p) => Seq(p)
+      case _ => Seq()
+    }
+  }
 
   val componentName: String
 
-
   def genDomainName: String = "___" + idndef.name + "_" + componentName + "_Domain"
-  def body: PFunInline
 
   //  def pViperTranslation(posTuple: (Position, Position)): PBinExp
 
@@ -26,16 +30,15 @@ trait PCompComponentDecl extends PExtender with PAnyFunction {
   override def translateMemberSignature(t: Translator): Member = {
     //    val pospos: Position = PDomain(null, null, null, null, null)(null, null)
     Domain(name = genDomainName, functions = Seq(), axioms = Seq())(
-      pos = t.liftPos(this), info = t.toInfo(this.annotations, this)
+      pos = t.liftPos(this), info = Translator.toInfo(this.annotations, this)
     )
   }
-
 
   def getEvalFuncAxiom(domain: Domain, evalFuncOpt: Option[DomainFunc],
                    t: Translator): (DomainFunc,AnonymousDomainAxiom) = {
     val funct = DomainFunc(idndef.name, formalArgs.map(f => t.liftAnyArgDecl(f)), t.ttyp(resultType), false, None)(
-      pos = t.liftPos(this), info = t.toInfo(this.annotations, this), domain.name)
-    val posInfoError = (t.liftPos(this), t.toInfo(this.annotations, this), NoTrafos)
+      pos = t.liftPos(this), info = Translator.toInfo(this.annotations, this), domain.name)
+    val posInfoError = (t.liftPos(this), Translator.toInfo(this.annotations, this), NoTrafos)
 
     // ex. receiver(a)
     // Note: typVar can be empty here because user-defined comprehension components are not generic.
@@ -45,7 +48,7 @@ trait PCompComponentDecl extends PExtender with PAnyFunction {
       typVarMap = Map.empty) _).tupled(posInfoError)
 
     // ex. i or could be i1 i2 for opApply
-    val iteratorVar = body.getArgs.map(a => (LocalVar(a.idndef.name, t.ttyp(a.typ)) _).tupled(posInfoError))
+    val iteratorVar = body.get.getArgs.map(a => (LocalVar(a.idndef.name, t.ttyp(a.typ)) _).tupled(posInfoError))
 
     // ex. eval(receiver(a),i)
     val evalApp : Exp = evalFuncOpt match {
@@ -66,7 +69,7 @@ trait PCompComponentDecl extends PExtender with PAnyFunction {
     }
 
     // ex. loc(a,i)
-    val rhs = t.exp(body.body)
+    val rhs = t.exp(body.get.body)
 
     // ex. eval(receiver(a),i) == loc(a,i)
     val equal = (EqCmp(evalApp, rhs)_).tupled(posInfoError)
@@ -82,12 +85,11 @@ trait PCompComponentDecl extends PExtender with PAnyFunction {
     }
 
     // all Vars. ex. a and i
-    val allVarsForall = (this.formalArgs ++ body.getArgs).map(a => t.liftArgDecl(a))
+    val allVarsForall = (this.formalArgs ++ body.get.getArgs).map(a => t.liftArgDecl(a))
     val forall = (Forall(allVarsForall, triggers, equal)_).tupled(posInfoError)
     val axiom = AnonymousDomainAxiom(forall)(domainName = domain.name)
     (funct, axiom)
   }
-
 
   def translateMemberWithName(t: Translator, evalName: Option[String]): Member = {
     // Gets the dummy domain
@@ -103,7 +105,4 @@ trait PCompComponentDecl extends PExtender with PAnyFunction {
     t.getMembers().put(funct.name, funct)
     dd
   }
-
-
-
 }

@@ -3,10 +3,8 @@ package viper.silver.plugin.toto.parser
 import viper.silver.ast.Position
 import viper.silver.parser._
 
-case class PFunInline(args: Seq[PFormalArgDecl], body: PExp)
-                     (val pos : (Position, Position)) extends PExtender {
-
-
+case class PFunInline(args: Seq[PFormalArgDecl], body: PExp)(val pos : (Position, Position)) extends PExtender {
+  
   override def subnodes(): Seq[PNode] = getArgs ++ Seq(body)
 
 //  def getArgs: Seq[PFormalArgDecl] = args.map(a => a.copy(
@@ -23,7 +21,6 @@ case class PFunInline(args: Seq[PFormalArgDecl], body: PExp)
     t.checkTopTyped(body, Some(TypeHelper.Ref))
     None
   }
-
 
   def typecheckOp(t: TypeChecker, n: NameAnalyser, expected: PType): Option[Seq[String]] = {
     if (args.length != 2) {
@@ -51,6 +48,4 @@ case class PFunInline(args: Seq[PFormalArgDecl], body: PExp)
     t.checkTopTyped(body, None)
     None
   }
-
-
 }
