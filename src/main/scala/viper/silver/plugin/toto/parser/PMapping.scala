@@ -1,12 +1,13 @@
 package viper.silver.plugin.toto.parser
 
 import viper.silver.ast.{Member, Position}
+import viper.silver.parser.PSym.Colon
 import viper.silver.parser._
 import viper.silver.plugin.toto.{ComprehensionPlugin, DomainsGenerator}
 
-case class PMapping(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], body: PFunInline)
+case class PMapping(idndef: PIdnDef, override val formalArgs: Seq[PFormalArgDecl], body: Some[PFunInline])
                   (val pos: (Position, Position))
-  extends PExtender with PAnyFunction with PCompComponentDecl  {
+  extends PExtender with PCompComponentDecl  {
 
   override val componentName: String = "Mapping"
 
@@ -19,28 +20,28 @@ case class PMapping(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], body: PFun
   override def typecheck(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] = {
     t.checkMember(this) {
       formalArgs.foreach(a => t.check(a.typ))
-      body.typecheckMapping(t, n) match {
+      body.get.typecheckMapping(t, n) match {
         case out @ Some(_) => return out
         case None => typToInfer = ComprehensionPlugin.makeDomainType(DomainsGenerator.mapDKey,
-          Seq(body.getArgs.head.typ, body.body.typ))
+          Seq(body.get.getArgs.head.typ, body.get.body.typ))
       }
     }
     None
   }
 
-
   def pViperTranslation(posTuple: (Position, Position)): PBinExp = {
-    val args1 = Seq(PCall(PIdnUse(idndef.name)(posTuple),
-      formalArgs.map(a => PIdnUse(a.idndef.name)(posTuple)))(posTuple))
-    val args2 = body.args.map(a => PIdnUse(a.idndef.name)(posTuple))
-    val lhs = PCall(PIdnUse(DomainsGenerator.mapApplyKey)(posTuple), args1 ++ args2)(posTuple)
-    val rhs = body.body
-    PBinExp(lhs, "==", rhs)(posTuple)
+    val args1 = Seq(PCall(PIdnRef(idndef.name)(posTuple),
+      PDelimited.impliedParenComma(formalArgs.map(a => PIdnUseExp(a.idndef.name)(posTuple))),
+      Some(new Colon(PSym.Colon)(posTuple), TypeHelper.Ref))(posTuple))
+    val args2 = body.get.args.map(a => PIdnUseExp(a.idndef.name)(posTuple))
+    val lhs = PCall(PIdnRef(DomainsGenerator.mapApplyKey)(posTuple),
+      PDelimited.impliedParenComma(args1 ++ args2),
+      Some(new Colon(PSym.Colon)(posTuple), TypeHelper.Ref))(posTuple)
+    val rhs = body.get.body
+    PBinExp(lhs, PReserved[PSymOp.EqEq.type], rhs)(posTuple)
   }
 
   override def translateMember(t: Translator): Member = {
     translateMemberWithName(t, Some(DomainsGenerator.mapApplyKey))
   }
-
-
 }

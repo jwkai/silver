@@ -48,4 +48,6 @@ case class PFunInline(args: Seq[PFormalArgDecl], body: PExp)(val pos : (Position
     t.checkTopTyped(body, None)
     None
   }
+
+  override def pretty: String = super.pretty
 }

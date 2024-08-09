@@ -2,7 +2,6 @@ package viper.silver.plugin.toto
 
 import fastparse.P
 import viper.silver.FastMessaging
-import viper.silver.ast.pretty.FastPrettyPrinter.pretty
 import viper.silver.ast.utility.rewriter.Traverse
 import viper.silver.ast._
 import viper.silver.parser.FastParserCompanion
@@ -23,7 +22,7 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
                           @unused config: viper.silver.frontend.SilFrontendConfig,
                           fp: FastParser) extends SilverPlugin with ParserPluginTemplate {
 
-  import fp.{ParserExtension, funcApp, exp, argList, formalArg, idndef, idnuse, lineCol, _file}
+  import fp.{ParserExtension, funcApp, exp, argList, formalArg, idndef, idnuse, idnref, lineCol, _file}
   import FastParserCompanion.{ExtendedParsing, PositionParsing, reservedKw, whitespace}
 
   private val comprehensionKeyword: String = "hfold"
@@ -57,28 +56,28 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
   def recDef[$:P]: P[PReceiver] =
     P(
       (P(recKeyword) ~ idndef ~ argList(formalArg) ~ funDef.parens) map {
-        case (name, args, body) => (name, args.inner.toSeq, body.inner)
+        case (name, args, body) => (name, args.inner.toSeq, Some(body.inner))
       } map (PReceiver.apply _).tupled
     ).pos
 
   def opUnitDef[$:P]: P[POperator] =
     P(
       (P(opUnitKeyword) ~ idndef ~ argList(formalArg) ~/ "(" ~ exp ~ "," ~ funDef ~ ")") map {
-        case (name, args, unitdef, fundef) => (name, args.inner.toSeq, unitdef, fundef)
+        case (name, args, unitdef, fundef) => (name, args.inner.toSeq, unitdef, Some(fundef))
       } map (POperator.apply _).tupled
     ).pos
 
   def mappingDef[$:P]: P[PMapping] =
     P(
       (P(mapKeyword) ~ idndef ~ argList(formalArg) ~ funDef.parens) map {
-        case (name, args, body) => (name, args.inner.toSeq, body.inner)
+        case (name, args, body) => (name, args.inner.toSeq, Some(body.inner))
       } map (PMapping.apply _).tupled
     ).pos
 
   def filterDef[$:P]: P[PFilter] =
   P(
     (P(filterKeyword) ~ idndef ~ argList(formalArg) ~ funDef.parens) map {
-      case (name, args, body) => (name, args.inner.toSeq, body.inner)
+      case (name, args, body) => (name, args.inner.toSeq, Some(body.inner))
     } map (PFilter.apply _).tupled
   ).pos
 
@@ -97,13 +96,18 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
 
   // Parser with mapping
   def mapRecVal[$: P]: P[PMappingFieldReceiver] =
-    {
-    FP(fp.idnuse ~ fp.parens(recVal ~ (P(",") ~ fp.actualArgList).?)).map{
-      case (posTuple, (mappingFunc, (pMappingFieldReceiver, mappingFuncArgs))) =>
-        pMappingFieldReceiver.copy(mapping =
-          PCall(mappingFunc, mappingFuncArgs.getOrElse(Seq()))(posTuple))(posTuple)
-    }
-  }
+    P(
+      (idnref[$, PCallable] ~/ "(" ~ recVal ~ "," ~ exp.rep(sep = ",").? ~ ")") map {
+        case (mappingFunc, pMappingFieldReceiver, mappingFuncArgs) =>
+          pMappingFieldReceiver.copy(mapping =
+            PCall(mappingFunc,
+              PDelimited.impliedParenComma(mappingFuncArgs.getOrElse(Seq())),
+              None
+            )(pMappingFieldReceiver.pos)
+          )(pMappingFieldReceiver.pos)
+
+      }
+    )
 
   // Allow both with and without Mapping function
   def mapRecBoth[$: P]: P[PMappingFieldReceiver] = {
@@ -142,15 +146,6 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
     */
   override def beforeResolve(input: PProgram) : PProgram = {
 
-
-
-//    errors
-//    val compDomain = parseDomainString(compDomainString())
-//    val receiverDomain  = parseDomainString(receiverDomainString())
-//    val opDomain = parseDomainString(opDomainString())
-//    val mappingDomain = parseDomainString(mappingDomainString())
-//    val domainsToAdd = Seq(compDomain, receiverDomain, opDomain, mappingDomain)
-
     val domainsToAdd = Seq(
       compDomainString(),
       receiverDomainString(),
@@ -161,7 +156,8 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
     ).map(parseDomainString)// :+ convertUserDefs(input.extensions)
 
     val newInput = input.copy(
-      domains = input.domains ++ domainsToAdd)(input.pos)
+      members = input.members ++ domainsToAdd
+    )(input.pos, input.localErrors)
     newInput
   }
 
@@ -292,19 +288,19 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
 object ComprehensionPlugin {
 
   def defaultMappingIden(tuple: (Position, Position)): PCall = {
-    PCall(PIdnUse(mapIdenKey)(tuple), Seq())(tuple)
+    PCall(PIdnRef(mapIdenKey)(tuple), PDelimited.impliedParenComma(Seq()), None)(tuple)
   }
 
   def makeDomainType(name: String, typeArgs: Seq[PType]): PDomainType = {
     val noPosTuple = (NoPosition,NoPosition)
-    val outType = PDomainType(PIdnUse(name)(noPosTuple), typeArgs)(noPosTuple)
+    val outType = PDomainType(PIdnRef(name)(noPosTuple), Some(PDelimited.impliedBracketComma(typeArgs)))(noPosTuple)
     outType.kind = PDomainTypeKinds.Domain
     outType
   }
 
   def makeSetType(typeArg: PType): PSetType = {
     val noPosTuple = (NoPosition,NoPosition)
-    val outType = PSetType(typeArg)(noPosTuple)
+    val outType = PSetType(PReserved.implied(PKw.Set), PGrouped.impliedBracket(typeArg))(noPosTuple)
     outType
   }
 

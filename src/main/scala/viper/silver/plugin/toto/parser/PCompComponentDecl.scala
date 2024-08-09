@@ -1,6 +1,8 @@
 package viper.silver.plugin.toto.parser
 
 import viper.silver.ast._
+import viper.silver.parser.PDelimited.Comma
+import viper.silver.parser.PSym.{Colon, Semi}
 import viper.silver.parser.{PAnyFunction, PGlobalCallableNamedArgs, Translator, _}
 
 // Defines a component declaration. This is a PExtender node (extended as a plugin) and acts as a Function declaration,
@@ -105,4 +107,16 @@ trait PCompComponentDecl extends PExtender with PAnyFunction with PGlobalCallabl
     t.getMembers().put(funct.name, funct)
     dd
   }
+
+  override def c: Colon = super.c
+
+  override def args: Comma[PSym.Paren, PFormalArgDecl] = super.args
+
+  override def keyword: PReserved[PKeywordLang] = super.keyword
+
+  override def pres: PDelimited[PSpecification[PKw.PreSpec], Option[Semi]] = super.pres
+
+  override def posts: PDelimited[PSpecification[PKw.PostSpec], Option[Semi]] = super.posts
+
+  override def pretty: String = super.pretty
 }

@@ -4,9 +4,9 @@ import viper.silver.ast.{Member, Position}
 import viper.silver.parser._
 import viper.silver.plugin.toto.ComprehensionPlugin
 
-case class PFilter(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], body: PFunInline)
+case class PFilter(idndef: PIdnDef, override val formalArgs: Seq[PFormalArgDecl], body: Some[PFunInline])
                   (val pos: (Position, Position))
-  extends PExtender with PAnyFunction with PCompComponentDecl {
+  extends PExtender with PCompComponentDecl {
 
   override val componentName: String = "Filter"
 
@@ -19,9 +19,9 @@ case class PFilter(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], body: PFunI
   override def typecheck(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] = {
     t.checkMember(this) {
       formalArgs.foreach(a => t.check(a.typ))
-      body.typecheckFilter(t, n) match {
+      body.get.typecheckFilter(t, n) match {
         case out @ Some(_) => return out
-        case None => typToInfer = ComprehensionPlugin.makeSetType(body.getArgs.head.typ)
+        case None => typToInfer = ComprehensionPlugin.makeSetType(body.get.getArgs.head.typ)
       }
     }
     None
@@ -40,5 +40,4 @@ case class PFilter(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], body: PFunI
   override def translateMember(t: Translator): Member = {
     translateMemberWithName(t, None)
   }
-
 }

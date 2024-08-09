@@ -5,11 +5,13 @@ import viper.silver.parser.PSym.Colon
 import viper.silver.parser._
 import viper.silver.plugin.toto.{ComprehensionPlugin, DomainsGenerator}
 
-case class PReceiver(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], body : PFunInline)(val pos: (Position, Position))
+case class PReceiver(idndef: PIdnDef, override val formalArgs: Seq[PFormalArgDecl], body : Some[PFunInline])(val pos: (Position, Position))
   extends PExtender with PCompComponentDecl {
 
   override def c: Colon = super.c
   override val componentName: String = "Receiver"
+
+  val myBody: PFunInline = body.get
 
 //  override def annotations: Seq[(String, Seq[String])] = Seq()
 //
@@ -18,10 +20,10 @@ case class PReceiver(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], body : PF
   override def typecheck(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] = {
     t.checkMember(this) {
       formalArgs.foreach( a => t.check(a.typ))
-      body.typecheckReceiver(t, n) match {
+      myBody.typecheckReceiver(t, n) match {
         case out @ Some(_) => return out
         case None => typToInfer = ComprehensionPlugin.makeDomainType(DomainsGenerator.recDKey,
-          Seq(body.getArgs.head.typ))
+          Seq(myBody.getArgs.head.typ))
       }
     }
     None
@@ -31,11 +33,11 @@ case class PReceiver(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], body : PF
     val args1 = Seq(PCall(PIdnRef(idndef.name)(posTuple),
       PDelimited.impliedParenComma(formalArgs.map(a => PIdnUseExp(a.idndef.name)(posTuple))),
       Some(new Colon(PSym.Colon)(posTuple), TypeHelper.Ref))(posTuple))
-    val args2 = body.args.map(a => PIdnUseExp(a.idndef.name)(posTuple))
+    val args2 = myBody.args.map(a => PIdnUseExp(a.idndef.name)(posTuple))
     val lhs = PCall(PIdnRef(DomainsGenerator.recApplyKey)(posTuple),
       PDelimited.impliedParenComma(args1 ++ args2),
-      Some(new Colon(PSym.Colon)(posTuple), TypeHelper.Ref))(posTuple))
-    val rhs = body.body
+      Some(new Colon(PSym.Colon)(posTuple), TypeHelper.Ref))(posTuple)
+    val rhs = myBody.body
     PBinExp(lhs, PReserved[PSymOp.EqEq.type], rhs)(posTuple)
   }
 

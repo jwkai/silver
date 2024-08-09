@@ -6,9 +6,9 @@ import viper.silver.plugin.toto.util.AxiomHelper
 import viper.silver.plugin.toto.{ComprehensionPlugin, DomainsGenerator, FoldErrors, FoldReasons}
 import viper.silver.verifier.errors.AssertFailed
 
-case class POperator(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], opUnit: PExp, body : PFunInline)
+case class POperator(idndef: PIdnDef, override val formalArgs: Seq[PFormalArgDecl], opUnit: PExp, body: Some[PFunInline])
                     (val pos: (Position, Position))
-  extends PExtender with PAnyFunction with PCompComponentDecl {
+  extends PExtender with PCompComponentDecl {
 
   override val componentName: String = "Operator"
   var sourcePos : Position = null;
@@ -23,7 +23,7 @@ case class POperator(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], opUnit: P
     t.checkMember(this){
       formalArgs.foreach(a => t.check(a.typ))
       t.checkTopTyped(opUnit, None)
-      body.typecheckOp(t, n, opUnit.typ) match {
+      body.get.typecheckOp(t, n, opUnit.typ) match {
         case out @ Some(_) => return out
         case None => typToInfer = ComprehensionPlugin.makeDomainType(DomainsGenerator.opDKey, Seq(opUnit.typ))
       }
@@ -144,8 +144,6 @@ case class POperator(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], opUnit: P
       Some(Seqn(Seq(assert1, assert2, assert3),Seq())()))()
   }
 
-
-
   def getOperUnitAxiom(t: Translator): AnonymousDomainAxiom = {
     val getUnitFunc = t.getMembers()(DomainsGenerator.opIdenKey).asInstanceOf[DomainFunc]
     val operFunc = t.getMembers()(idndef.name).asInstanceOf[DomainFunc]
@@ -181,16 +179,4 @@ case class POperator(idndef: PIdnDef, formalArgs: Seq[PFormalArgDecl], opUnit: P
     val axiom = AnonymousDomainAxiom(forall)(domainName = genDomainName)
     axiom
   }
-
-
-
-
-
-
-
-
-
-
-
-
 }

@@ -46,4 +46,5 @@ case class PMappingFieldReceiver(mapping: PCall, fieldID: PIdnUse, receiver: PCa
 
 //  override def translateMember(t: Translator): Member = ???
 
+  override def pretty: String = super.pretty
 }

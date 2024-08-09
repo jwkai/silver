@@ -292,7 +292,6 @@ object DomainsGenerator {
 //    dummyOut
 //  }
 
-
   def parseDomainString(input: String): PDomain = {
     val fp = new DummyParser();
     fp._line_offset = Array();
