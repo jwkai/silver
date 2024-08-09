@@ -2,8 +2,9 @@ package viper.silver.plugin.toto
 
 import fastparse.Parsed
 import viper.silver.ast.{FilePosition, NoPosition, Position, VirtualPosition}
-import viper.silver.parser.{PDomain, PNode, ParseException}
+import viper.silver.parser.{PDomain, PNode}
 
+case class ParseException(msg: String, pos: (Position, Position)) extends Exception
 
 object DomainsGenerator {
   final val compDKey = "Fold"

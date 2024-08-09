@@ -2,13 +2,13 @@ package viper.silver.plugin.toto
 
 import viper.silver.ast.{Exp, Position}
 import viper.silver.plugin.toto.ast.ACompApply
-import viper.silver.plugin.toto.parser.POperator
+import viper.silver.plugin.toto.parser.PCompOperator
 import viper.silver.verifier.errors.ErrorNode
 import viper.silver.verifier._
 
 object FoldErrors {
 
-  case class OpWellDefinednessError(offendingNode: ErrorNode, op: POperator, reason: ErrorReason, override val cached: Boolean = false) extends ExtensionAbstractVerificationError {
+  case class OpWellDefinednessError(offendingNode: ErrorNode, op: PCompOperator, reason: ErrorReason, override val cached: Boolean = false) extends ExtensionAbstractVerificationError {
 
     val id = "op.welldefined"
     val text = s"Fold operator might not be well-defined."
@@ -51,21 +51,21 @@ object FoldErrors {
 
 object FoldReasons {
 
-  case class NotCommutative(offendingNode: ErrorNode, op: POperator) extends ExtensionAbstractErrorReason {
+  case class NotCommutative(offendingNode: ErrorNode, op: PCompOperator) extends ExtensionAbstractErrorReason {
     override def id: String = "op.commutative"
     override def readableMessage: String = s"Operator ${op.idndef.name} might not be commutative."
     override def pos: Position = op.sourcePos
     override def withNode(offendingNode: ErrorNode): ErrorMessage = NotCommutative(offendingNode, op)
   }
 
-  case class NotAssociative(offendingNode: ErrorNode, op: POperator) extends ExtensionAbstractErrorReason {
+  case class NotAssociative(offendingNode: ErrorNode, op: PCompOperator) extends ExtensionAbstractErrorReason {
     override def id: String = "op.associative"
     override def readableMessage: String = s"Operator ${op.idndef.name} might not be associative."
     override def pos: Position = op.sourcePos
     override def withNode(offendingNode: ErrorNode): ErrorMessage = NotAssociative(offendingNode, op)
   }
 
-  case class IncorrectIdentity(offendingNode: ErrorNode, op: POperator) extends ExtensionAbstractErrorReason {
+  case class IncorrectIdentity(offendingNode: ErrorNode, op: PCompOperator) extends ExtensionAbstractErrorReason {
     override def id: String = "op.identity"
     override def readableMessage: String = s"Operator ${op.idndef.name} might not have the correct identity."
     override def pos: Position = op.sourcePos

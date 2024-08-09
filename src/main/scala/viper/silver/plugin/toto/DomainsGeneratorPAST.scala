@@ -1,8 +1,11 @@
 package viper.silver.plugin.toto
 
 import viper.silver.ast.NoPosition
+import viper.silver.parser.PKw.FunctionD
+import viper.silver.parser.PSym.Colon
 import viper.silver.parser._
-import viper.silver.plugin.toto.parser.{PFilter, PMapping, PReceiver}
+import viper.silver.plugin.toto.parser.{PCompOperator, PFilter, PMapping, PReceiver}
+
 // No longer used. Strings instead.
 object DomainsGeneratorPAST {
   final val compDKey = "Comp"
@@ -26,54 +29,59 @@ object DomainsGeneratorPAST {
 
   private def makeFilterDef(pf: PFilter): (PDomainFunction, Seq[PAxiom]) = {
     val fd = PDomainFunction(
+      annotations = pf.annotations,
+      keyword = FunctionD,
       idndef = pf.idndef,
-      formalArgs = pf.formalArgs,
+      args = pf.formalArgs,
+      c = Colon,
       resultType = pf.typ,
       unique = false,
       interpretation = None
-    )(PIdnUse(USER_D)(noPosTuple))(pf.pos,Seq())
-
-
-
+    )(pf.pos)
     (fd, Seq())
   }
 
   private def makeMappingDef(pm: PMapping): (PDomainFunction, Seq[PAxiom]) = {
     val md = PDomainFunction(
+      annotations = pm.annotations,
+      keyword = FunctionD,
       idndef = pm.idndef,
-      formalArgs = pm.formalArgs,
+      args = pm.formalArgs,
+      c = Colon,
       resultType = pm.typ,
       unique = false,
       interpretation = None
-    )(PIdnUse(USER_D)(noPosTuple))(pm.pos,Seq())
+    )(pm.pos)
     (md, Seq())
   }
 
-
   private def makeRecDef(pr: PReceiver): (PDomainFunction, Seq[PAxiom]) = {
     val rd = PDomainFunction(
+      annotations = pr.annotations,
+      keyword = FunctionD,
       idndef = pr.idndef,
-      formalArgs = pr.formalArgs,
+      args = pr.formalArgs,
+      c = Colon,
       resultType = pr.typ,
       unique = false,
       interpretation = None
-    )(PIdnUse(USER_D)(noPosTuple))(pr.pos, Seq())
+    )(pr.pos)
     (rd, Seq())
   }
 
-
-
-  private def makeOpDef(po: POperator): (PDomainFunction, Seq[PAxiom]) = {
+  private def makeOpDef(po: PCompOperator): (PDomainFunction, Seq[PAxiom]) = {
     val od = PDomainFunction(
+      annotations = po.annotations,
+      keyword = FunctionD,
       idndef = po.idndef,
-      formalArgs = po.formalArgs,
+      args = po.formalArgs,
+      c = Colon,
       resultType = po.typ,
       unique = false,
       interpretation = None
-    )(PIdnUse(USER_D)(noPosTuple))(po.pos, Seq())
+    )(po.pos)
     (od, Seq())
   }
-
 
   def convertUserDefs(allDefs : Seq[PExtender]) : PDomain = {
     var allDomainF : Seq[PDomainFunction] = Seq()
@@ -108,7 +116,6 @@ object DomainsGeneratorPAST {
     userDomain
   }
 
-
   private def makeReceiverDomain(): PDomain = {
     val typVar0 = PTypeVarDecl(PIdnDef(compDTV0)(noPosTuple))(noPosTuple)
     val receiverDomain = PDomain(PIdnDef(recDKey)(noPosTuple),
@@ -130,7 +137,6 @@ object DomainsGeneratorPAST {
       Seq(typVar0), Seq(), Seq(), None)(noPosTuple, Seq())
     operatorDomain
   }
-
 
   private def makeCompDomain(): PDomain = {
     val typVar0 = PTypeVarDecl(PIdnDef(compDTV0)(noPosTuple))(noPosTuple)
@@ -154,7 +160,6 @@ object DomainsGeneratorPAST {
       Seq(compArg, snapArg), PTypeVar(compDTV2), unique = false, None)(
       PIdnUse(compDKey)(noPosTuple))(noPosTuple, Seq())
     evalCompFunc
-
   }
 
   private def makeCompFunction(): PDomainFunction = {
@@ -271,7 +276,6 @@ object DomainsGeneratorPAST {
 
   }
 
-
   private def checkCompExists(input: PProgram): Boolean = {
     input.domains.find(d => d.idndef.name == compDKey) match {
       case Some(value) =>
@@ -286,6 +290,4 @@ object DomainsGeneratorPAST {
   }
 
   private def noPosTuple = (NoPosition, NoPosition)
-
-
 }

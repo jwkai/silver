@@ -6,10 +6,10 @@ import viper.silver.plugin.toto.util.AxiomHelper
 import viper.silver.plugin.toto.{ComprehensionPlugin, DomainsGenerator, FoldErrors, FoldReasons}
 import viper.silver.verifier.errors.AssertFailed
 
-case object POperatorKeyword extends PKw("operator") with PKeywordLang
+case object PCompOperatorKeyword extends PKw("operator") with PKeywordLang
 
-case class POperator(keyword: PReserved[POperatorKeyword.type], idndef: PIdnDef, override val formalArgs: Seq[PFormalArgDecl], opUnit: PExp, body: Some[PFunInline])
-                    (val pos: (Position, Position))
+case class PCompOperator(keyword: PReserved[PCompOperatorKeyword.type], idndef: PIdnDef, override val formalArgs: Seq[PFormalArgDecl], opUnit: PExp, body: Some[PFunInline])
+                        (val pos: (Position, Position))
   extends PExtender with PSingleMember with PCompComponentDecl {
 
   override val componentName: String = "Operator"

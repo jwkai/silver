@@ -11,7 +11,7 @@ import viper.silver.plugin.toto.ComprehensionPlugin.{addInlinedAxioms, defaultMa
 import viper.silver.plugin.toto.DomainsGenerator._
 import viper.silver.plugin.toto.ast.{ACompApply, ASnapshotDecl}
 import viper.silver.plugin.toto.parser.PComprehension.PComprehensionKeywordType
-import viper.silver.plugin.toto.parser.{PComprehension, PComprehensionKeyword, PFilter, PFilterKeyword, PFunInline, PFunInlineKeyword, PMapping, PMappingFieldReceiver, PMappingKeyword, POperator, POperatorKeyword, PReceiver, PReceiverKeyword}
+import viper.silver.plugin.toto.parser.{PComprehension, PComprehensionKeyword, PFilter, PFilterKeyword, PFunInline, PFunInlineKeyword, PMapping, PMappingFieldReceiver, PMappingKeyword, PCompOperator, PCompOperatorKeyword, PReceiver, PReceiverKeyword}
 import viper.silver.plugin.toto.util.AxiomHelper
 import viper.silver.plugin.{ParserPluginTemplate, SilverPlugin}
 import viper.silver.verifier.{AbstractError, VerificationResult}
@@ -26,7 +26,7 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
   import fp.{ParserExtension, funcApp, exp, argList, formalArg, idndef, idnuse, idnref, lineCol, _file}
   import FastParserCompanion.{ExtendedParsing, PositionParsing, reservedKw, whitespace}
 
-  private var setOperators: Set[POperator] = Set()
+  private var setOperators: Set[PCompOperator] = Set()
 
   /** Parser for comprehension statements. */
   def compOp[$: P]: P[(PComprehensionKeywordType, PCall)] =
@@ -59,12 +59,12 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
       }
     )
 
-  def opUnitDef[$:P]: P[PAnnotationsPosition => POperator] =
+  def opUnitDef[$:P]: P[PAnnotationsPosition => PCompOperator] =
     P(
-      (P(POperatorKeyword) ~ idndef ~ argList(formalArg) ~/ "(" ~ exp ~ "," ~ funDef ~ ")") map {
+      (P(PCompOperatorKeyword) ~ idndef ~ argList(formalArg) ~/ "(" ~ exp ~ "," ~ funDef ~ ")") map {
         case (kw, name, args, unitdef, fundef) =>
           ap: PAnnotationsPosition => {
-            POperator(
+            PCompOperator(
               kw, name, args.inner.toSeq, unitdef, Some(fundef)
             )(ap.pos)
           }
@@ -189,7 +189,7 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
 //        case _ => false
 //      }))(input.pos)
     setOperators = input.deepCollect({
-      case op: POperator =>
+      case op: PCompOperator =>
         op
     }).toSet
     input
