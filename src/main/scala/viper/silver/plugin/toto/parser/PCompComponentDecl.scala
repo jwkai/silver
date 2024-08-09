@@ -7,10 +7,10 @@ import viper.silver.parser.{PAnyFunction, PGlobalCallableNamedArgs, Translator, 
 
 // Defines a component declaration. This is a PExtender node (extended as a plugin) and acts as a Function declaration,
 // hence the PAnyFunction.
-trait PCompComponentDecl extends PExtender with PAnyFunction with PGlobalCallableNamedArgs {
+trait PCompComponentDecl extends PExtender with PAnyFunction with PSingleMember with PGlobalCallableNamedArgs with PPrettySubnodes {
 
-  var typToInfer: PType = null;
-  override def resultType: PType = typToInfer;
+  var typToInfer: PType = null
+  override def resultType: PType = typToInfer
   override def body: Some[PFunInline]
   override def annotations: Seq[PAnnotation] = Seq()
 
@@ -38,7 +38,7 @@ trait PCompComponentDecl extends PExtender with PAnyFunction with PGlobalCallabl
 
   def getEvalFuncAxiom(domain: Domain, evalFuncOpt: Option[DomainFunc],
                    t: Translator): (DomainFunc,AnonymousDomainAxiom) = {
-    val funct = DomainFunc(idndef.name, formalArgs.map(f => t.liftAnyArgDecl(f)), t.ttyp(resultType), false, None)(
+    val funct = DomainFunc(idndef.name, formalArgs.map(f => t.liftAnyArgDecl(f)), t.ttyp(resultType), unique = false, None)(
       pos = t.liftPos(this), info = Translator.toInfo(this.annotations, this), domain.name)
     val posInfoError = (t.liftPos(this), Translator.toInfo(this.annotations, this), NoTrafos)
 
@@ -54,17 +54,16 @@ trait PCompComponentDecl extends PExtender with PAnyFunction with PGlobalCallabl
 
     // ex. eval(receiver(a),i)
     val evalApp : Exp = evalFuncOpt match {
-      case Some(evalFunc) => {
+      case Some(evalFunc) =>
         val evalTypMap = funct.typ match {
           case gt: DomainType =>
             gt.typVarsMap
           case _ =>
-            throw new Exception(s"Function ${funct} should be a generic/domain type.")
+            throw new Exception(s"Function $funct should be a generic/domain type.")
 
         }
         (DomainFuncApp.apply(evalFunc, Seq(funcApp) ++ iteratorVar,
           typVarMap = evalTypMap) _).tupled(posInfoError)
-      }
       case None =>
         // This is for set contains, for filter definition axiom.i.e. i in filter(a,b)
         (AnySetContains(iteratorVar.head , funcApp)_).tupled(posInfoError)
@@ -108,15 +107,15 @@ trait PCompComponentDecl extends PExtender with PAnyFunction with PGlobalCallabl
     dd
   }
 
-  override def c: Colon = super.c
+  override def c: Colon = PReserved.implied(PSym.Colon)
 
-  override def args: Comma[PSym.Paren, PFormalArgDecl] = super.args
+  override def args: Comma[PSym.Paren, PFormalArgDecl] = PDelimited.impliedParenComma(formalArgs)
 
-  override def keyword: PReserved[PKeywordLang] = super.keyword
+//  override def keyword: PReserved[PKeywordLang] = super.keyword
 
-  override def pres: PDelimited[PSpecification[PKw.PreSpec], Option[Semi]] = super.pres
+  override def pres: PDelimited[PSpecification[PKw.PreSpec], Option[Semi]] = PDelimited.empty
 
-  override def posts: PDelimited[PSpecification[PKw.PostSpec], Option[Semi]] = super.posts
+  override def posts: PDelimited[PSpecification[PKw.PostSpec], Option[Semi]] = PDelimited.empty
 
-  override def pretty: String = super.pretty
+//  override def pretty: String = super.pretty
 }

@@ -3,12 +3,11 @@ package viper.silver.plugin.toto.parser
 import viper.silver.ast.Position
 import viper.silver.parser._
 
-case class PFunInline(args: Seq[PFormalArgDecl], body: PExp)(val pos : (Position, Position)) extends PExtender {
-  
-  override def subnodes(): Seq[PNode] = getArgs ++ Seq(body)
+case object PFunInlineKeyword extends PKw("fun") with PKeywordLang
 
-//  def getArgs: Seq[PFormalArgDecl] = args.map(a => a.copy(
-//    idndef = a.idndef.copy(name = DomainsGenerator.prefix + a.idndef.name)(a.idndef.pos))(a.pos))
+case class PFunInline(keyword: PReserved[PFunInlineKeyword.type], args: Seq[PFormalArgDecl], body: PExp)(val pos : (Position, Position)) extends PExtender with PPrettySubnodes {
+  
+  override def subnodes: Seq[PNode] = getArgs ++ Seq(body)
 
   def getArgs: Seq[PFormalArgDecl] = args
 
@@ -48,6 +47,4 @@ case class PFunInline(args: Seq[PFormalArgDecl], body: PExp)(val pos : (Position
     t.checkTopTyped(body, None)
     None
   }
-
-  override def pretty: String = super.pretty
 }

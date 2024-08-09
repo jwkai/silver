@@ -5,17 +5,13 @@ import viper.silver.parser.PSym.Colon
 import viper.silver.parser._
 import viper.silver.plugin.toto.{ComprehensionPlugin, DomainsGenerator}
 
-case class PMapping(idndef: PIdnDef, override val formalArgs: Seq[PFormalArgDecl], body: Some[PFunInline])
+case object PMappingKeyword extends PKw("mapping") with PKeywordLang
+
+case class PMapping(keyword: PReserved[PMappingKeyword.type], idndef: PIdnDef, override val formalArgs: Seq[PFormalArgDecl], body: Some[PFunInline])
                   (val pos: (Position, Position))
-  extends PExtender with PCompComponentDecl  {
+  extends PExtender with PSingleMember with PCompComponentDecl  {
 
   override val componentName: String = "Mapping"
-
-//  override val getSubnodes: Seq[PNode] = Seq(idndef) ++ formalArgs ++ Seq(body)
-
-//  var typToInfer: PType = null;
-//
-//  override def resultType(): PType = typToInfer;
 
   override def typecheck(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] = {
     t.checkMember(this) {

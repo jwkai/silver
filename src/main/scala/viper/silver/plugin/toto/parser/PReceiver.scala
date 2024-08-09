@@ -5,8 +5,10 @@ import viper.silver.parser.PSym.Colon
 import viper.silver.parser._
 import viper.silver.plugin.toto.{ComprehensionPlugin, DomainsGenerator}
 
-case class PReceiver(idndef: PIdnDef, override val formalArgs: Seq[PFormalArgDecl], body : Some[PFunInline])(val pos: (Position, Position))
-  extends PExtender with PCompComponentDecl {
+case object PReceiverKeyword extends PKw("receiver") with PKeywordLang
+
+case class PReceiver(keyword: PReserved[PReceiverKeyword.type], idndef: PIdnDef, override val formalArgs: Seq[PFormalArgDecl], body : Some[PFunInline])(val pos: (Position, Position))
+  extends PExtender with PSingleMember with PCompComponentDecl {
 
   override def c: Colon = super.c
   override val componentName: String = "Receiver"

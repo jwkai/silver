@@ -5,7 +5,7 @@ import viper.silver.parser._
 import viper.silver.plugin.toto.ComprehensionPlugin
 
 case class PMappingFieldReceiver(mapping: PCall, fieldID: PIdnUse, receiver: PCall)(val pos: (Position, Position))
-  extends PExtender {
+  extends PExtender with PPrettySubnodes {
 
   override val subnodes: Seq[PNode] = Seq(mapping, fieldID, receiver)
 
@@ -43,8 +43,4 @@ case class PMappingFieldReceiver(mapping: PCall, fieldID: PIdnUse, receiver: PCa
     val receiverOut = t.exp(receiver)
     (mappingOut, fieldOut, receiverOut)
   }
-
-//  override def translateMember(t: Translator): Member = ???
-
-  override def pretty: String = super.pretty
 }

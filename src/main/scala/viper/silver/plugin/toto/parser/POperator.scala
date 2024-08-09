@@ -6,18 +6,14 @@ import viper.silver.plugin.toto.util.AxiomHelper
 import viper.silver.plugin.toto.{ComprehensionPlugin, DomainsGenerator, FoldErrors, FoldReasons}
 import viper.silver.verifier.errors.AssertFailed
 
-case class POperator(idndef: PIdnDef, override val formalArgs: Seq[PFormalArgDecl], opUnit: PExp, body: Some[PFunInline])
+case object POperatorKeyword extends PKw("operator") with PKeywordLang
+
+case class POperator(keyword: PReserved[POperatorKeyword.type], idndef: PIdnDef, override val formalArgs: Seq[PFormalArgDecl], opUnit: PExp, body: Some[PFunInline])
                     (val pos: (Position, Position))
-  extends PExtender with PCompComponentDecl {
+  extends PExtender with PSingleMember with PCompComponentDecl {
 
   override val componentName: String = "Operator"
-  var sourcePos : Position = null;
-
-//  override val getSubnodes: Seq[PNode] = Seq(idndef) ++ formalArgs ++ Seq(opUnit, body)
-//
-//  var typToInfer: PType = null;
-//
-//  override def resultType(): PType = typToInfer;
+  var sourcePos : Position = null
 
   override def typecheck(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] = {
     t.checkMember(this){
@@ -85,10 +81,9 @@ case class POperator(idndef: PIdnDef, override val formalArgs: Seq[PFormalArgDec
       EqCmp(opAppliedi1i2, opAppliedi2i1)())()
 
     val errComm = ErrTrafo({
-      case AssertFailed(offendingNode, _, cached) => {
+      case AssertFailed(offendingNode, _, cached) =>
         val reason = FoldReasons.NotCommutative(offendingNode, this)
         FoldErrors.OpWellDefinednessError(offendingNode, this, reason, cached)
-      }
     })
 
     val assert1 = Assert(forallComm)(errT = errComm)
@@ -109,10 +104,9 @@ case class POperator(idndef: PIdnDef, override val formalArgs: Seq[PFormalArgDec
       EqCmp(opAppliedAssocL, opAppliedAssocR)())()
 
     val errAssoc = ErrTrafo({
-      case AssertFailed(offendingNode, _, cached) => {
+      case AssertFailed(offendingNode, _, cached) =>
         val reason = FoldReasons.NotAssociative(offendingNode, this)
         FoldErrors.OpWellDefinednessError(offendingNode, this, reason, cached)
-      }
     })
     val assert2 = Assert(forallAssoc)(errT = errAssoc)
 
@@ -129,11 +123,10 @@ case class POperator(idndef: PIdnDef, override val formalArgs: Seq[PFormalArgDec
       EqCmp(opAppliedUnit, input1.localVar)())()
 
     val errIden = ErrTrafo({
-      case AssertFailed(offendingNode, _, cached) => {
+      case AssertFailed(offendingNode, _, cached) =>
         val reason = FoldReasons.IncorrectIdentity(offendingNode, this)
         FoldErrors.OpWellDefinednessError(offendingNode, this, reason, cached)
-      }
-//      case ExhaleFailed(offendingNode, _, cached) => {
+      //      case ExhaleFailed(offendingNode, _, cached) => {
 //        val reason = FoldReasons.IncorrectIdentity(offendingNode, this)
 //        FoldErrors.OpWellDefinednessError(offendingNode, this, reason, cached)
 //      }
@@ -157,7 +150,7 @@ case class POperator(idndef: PIdnDef, override val formalArgs: Seq[PFormalArgDec
       case gt: DomainType =>
         gt.typVarsMap
       case _ =>
-        throw new Exception(s"Function ${operFunc} should be a generic/domain type.")
+        throw new Exception(s"Function $operFunc should be a generic/domain type.")
     }
 
     val getUnitApp = (DomainFuncApp.apply(getUnitFunc, Seq(funcApp),
@@ -169,7 +162,7 @@ case class POperator(idndef: PIdnDef, override val formalArgs: Seq[PFormalArgDec
     val triggers = Seq(Trigger(Seq(getUnitApp))())
 
     // all Vars
-    val allVarsForall = (this.formalArgs).map(a => t.liftArgDecl(a))
+    val allVarsForall = this.formalArgs.map(a => t.liftArgDecl(a))
     var forall : Exp = null
     if (allVarsForall.isEmpty) {
       forall = equal

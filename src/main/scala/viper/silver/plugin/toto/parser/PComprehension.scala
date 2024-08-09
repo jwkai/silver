@@ -7,8 +7,10 @@ import viper.silver.plugin.toto._
 import viper.silver.plugin.toto.ast.{ACompApply, AComprehension3Tuple, ASnapshotApp}
 import viper.silver.verifier.errors
 
+case object PComprehensionKeyword extends PKw("hfold") with PKeywordLang
+
 // First representation, the user input of comprehension gets turned into this PAst Node
-case class PComprehension(opUnit: PCall, mappingFieldReceiver: PMappingFieldReceiver, filter: PExp)(val pos: (Position, Position)) extends PExtender with PExp {
+case class PComprehension(keyword: PReserved[PComprehensionKeyword.type], opUnit: PCall, mappingFieldReceiver: PMappingFieldReceiver, filter: PExp)(val pos: (Position, Position)) extends PExtender with PExp {
 
   override val subnodes: Seq[PNode] = Seq(opUnit, mappingFieldReceiver, filter)
 
@@ -85,6 +87,8 @@ case class PComprehension(opUnit: PCall, mappingFieldReceiver: PMappingFieldRece
 }
 
 object PComprehension {
+  type PComprehensionKeywordType = PReserved[PComprehensionKeyword.type]
+
   private var counter = 0
   private def increment(): Int = {
     counter += 1

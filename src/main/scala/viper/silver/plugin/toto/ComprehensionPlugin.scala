@@ -10,7 +10,8 @@ import viper.silver.parser._
 import viper.silver.plugin.toto.ComprehensionPlugin.{addInlinedAxioms, defaultMappingIden, makeDomainType}
 import viper.silver.plugin.toto.DomainsGenerator._
 import viper.silver.plugin.toto.ast.{ACompApply, ASnapshotDecl}
-import viper.silver.plugin.toto.parser.{PComprehension, PFilter, PFunInline, PMapping, PMappingFieldReceiver, POperator, PReceiver}
+import viper.silver.plugin.toto.parser.PComprehension.PComprehensionKeywordType
+import viper.silver.plugin.toto.parser.{PComprehension, PComprehensionKeyword, PFilter, PFilterKeyword, PFunInline, PFunInlineKeyword, PMapping, PMappingFieldReceiver, PMappingKeyword, POperator, POperatorKeyword, PReceiver, PReceiverKeyword}
 import viper.silver.plugin.toto.util.AxiomHelper
 import viper.silver.plugin.{ParserPluginTemplate, SilverPlugin}
 import viper.silver.verifier.{AbstractError, VerificationResult}
@@ -25,16 +26,11 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
   import fp.{ParserExtension, funcApp, exp, argList, formalArg, idndef, idnuse, idnref, lineCol, _file}
   import FastParserCompanion.{ExtendedParsing, PositionParsing, reservedKw, whitespace}
 
-  private val comprehensionKeyword: String = "hfold"
-  private val recKeyword: String = "receiver"
-  private val opUnitKeyword: String = "identityOp"
-  private val mapKeyword: String = "mapping"
-  private val filterKeyword: String = "filter"
   private var setOperators: Set[POperator] = Set()
 
   /** Parser for comprehension statements. */
-  def compOp[$: P]: P[PCall] =
-    P(P(comprehensionKeyword) ~/ "[" ~ funcApp ~ "]")
+  def compOp[$: P]: P[(PComprehensionKeywordType, PCall)] =
+    P(P(PComprehensionKeyword) ~/ "[" ~ funcApp ~ "]")
 
   def compDef[$: P]: P[(PMappingFieldReceiver, PExp)] =
     P("(") ~ mapRecBoth ~ "|" ~ exp ~ ")"
@@ -42,44 +38,63 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
   def comp[$: P]: P[PComprehension] =
     P(
       (compOp ~/ compDef) map {
-        case (op, (mRf, f)) => (op, mRf, f)
+        case (kw, op, (mRf, f)) => (kw, op, mRf, f)
       } map (PComprehension.apply _).tupled
     ).pos
 
   def funDef[$:P]: P[PFunInline] =
     P(
-      (P("fun") ~ argList(formalArg) ~ "::" ~ exp) map {
-        case (args, body) => (args.inner.toSeq, body)
+      (P(PFunInlineKeyword) ~ argList(formalArg) ~ "::" ~ exp) map {
+        case (kw, args, body) => (kw, args.inner.toSeq, body)
       } map (PFunInline.apply _).tupled
     ).pos
 
-  def recDef[$:P]: P[PReceiver] =
+  def recDef[$:P]: P[PAnnotationsPosition => PReceiver] =
     P(
-      (P(recKeyword) ~ idndef ~ argList(formalArg) ~ funDef.parens) map {
-        case (name, args, body) => (name, args.inner.toSeq, Some(body.inner))
-      } map (PReceiver.apply _).tupled
-    ).pos
+      (P(PReceiverKeyword) ~ idndef ~ argList(formalArg) ~ funDef.parens) map {
+        case (kw, name, args, body) =>
+          ap: PAnnotationsPosition => {
+            PReceiver(kw, name, args.inner.toSeq, Some(body.inner))(ap.pos)
+          }
+      }
+    )
 
-  def opUnitDef[$:P]: P[POperator] =
+  def opUnitDef[$:P]: P[PAnnotationsPosition => POperator] =
     P(
-      (P(opUnitKeyword) ~ idndef ~ argList(formalArg) ~/ "(" ~ exp ~ "," ~ funDef ~ ")") map {
-        case (name, args, unitdef, fundef) => (name, args.inner.toSeq, unitdef, Some(fundef))
-      } map (POperator.apply _).tupled
-    ).pos
+      (P(POperatorKeyword) ~ idndef ~ argList(formalArg) ~/ "(" ~ exp ~ "," ~ funDef ~ ")") map {
+        case (kw, name, args, unitdef, fundef) =>
+          ap: PAnnotationsPosition => {
+            POperator(
+              kw, name, args.inner.toSeq, unitdef, Some(fundef)
+            )(ap.pos)
+          }
+      }
+    )
 
-  def mappingDef[$:P]: P[PMapping] =
+  def mappingDef[$:P]: P[PAnnotationsPosition => PMapping] =
     P(
-      (P(mapKeyword) ~ idndef ~ argList(formalArg) ~ funDef.parens) map {
-        case (name, args, body) => (name, args.inner.toSeq, Some(body.inner))
-      } map (PMapping.apply _).tupled
-    ).pos
+      (P(PMappingKeyword) ~ idndef ~ argList(formalArg) ~ funDef.parens) map {
+        case (kw, name, args, body) =>
+          ap: PAnnotationsPosition => {
+            PMapping(kw, name, args.inner.toSeq, Some(body.inner))(ap.pos)
+          }
+      }
+    )
 
-  def filterDef[$:P]: P[PFilter] =
+  def filterDef[$:P]: P[PAnnotationsPosition => PFilter] =
   P(
-    (P(filterKeyword) ~ idndef ~ argList(formalArg) ~ funDef.parens) map {
-      case (name, args, body) => (name, args.inner.toSeq, Some(body.inner))
-    } map (PFilter.apply _).tupled
-  ).pos
+    (P(PFilterKeyword) ~ idndef ~ argList(formalArg) ~ funDef.parens) map {
+      case (kw, name, args, body) =>
+        ap: PAnnotationsPosition => {
+          PFilter(
+            kw,
+            name,
+            args.inner.toSeq,
+            Some(body.inner)
+          )(ap.pos)
+        }
+    }
+  )
 
   // Parser without the mapping function
   def recVal[$: P]: P[PMappingFieldReceiver] =
@@ -113,7 +128,6 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
   def mapRecBoth[$: P]: P[PMappingFieldReceiver] = {
     recVal | mapRecVal
   }
-
 
   /** Called before any processing happened.
     *
@@ -282,7 +296,6 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
     val opMethods = setOperators.map(o => o.generatedOpWelldefinednessCheck(p)).toSeq
     p.copy(methods = opMethods ++ p.methods)(p.pos, p.info, p.errT)
   }
-
 }
 
 object ComprehensionPlugin {
@@ -303,7 +316,6 @@ object ComprehensionPlugin {
     val outType = PSetType(PReserved.implied(PKw.Set), PGrouped.impliedBracket(typeArg))(noPosTuple)
     outType
   }
-
 
   def typeCheckCustom(t: TypeChecker, exp: PExp, oexpected: Option[PType],
                        doCheckInternal : Boolean = true,
@@ -329,10 +341,10 @@ object ComprehensionPlugin {
             }
             if (customMessage.nonEmpty) {
               t.messages ++= FastMessaging.message(exp, customMessage.get +
-                s"Expected ${expected.toString()}, but found ${reportedActual}")
+                s"Expected ${expected.toString()}, but found $reportedActual")
             } else {
               t.messages ++= FastMessaging.message(exp,
-                s"Expected type ${expected.toString()}, but found ${reportedActual} at the expression at ${exp.pos._1}")
+                s"Expected type ${expected.toString()}, but found $reportedActual at the expression at ${exp.pos._1}")
             }
           case None =>
             t.typeError(exp)
@@ -340,7 +352,6 @@ object ComprehensionPlugin {
       }
     }
   }
-
 
   def addInlinedAxioms(p: Program) : Program = {
     def modifyMethod(m: Method) : Method = {
@@ -389,11 +400,5 @@ object ComprehensionPlugin {
     val outMethods = p.methods.map(m => modifyMethod(m))
     // Modify the program
     p.copy(methods = outMethods)(p.pos, p.info, p.errT)
-
-
   }
-
-
-
-
 }
