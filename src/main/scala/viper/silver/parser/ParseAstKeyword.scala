@@ -35,10 +35,11 @@ case class PGrouped[G <: PSym.Group, +T](l: PReserved[G#L], inner: T, r: PReserv
 object PGrouped {
   /** Grouped and delimited. */
   type Paren[+T] = PGrouped[PSym.Paren, T]
+  type Bracket[+T] = PGrouped[PSym.Bracket, T]
 
   def implied[G <: PSym.Group, T](l: G#L, inner: T, r: G#R): PGrouped[G, T] =
     PGrouped[G, T](PReserved.implied(l), inner, PReserved.implied(r))(NoPosition, NoPosition)
-  def impliedBracket[T](inner: T): PGrouped[PSym.Bracket, T] = implied[PSym.Bracket, T](PSym.LBracket, inner, PSym.RBracket)
+  def impliedBracket[T](inner: T): PGrouped.Bracket[T] = implied[PSym.Bracket, T](PSym.LBracket, inner, PSym.RBracket)
   def impliedParen[T](inner: T): PGrouped.Paren[T] = implied[PSym.Paren, T](PSym.LParen, inner, PSym.RParen)
 }
 
@@ -105,6 +106,9 @@ object PDelimited {
   }
   def impliedBlock[T <: PNode](inner: Seq[T]): Block[T] = {
     PGrouped.implied[PSym.Brace, PDelimited[T, Option[PSym.Semi]]](PSym.LBrace, PDelimited.implied(inner, None), PSym.RBrace)
+  }
+  def impliedBracketComma[T <: PNode](inner: Seq[T]): Comma[PSym.Bracket, T] = {
+    PGrouped.impliedBracket(PDelimited.implied(inner, PReserved.implied(PSym.Comma)))
   }
   def impliedParenComma[T <: PNode](inner: Seq[T]): Comma[PSym.Paren, T] = {
     PGrouped.impliedParen(PDelimited.implied(inner, PReserved.implied(PSym.Comma)))
