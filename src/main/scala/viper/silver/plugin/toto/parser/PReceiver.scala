@@ -40,7 +40,7 @@ case class PReceiver(keyword: PReserved[PReceiverKeyword.type], idndef: PIdnDef,
       PDelimited.impliedParenComma(args1 ++ args2),
       Some(PReserved.implied(PSym.Colon), TypeHelper.Ref))(posTuple)
     val rhs = myBody.body
-    PBinExp(lhs, PReserved[PSymOp.EqEq.type], rhs)(posTuple)
+    PBinExp(lhs, PReserved.implied(PSymOp.EqEq), rhs)(posTuple)
   }
 
   override def typecheck(t: TypeChecker, n: NameAnalyser, expected: PType): Option[Seq[String]] = {

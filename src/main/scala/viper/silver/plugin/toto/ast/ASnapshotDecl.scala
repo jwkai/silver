@@ -3,6 +3,7 @@ package viper.silver.plugin.toto.ast
 import viper.silver.ast._
 import viper.silver.ast.pretty.FastPrettyPrinter.text
 import viper.silver.ast.pretty.PrettyPrintPrimitives
+import viper.silver.plugin.toto.ast.ASnapshotDecl.tupleFieldToString
 import viper.silver.plugin.toto.util.AxiomHelper
 import viper.silver.plugin.toto.{DomainsGenerator, FoldReasons}
 import viper.silver.verifier.reasons

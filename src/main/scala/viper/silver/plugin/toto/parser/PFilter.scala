@@ -33,9 +33,9 @@ case class PFilter(keyword: PReserved[PFilterKeyword.type], idndef: PIdnDef, ove
       PDelimited.impliedParenComma(formalArgs.map(a => PIdnUseExp(a.idndef.name)(posTuple))),
       Some(PReserved.implied(PSym.Colon), TypeHelper.Bool))(posTuple)
 
-    val lhs = PBinExp(elem, PReserved[PKwOp.In.type], set)(posTuple)
+    val lhs = PBinExp(elem, PReserved.implied(PKwOp.In), set)(posTuple)
     val rhs = body.get.body
-    PBinExp(lhs, PReserved[PSymOp.EqEq.type], rhs)(posTuple)
+    PBinExp(lhs, PReserved.implied(PSymOp.EqEq), rhs)(posTuple)
   }
 
   override def translateMember(t: Translator): Member = {

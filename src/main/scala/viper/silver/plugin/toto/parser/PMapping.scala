@@ -34,7 +34,7 @@ case class PMapping(keyword: PReserved[PMappingKeyword.type], idndef: PIdnDef, o
       PDelimited.impliedParenComma(args1 ++ args2),
       Some(PReserved.implied(PSym.Colon), TypeHelper.Ref))(posTuple)
     val rhs = body.get.body
-    PBinExp(lhs, PReserved[PSymOp.EqEq.type], rhs)(posTuple)
+    PBinExp(lhs, PReserved.implied(PSymOp.EqEq), rhs)(posTuple)
   }
 
   override def translateMember(t: Translator): Member = {

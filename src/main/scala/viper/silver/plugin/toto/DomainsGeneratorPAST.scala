@@ -270,6 +270,9 @@ object DomainsGeneratorPAST {
   private def makeBracketedTypes[T <: PType](typVars: Seq[T]): Option[PDelimited.Comma[PSym.Bracket, T]] =
     Some(PDelimited.impliedBracketComma(typVars))
 
+  private def makeBracketedTypeVarDecls(typVars: Seq[PTypeVarDecl]): Option[PDelimited.Comma[PSym.Bracket, PTypeVarDecl]] =
+    Some(PDelimited.impliedBracketComma(typVars))
+
   private def makePDomainFunction(name: String, args: Seq[PFormalArgDecl], resultType: PType): PDomainFunction = {
     PDomainFunction(
       annotations = Seq(),
@@ -283,12 +286,12 @@ object DomainsGeneratorPAST {
     )(noPosTuple)
   }
 
-  private def makePDomain(name: String, typVars: Seq[PTypeVarDecl]): PDomain =
+  private def makePDomain(name: String, typVarDecls: Seq[PTypeVarDecl]): PDomain =
     PDomain(
       annotations = Seq(),
       domain = PReserved.implied(PKw.Domain),
       idndef = PIdnDef(name)(noPosTuple),
-      typVars = makeBracketedTypes(typVars),
+      typVars = makeBracketedTypeVarDecls(typVarDecls),
       interpretations = None,
       members = emptyDomainMembers
     )(noPosTuple)
