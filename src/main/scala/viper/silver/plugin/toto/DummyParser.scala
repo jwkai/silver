@@ -12,3 +12,7 @@ class DummyParser extends FastParser {
   }
 
 }
+
+class DummyParser2 extends FastParser {
+
+}

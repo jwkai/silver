@@ -31,7 +31,7 @@ case class PFilter(keyword: PReserved[PFilterKeyword.type], idndef: PIdnDef, ove
     val elem = PIdnUseExp(body.get.args.head.idndef.name)(posTuple)
     val set = PCall(PIdnRef(idndef.name)(posTuple),
       PDelimited.impliedParenComma(formalArgs.map(a => PIdnUseExp(a.idndef.name)(posTuple))),
-      Some(new Colon(PSym.Colon)(posTuple), TypeHelper.Bool))(posTuple)
+      Some(PReserved.implied(PSym.Colon), TypeHelper.Bool))(posTuple)
 
     val lhs = PBinExp(elem, PReserved[PKwOp.In.type], set)(posTuple)
     val rhs = body.get.body

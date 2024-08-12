@@ -34,11 +34,11 @@ case class PReceiver(keyword: PReserved[PReceiverKeyword.type], idndef: PIdnDef,
   def pViperTranslation(posTuple: (Position, Position)): PBinExp = {
     val args1 = Seq(PCall(PIdnRef(idndef.name)(posTuple),
       PDelimited.impliedParenComma(formalArgs.map(a => PIdnUseExp(a.idndef.name)(posTuple))),
-      Some(new Colon(PSym.Colon)(posTuple), TypeHelper.Ref))(posTuple))
+      Some(PReserved.implied(PSym.Colon), TypeHelper.Ref))(posTuple))
     val args2 = myBody.args.map(a => PIdnUseExp(a.idndef.name)(posTuple))
     val lhs = PCall(PIdnRef(DomainsGenerator.recApplyKey)(posTuple),
       PDelimited.impliedParenComma(args1 ++ args2),
-      Some(new Colon(PSym.Colon)(posTuple), TypeHelper.Ref))(posTuple)
+      Some(PReserved.implied(PSym.Colon), TypeHelper.Ref))(posTuple)
     val rhs = myBody.body
     PBinExp(lhs, PReserved[PSymOp.EqEq.type], rhs)(posTuple)
   }

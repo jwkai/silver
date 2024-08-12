@@ -2,7 +2,7 @@ package viper.silver.plugin.toto
 
 import fastparse.Parsed
 import viper.silver.ast.{FilePosition, NoPosition, Position, VirtualPosition}
-import viper.silver.parser.{PDomain, PNode}
+import viper.silver.parser.{FastParser, PDomain, PKw, PNode, PReserved}
 
 case class ParseException(msg: String, pos: (Position, Position)) extends Exception
 
@@ -294,9 +294,9 @@ object DomainsGenerator {
 //  }
 
   def parseDomainString(input: String): PDomain = {
-    val fp = new DummyParser();
+    val fp = new FastParser();
     fp._line_offset = Array();
-    fastparse.parse(input, fp.domainDecl(_)) match {
+    fastparse.parse[PDomain](input, fp.domainDecl(_).map(_(PReserved.implied(PKw.Domain)))) match {
       case Parsed.Success(newDomain, index) =>
         changePosRecursive(newDomain,
           (FilePosition(null, 0, 0), FilePosition(null, 0, 0))).asInstanceOf[PDomain]
@@ -313,12 +313,9 @@ object DomainsGenerator {
     }
   }
 
-
-
   // Copied from MacroExpander.scala
   def changePosRecursive(body: PNode, pos: (Position, Position)): PNode = {
     val children = body.children.map { child => if (child.isInstanceOf[PNode]) changePosRecursive(child.asInstanceOf[PNode], pos) else child }
     body.withChildren(children, Some(pos))
   }
-
 }

@@ -28,11 +28,11 @@ case class PMapping(keyword: PReserved[PMappingKeyword.type], idndef: PIdnDef, o
   def pViperTranslation(posTuple: (Position, Position)): PBinExp = {
     val args1 = Seq(PCall(PIdnRef(idndef.name)(posTuple),
       PDelimited.impliedParenComma(formalArgs.map(a => PIdnUseExp(a.idndef.name)(posTuple))),
-      Some(new Colon(PSym.Colon)(posTuple), TypeHelper.Ref))(posTuple))
+      Some(PReserved.implied(PSym.Colon), TypeHelper.Ref))(posTuple))
     val args2 = body.get.args.map(a => PIdnUseExp(a.idndef.name)(posTuple))
     val lhs = PCall(PIdnRef(DomainsGenerator.mapApplyKey)(posTuple),
       PDelimited.impliedParenComma(args1 ++ args2),
-      Some(new Colon(PSym.Colon)(posTuple), TypeHelper.Ref))(posTuple)
+      Some(PReserved.implied(PSym.Colon), TypeHelper.Ref))(posTuple)
     val rhs = body.get.body
     PBinExp(lhs, PReserved[PSymOp.EqEq.type], rhs)(posTuple)
   }
