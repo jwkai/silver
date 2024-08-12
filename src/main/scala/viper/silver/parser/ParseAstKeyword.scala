@@ -35,10 +35,12 @@ case class PGrouped[G <: PSym.Group, +T](l: PReserved[G#L], inner: T, r: PReserv
 object PGrouped {
   /** Grouped and delimited. */
   type Paren[+T] = PGrouped[PSym.Paren, T]
+  type Brace[+T] = PGrouped[PSym.Brace, T]
   type Bracket[+T] = PGrouped[PSym.Bracket, T]
 
   def implied[G <: PSym.Group, T](l: G#L, inner: T, r: G#R): PGrouped[G, T] =
     PGrouped[G, T](PReserved.implied(l), inner, PReserved.implied(r))(NoPosition, NoPosition)
+  def impliedBrace[T](inner: T): PGrouped.Brace[T] = implied[PSym.Brace, T](PSym.LBrace, inner, PSym.RBrace)
   def impliedBracket[T](inner: T): PGrouped.Bracket[T] = implied[PSym.Bracket, T](PSym.LBracket, inner, PSym.RBracket)
   def impliedParen[T](inner: T): PGrouped.Paren[T] = implied[PSym.Paren, T](PSym.LParen, inner, PSym.RParen)
 }
