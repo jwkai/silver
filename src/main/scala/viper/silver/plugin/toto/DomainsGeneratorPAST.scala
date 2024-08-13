@@ -171,9 +171,10 @@ object DomainsGeneratorPAST {
         throw new Exception("Should not get here.")
       case Some(domain) =>
         val newDomainFuncs = domain.members.inner.funcs.toSeq :+ makeCompFunction()
-        val newCompDomain = domain.copy(members = domain.members.update {
-          case p@PDomainMembers(_, axs) => PDomainMembers(impliedBlock(newDomainFuncs).inner, axs)(p.pos)
-        })(domain.pos)
+        val newCompDomain = domain.copy(members = domain.members.update(
+          domain.members.inner match {
+            case p@PDomainMembers(_, axs) => PDomainMembers(impliedBlock(newDomainFuncs).inner, axs)(p.pos)
+          }))(domain.pos)
         val newDomains = input.domains.filter(d => d.idndef.name != domainName) :+ newCompDomain
         input.copy(
           members = input.members ++ newDomains

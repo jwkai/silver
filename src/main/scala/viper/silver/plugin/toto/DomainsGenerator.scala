@@ -1,7 +1,7 @@
 package viper.silver.plugin.toto
 
-import fastparse.Parsed
-import viper.silver.ast.{FilePosition, NoPosition, Position, VirtualPosition}
+import fastparse.{P, Parsed}
+import viper.silver.ast.{FilePosition, NoPosition, Position}
 import viper.silver.parser.{FastParser, PDomain, PKw, PNode, PReserved}
 
 case class ParseException(msg: String, pos: (Position, Position)) extends Exception
@@ -132,7 +132,6 @@ object DomainsGenerator {
   }
 
   def compDomainString(): String = {
-    val axioms: Seq[String] = Seq()
     val compOut =
       s"""domain $compDKey[$compDTV0,$compDTV1,$compDTV2] {
          |
@@ -234,7 +233,6 @@ object DomainsGenerator {
   }
 
   def setFuncDomainString(): String = {
-    val axioms: Seq[String] = Seq()
     val setOut =
       s"""domain setFunc[A] {
          |
@@ -264,7 +262,6 @@ object DomainsGenerator {
   }
 
   def mapCustomDomainString(): String = {
-    val axioms: Seq[String] = Seq()
     val mapCustomOut =
       s"""domain MapEdit[$compDTV0,$compDTV2] {
          |    function mapDelete(m: Map[$compDTV0,$compDTV2], e: Set[$compDTV0]): Map[$compDTV0,$compDTV2]
@@ -294,10 +291,14 @@ object DomainsGenerator {
 //  }
 
   def parseDomainString(input: String): PDomain = {
-    val fp = new FastParser();
-    fp._line_offset = Array();
-    fastparse.parse[PDomain](input, fp.domainDecl(_).map(_(PReserved.implied(PKw.Domain)))) match {
-      case Parsed.Success(newDomain, index) =>
+    val fp = new FastParser()
+    fp._line_offset = Array()
+
+    def myParserToPDomain(implicit ctx : P[_]): P[PDomain] =
+      fp.annotated(fp.domainDecl(ctx).map(_(PReserved.implied(PKw.Domain))))
+
+    fastparse.parse(input, myParserToPDomain(_)) match {
+      case Parsed.Success(newDomain, _) =>
         changePosRecursive(newDomain,
           (FilePosition(null, 0, 0), FilePosition(null, 0, 0))).asInstanceOf[PDomain]
 //          (VirtualPosition(s"Generated ${newDomain.idndef.name} domain start"),
@@ -315,7 +316,10 @@ object DomainsGenerator {
 
   // Copied from MacroExpander.scala
   def changePosRecursive(body: PNode, pos: (Position, Position)): PNode = {
-    val children = body.children.map { child => if (child.isInstanceOf[PNode]) changePosRecursive(child.asInstanceOf[PNode], pos) else child }
+    val children = body.children.map {
+      case node: PNode => changePosRecursive(node, pos)
+      case child => child
+    }
     body.withChildren(children, Some(pos))
   }
 }
