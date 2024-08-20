@@ -356,6 +356,9 @@ class FastParser {
   /** `[`...`,` ...`,` ...`]` */
   def typeList[$: P, T](p: => P[T]) = p.delimited(PSym.Comma).brackets
 
+  /** ...`,` ...`,` ... */
+  def commaSeparated[$: P, T](p: => P[T]) = p.delimited(PSym.Comma)
+
   /** ...`;`? ...`;`? ...`;`? */
   def semiSeparated[$: P, T](p: => P[T]) = p.delimitedTrailing(PSym.Semi)
 
