@@ -1,6 +1,6 @@
 package viper.silver.plugin.toto
 
-import fastparse.{P, Parsed}
+import fastparse.{P, Parsed, StringIn}
 import viper.silver.ast.{FilePosition, NoPosition, Position}
 import viper.silver.parser.{FastParser, PDomain, PKw, PNode, PReserved}
 
@@ -292,10 +292,17 @@ object DomainsGenerator {
 
   def parseDomainString(input: String): PDomain = {
     val fp = new FastParser()
-    fp._line_offset = Array()
+    fp._line_offset = Array(0)
 
-    def myParserToPDomain(implicit ctx : P[_]): P[PDomain] =
-      fp.annotated(fp.domainDecl(ctx).map(_(PReserved.implied(PKw.Domain))))
+    def myParserToPDomain(implicit ctx: P[_]): P[PDomain] =
+      fp.annotated(
+        fp.reservedKwMany(
+          StringIn("domain"),
+          str => pos => str match {
+            case "domain" => fp.domainDecl.map(_(PReserved(PKw.Domain)(pos)))
+          }
+        )
+      )
 
     fastparse.parse(input, myParserToPDomain(_)) match {
       case Parsed.Success(newDomain, _) =>

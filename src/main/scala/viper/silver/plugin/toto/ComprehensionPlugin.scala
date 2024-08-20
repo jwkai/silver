@@ -4,14 +4,15 @@ import fastparse.P
 import viper.silver.FastMessaging
 import viper.silver.ast.utility.rewriter.Traverse
 import viper.silver.ast._
+import viper.silver.ast.pretty.FastPrettyPrinter.pretty
 import viper.silver.parser.FastParserCompanion
 import viper.silver.parser.FastParser
 import viper.silver.parser._
-import viper.silver.plugin.toto.ComprehensionPlugin.{addInlinedAxioms, defaultMappingIden, makeDomainType}
+import viper.silver.plugin.toto.ComprehensionPlugin.{addInlinedAxioms, defaultMappingIden}
 import viper.silver.plugin.toto.DomainsGenerator._
 import viper.silver.plugin.toto.ast.{ACompApply, ASnapshotDecl}
 import viper.silver.plugin.toto.parser.PComprehension.PComprehensionKeywordType
-import viper.silver.plugin.toto.parser.{PComprehension, PComprehensionKeyword, PFilter, PFilterKeyword, PFunInline, PFunInlineKeyword, PMapping, PMappingFieldReceiver, PMappingKeyword, PCompOperator, PCompOperatorKeyword, PReceiver, PReceiverKeyword}
+import viper.silver.plugin.toto.parser._
 import viper.silver.plugin.toto.util.AxiomHelper
 import viper.silver.plugin.{ParserPluginTemplate, SilverPlugin}
 import viper.silver.verifier.{AbstractError, VerificationResult}
@@ -23,7 +24,7 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
                           @unused config: viper.silver.frontend.SilFrontendConfig,
                           fp: FastParser) extends SilverPlugin with ParserPluginTemplate {
 
-  import fp.{ParserExtension, funcApp, exp, argList, formalArg, idndef, idnuse, idnref, lineCol, _file}
+  import fp.{ParserExtension, funcApp, exp, argList, commaSeparated, formalArg, idndef, idnuse, idnref, lineCol, _file}
   import FastParserCompanion.{ExtendedParsing, PositionParsing, reservedKw, whitespace}
 
   private var setOperators: Set[PCompOperator] = Set()
@@ -44,8 +45,8 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
 
   def funDef[$:P]: P[PFunInline] =
     P(
-      (P(PFunInlineKeyword) ~ argList(formalArg) ~ "::" ~ exp) map {
-        case (kw, args, body) => (kw, args.inner.toSeq, body)
+      (P(PFunInlineKeyword) ~ commaSeparated(formalArg) ~ "::" ~ exp) map {
+        case (kw, args, body) => (kw, args.inner.map(_._2), body)
       } map (PFunInline.apply _).tupled
     ).pos
 
