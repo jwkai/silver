@@ -700,9 +700,19 @@ case class TypeChecker(names: NameAnalyser) {
                         val fdtv = PTypeVar.freshTypeSubstitution((typVars map (tv => tv.idndef.name)).distinct, Some(domain.idndef.name)) //fresh domain type variables
                         pfa.domainTypeRenaming = Some(fdtv)
                         pfa._extraLocalTypeVariables = (typVars map (tv => PTypeVar(tv.idndef.name))).toSet
+
                       case _: PPredicate =>
                         if (explicitType.isDefined)
                           issueError(pfa, "predicate call cannot have an explicit type")
+
+                      // Add extra case for (extension) functions that are neither PFunction or PDomainFunction
+                      case _ =>
+                        checkMember(fd) {
+                          check(fd.typ)
+                          fd.formalArgs foreach (a => check(a.typ))
+                        }
+                        pfa.domainTypeRenaming = Some(new PTypeRenaming(Map.empty))
+                        pfa.domainSubstitution = Some(new PTypeSubstitution(Seq()))
                     }
                   }
                 }

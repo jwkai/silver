@@ -46,7 +46,7 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
   def funDef[$:P]: P[PFunInline] =
     P(
       (P(PFunInlineKeyword) ~ commaSeparated(formalArg) ~ "::" ~ exp) map {
-        case (kw, args, body) => (kw, args.inner.map(_._2), body)
+        case (kw, args, body) => (kw, args.toSeq, body)
       } map (PFunInline.apply _).tupled
     ).pos
 
@@ -253,7 +253,7 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
           // Dont need to transform asserts
 //      case ori @ Assert(a) => Exhale(a)(ori.pos, ori.info, ori.errT)
     })
-//    print(pretty(newInput))
+    print(pretty(newInput))
 
     newInput
 

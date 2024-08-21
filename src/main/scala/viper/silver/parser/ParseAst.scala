@@ -910,6 +910,10 @@ case class PCall(idnref: PIdnRef[PCallable], callArgs: PDelimited.Comma[PSym.Par
     case Some(pp: PPredicate) if pp.formalArgs.size == args.size => List(
         (args.indices.map(i => POpApp.pArgS(i) -> pp.formalArgs(i).typ) :+ (POpApp.pResS -> pp.resultType)).toMap
       )
+    case Some(pf) => List(
+        new PTypeSubstitution(args.indices.map(i => POpApp.pArg(i).domain.name -> pf.formalArgs(i).typ) :+
+            (POpApp.pRes.domain.name -> pf.typ.resultType))
+      )
     // this case is handled in Resolver.scala (- method check) which generates the appropriate error message
     case _ => Nil
   })
