@@ -564,7 +564,7 @@ case class TypeChecker(names: NameAnalyser) {
       if (etss.nonEmpty) {
         val ts = selectAndGroundTypeSubstitution(exp, etss)
         exp.forceSubstitution(ts)
-        error = oexpected.isDefined && !isSubtype(exp.typ, oexpected.get)
+        error = oexpected.isDefined && !isSubtype(exp.typ, oexpected.get.substitute(ts))
       }
       if (error) oexpected match {
         case Some(expected) =>

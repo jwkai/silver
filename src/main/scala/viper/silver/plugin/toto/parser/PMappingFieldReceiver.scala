@@ -22,8 +22,7 @@ case class PMappingFieldReceiver(mapping: PCall, fieldID: PIdnUse, receiver: PCa
         field match {
           case decl: PFieldDecl =>
             // Mapping must be from field's type to operator's type
-            val correctMappingType = ComprehensionPlugin.makeDomainType("Mapping",
-              Seq(decl.typ, typeUnit))
+            val correctMappingType = ComprehensionPlugin.makeDomainType("Mapping", Seq(decl.typ, typeUnit))
             t.checkTopTyped(mapping, Some(correctMappingType))
           case _ => return errorSeq :+ "Comprehension field not declared as a field."
         }

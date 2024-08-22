@@ -32,8 +32,7 @@ case class PComprehension(keyword: PReserved[PComprehensionKeyword.type], opUnit
 
     // Check type of op, must be an Operator with unit as argument
 //    val correctOpType = ComprehensionPlugin.makeDomainType("Operator", Seq(unit.typ))
-    t.checkTopTyped(opUnit, Some(ComprehensionPlugin.
-      makeDomainType("Operator", Seq(getNewTypeVariable("CompOp")))))
+    t.checkTopTyped(opUnit, Some(ComprehensionPlugin.makeDomainType("Operator", Seq(getNewTypeVariable("CompOp")))))
 
     // Look inside the operator type
     opUnit.typ match {

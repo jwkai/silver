@@ -1,7 +1,7 @@
 package viper.silver.plugin.toto
 
 import fastparse.{P, Parsed, StringIn}
-import viper.silver.ast.{FilePosition, NoPosition, Position}
+import viper.silver.ast.{NoPosition, Position}
 import viper.silver.parser.{FastParser, PDomain, PKw, PNode, PReserved}
 
 case class ParseException(msg: String, pos: (Position, Position)) extends Exception
@@ -306,17 +306,12 @@ object DomainsGenerator {
 
     fastparse.parse(input, myParserToPDomain(_)) match {
       case Parsed.Success(newDomain, _) =>
-        changePosRecursive(newDomain,
-          (FilePosition(null, 0, 0), FilePosition(null, 0, 0))).asInstanceOf[PDomain]
-//          (VirtualPosition(s"Generated ${newDomain.idndef.name} domain start"),
-//          VirtualPosition(s"Generated ${newDomain.idndef.name} domain end"))).asInstanceOf[PDomain]
+        changePosRecursive(newDomain, (NoPosition, NoPosition)).asInstanceOf[PDomain]
       case fail: Parsed.Failure =>
         // This should not happen
         val trace = fail.trace()
         val fullStack = fastparse.Parsed.Failure.formatStack(trace.input, trace.stack)
         val msg = s"${trace.aggregateMsg}. Occurred while parsing: $fullStack"
-//        val (line, col) = lineCol.getPos(trace.index)
-//        val pos = FilePosition(_file, line, col)
         throw ParseException(msg, (NoPosition, NoPosition))
     }
   }

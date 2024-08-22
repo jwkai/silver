@@ -7,6 +7,7 @@ import viper.silver.ast._
 import viper.silver.ast.pretty.FastPrettyPrinter.pretty
 import viper.silver.parser.FastParserCompanion
 import viper.silver.parser.FastParser
+import viper.silver.parser.PSym.{Comma, LBracket, RBracket}
 import viper.silver.parser._
 import viper.silver.plugin.toto.ComprehensionPlugin.{addInlinedAxioms, defaultMappingIden}
 import viper.silver.plugin.toto.DomainsGenerator._
@@ -116,7 +117,7 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
       (idnref[$, PCallable] ~/ "(" ~ recVal ~ "," ~ exp.rep(sep = ",").? ~ ")") map {
         case (mappingFunc, pMappingFieldReceiver, mappingFuncArgs) =>
           pMappingFieldReceiver.copy(mapping =
-            PCall(mappingFunc,
+            PCall(mappingFunc.retype(),
               PDelimited.impliedParenComma(mappingFuncArgs.getOrElse(Seq())),
               None
             )(pMappingFieldReceiver.pos)
@@ -253,7 +254,7 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
           // Dont need to transform asserts
 //      case ori @ Assert(a) => Exhale(a)(ori.pos, ori.info, ori.errT)
     })
-    print(pretty(newInput))
+//    print(pretty(newInput) + "\n\n")
 
     newInput
 
