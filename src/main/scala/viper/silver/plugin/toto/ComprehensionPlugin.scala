@@ -4,10 +4,8 @@ import fastparse.P
 import viper.silver.FastMessaging
 import viper.silver.ast.utility.rewriter.Traverse
 import viper.silver.ast._
-import viper.silver.ast.pretty.FastPrettyPrinter.pretty
 import viper.silver.parser.FastParserCompanion
 import viper.silver.parser.FastParser
-import viper.silver.parser.PSym.{Comma, LBracket, RBracket}
 import viper.silver.parser._
 import viper.silver.plugin.toto.ComprehensionPlugin.{addInlinedAxioms, defaultMappingIden}
 import viper.silver.plugin.toto.DomainsGenerator._
@@ -25,7 +23,7 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
                           @unused config: viper.silver.frontend.SilFrontendConfig,
                           fp: FastParser) extends SilverPlugin with ParserPluginTemplate {
 
-  import fp.{ParserExtension, funcApp, exp, argList, commaSeparated, formalArg, idndef, idnuse, idnref, lineCol, _file}
+  import fp.{ParserExtension, funcApp, exp, argList, commaSeparated, formalArg, idnuse, idndef, idnref, lineCol, _file}
   import FastParserCompanion.{ExtendedParsing, PositionParsing, reservedKw, whitespace}
 
   private var setOperators: Set[PCompOperator] = Set()
@@ -114,15 +112,17 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
   // Parser with mapping
   def mapRecVal[$: P]: P[PMappingFieldReceiver] =
     P(
-      (idnref[$, PCallable] ~/ "(" ~ recVal ~ "," ~ exp.rep(sep = ",").? ~ ")") map {
-        case (mappingFunc, pMappingFieldReceiver, mappingFuncArgs) =>
+      (idnref[$, PCallable] ~ (recVal ~ (P(",") ~ exp.rep(sep = ",")).?).parens) map {
+        case (mappingFunc, mappingFuncArgs) =>
+          val pMappingFieldReceiver = mappingFuncArgs.inner._1
+          val mappingCallArgs = mappingFuncArgs.inner._2
           pMappingFieldReceiver.copy(mapping =
-            PCall(mappingFunc.retype(),
-              PDelimited.impliedParenComma(mappingFuncArgs.getOrElse(Seq())),
+            PCall(
+              mappingFunc.retype(),
+              PDelimited.impliedParenComma(mappingCallArgs.getOrElse(Seq())),
               None
             )(pMappingFieldReceiver.pos)
           )(pMappingFieldReceiver.pos)
-
       }
     )
 
