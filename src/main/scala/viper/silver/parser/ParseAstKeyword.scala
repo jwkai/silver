@@ -109,11 +109,12 @@ object PDelimited {
   def impliedBlock[T <: PNode](inner: Seq[T]): Block[T] = {
     PGrouped.implied[PSym.Brace, PDelimited[T, Option[PSym.Semi]]](PSym.LBrace, PDelimited.implied(inner, None), PSym.RBrace)
   }
-  def impliedBracketComma[T <: PNode](inner: Seq[T]): Comma[PSym.Bracket, T] = {
-    PGrouped.impliedBracket(PDelimited.implied(inner, PReserved.implied(PSym.Comma)))
-  }
   def impliedParenComma[T <: PNode](inner: Seq[T]): Comma[PSym.Paren, T] = {
     PGrouped.impliedParen(PDelimited.implied(inner, PReserved.implied(PSym.Comma)))
+  }
+  // Bracketed, comma-separated list without trailing comma (end = None)
+  def impliedBracketComma[T <: PNode](inner: Seq[T]): Comma[PSym.Bracket, T] = {
+    PGrouped.impliedBracket(PDelimited[T, PSym.Comma](inner.headOption, inner.map((PReserved.implied(PSym.Comma), _)).drop(1), None)(NoPosition, NoPosition))
   }
 }
 
