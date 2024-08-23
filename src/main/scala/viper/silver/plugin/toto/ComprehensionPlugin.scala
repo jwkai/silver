@@ -1,9 +1,10 @@
 package viper.silver.plugin.toto
 
-import fastparse.P
+import fastparse.{NoCut, P}
 import viper.silver.FastMessaging
 import viper.silver.ast.utility.rewriter.Traverse
 import viper.silver.ast._
+import viper.silver.ast.pretty.FastPrettyPrinter.pretty
 import viper.silver.parser.FastParserCompanion
 import viper.silver.parser.FastParser
 import viper.silver.parser._
@@ -23,7 +24,7 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
                           @unused config: viper.silver.frontend.SilFrontendConfig,
                           fp: FastParser) extends SilverPlugin with ParserPluginTemplate {
 
-  import fp.{ParserExtension, funcApp, exp, argList, commaSeparated, formalArg, idnuse, idndef, idnref, lineCol, _file}
+  import fp.{ParserExtension, funcApp, exp, argList, commaSeparated, formalArg, fieldAccess, foldPExp, idndef, idnref, lineCol, _file}
   import FastParserCompanion.{ExtendedParsing, PositionParsing, reservedKw, whitespace}
 
   private var setOperators: Set[PCompOperator] = Set()
@@ -33,7 +34,7 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
     P(P(PComprehensionKeyword) ~/ "[" ~ funcApp ~ "]")
 
   def compDef[$: P]: P[(PMappingFieldReceiver, PExp)] =
-    P("(") ~ mapRecBoth ~ "|" ~ exp ~ ")"
+    P(P("(") ~/ mapRecBoth ~ "|" ~ exp ~ ")")
 
   def comp[$: P]: P[PComprehension] =
     P(
@@ -98,13 +99,12 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
 
   // Parser without the mapping function
   def recVal[$: P]: P[PMappingFieldReceiver] =
-    // Parse the mapping function with two possible syntaxes
     P(
-      (funcApp ~ "." ~ idnuse) map {
-        case (receiver, field) => (
-          defaultMappingIden(receiver.pos),
-          field,
-          receiver
+      (funcApp ~~ fieldAccess map { case (fa, ss) => foldPExp(fa, Seq(ss)) }) map {
+        case p@PFieldAccess(rcv, _, idnref) => (
+          defaultMappingIden(p.pos),
+          idnref,
+          rcv.asInstanceOf[PCall]
         )
       } map (PMappingFieldReceiver.apply _).tupled
     ).pos
@@ -121,15 +121,14 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
               mappingFunc.retype(),
               PDelimited.impliedParenComma(mappingCallArgs.getOrElse(Seq())),
               None
-            )(pMappingFieldReceiver.pos)
+            )(pMappingFieldReceiver.mapping.pos)
           )(pMappingFieldReceiver.pos)
       }
     )
 
   // Allow both with and without Mapping function
-  def mapRecBoth[$: P]: P[PMappingFieldReceiver] = {
-    recVal | mapRecVal
-  }
+  def mapRecBoth[$: P]: P[PMappingFieldReceiver] =
+    P(NoCut(recVal) | mapRecVal)
 
   /** Called before any processing happened.
     *
@@ -162,19 +161,26 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
     */
   override def beforeResolve(input: PProgram) : PProgram = {
 
-    val domainsToAdd = Seq(
-      compDomainString(),
-      receiverDomainString(),
-      opDomainString(),
-      mappingDomainString(),
-      mapCustomDomainString(),
-      setFuncDomainString()
-    ).map(parseDomainString)// :+ convertUserDefs(input.extensions)
+    if (input.filterMembers {
+      case _: PComprehension | _: PReceiver | _: PMapping | _: PFilter | _: PCompOperator => true
+      case _ => false
+    }.members.isEmpty) {
+      input
+    } else {
+      val domainsToAdd = Seq(
+        compDomainString(),
+        receiverDomainString(),
+        opDomainString(),
+        mappingDomainString(),
+        mapCustomDomainString(),
+        setFuncDomainString()
+      ).map(parseDomainString) // :+ convertUserDefs(input.extensions)
 
-    val newInput = input.copy(
-      members = input.members ++ domainsToAdd
-    )(input.pos, input.localErrors)
-    newInput
+      val newInput = input.copy(
+        members = input.members ++ domainsToAdd
+      )(input.pos, input.localErrors)
+      newInput
+    }
   }
 
   /** Called after identifiers have been resolved but before the parse AST is translated into the normal AST.
