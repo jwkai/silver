@@ -9,10 +9,8 @@ import viper.silver.verifier.errors.{ExhaleFailed, InhaleFailed}
 
 import scala.collection.mutable
 
-
 // TODOS: 1. Count how many inhales to find how many Lost vars we need to declare
 // 2. track which Lost Var is related to which inhale
-
 
 class InlineAxiomGenerator(program: Program, methodName: String) {
 
@@ -262,14 +260,14 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val fAccess = helper.forallFilterHaveSomeAccess(forallVarF.localVar,
       compVar, field.name, None)
 
-    val receiverApp = helper.applyDomainFunc("getreceiver", Seq(compVar), compDType.typVarsMap)
+    val receiverApp = helper.applyDomainFunc(DomainsGenerator.compGetRecvKey, Seq(compVar), compDType.typVarsMap)
     val invApp = helper.applyDomainFunc(DomainsGenerator.recInvKey,
       Seq(receiverApp, writeTo),
       compDType.typVarsMap)
-    val triggerDeleteKeyNew = helper.applyDomainFunc("_triggerDeleteKey1",
+    val triggerDeleteKeyNew = helper.applyDomainFunc(DomainsGenerator.trigDelKey1Key,
       Seq(helper.compApplySnapApply(compVar, snapDecl, forallVarF.localVar), invApp),
       compDType.typVarsMap)
-    val triggerDeleteKeyOld = helper.applyDomainFunc("_triggerDeleteKey1",
+    val triggerDeleteKeyOld = helper.applyDomainFunc(DomainsGenerator.trigDelKey1Key,
       Seq(
         LabelledOld(helper.compApplySnapApply(compVar, snapDecl, forallVarF.localVar), getLastLabel().name)(),
         invApp),
@@ -304,11 +302,11 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val fAccess = helper.forallFilterHaveSomeAccess(forallVarF.localVar,
       compVar, field.name, None)
 
-    val receiverApp = helper.applyDomainFunc("getreceiver", Seq(compVar), compDType.typVarsMap)
+    val receiverApp = helper.applyDomainFunc(DomainsGenerator.compGetRecvKey, Seq(compVar), compDType.typVarsMap)
     val invApp = helper.applyDomainFunc(DomainsGenerator.recInvKey,
       Seq(receiverApp, readFrom),
       compDType.typVarsMap)
-    val triggerDeleteKey = helper.applyDomainFunc("_triggerDeleteKey1",
+    val triggerDeleteKey = helper.applyDomainFunc(DomainsGenerator.trigDelKey1Key,
       Seq(helper.compApplySnapApply(compVar, snapDecl, forallVarF.localVar), invApp),
       compDType.typVarsMap)
 
@@ -404,11 +402,11 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val compApplyF = helper.compApplySnapApply(compVar,
       snapDecl,
       forallVarFilter.localVar)
-    val dummy1 = helper.applyDomainFunc("dummy1", Seq(compApplyNotLost), compDType.typVarsMap)
-    val triggerDelete = helper.applyDomainFunc("_triggerDeleteBlock",
+    val dummy1 = helper.applyDomainFunc(DomainsGenerator.compApplyDummyKey, Seq(compApplyNotLost), compDType.typVarsMap)
+    val triggerDelete = helper.applyDomainFunc(DomainsGenerator.trigDelBlockKey,
       Seq(LabelledOld(compApplyF, getLastLabel().name)(), filterNotLostApplied),
       compDType.typVarsMap)
-    val exhaleCF = helper.applyDomainFunc("exhaleCompMap",
+    val exhaleCF = helper.applyDomainFunc(DomainsGenerator.exhaleFoldSetKey,
       Seq(compVar, LabelledOld(
         FuncApp(snapDecl,
           Seq(compVar, forallVarFilter.localVar))(),
@@ -449,7 +447,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
         forallVarF.localVar),
         getLastLabel().name)(),
       // Second trigger
-      helper.applyDomainFunc("exhaleCompMap",
+      helper.applyDomainFunc(DomainsGenerator.exhaleFoldSetKey,
         Seq(compVar, forallVarM.localVar,
           IntLit(ASnapshotDecl.getFieldInt(field.name))()
         ),
@@ -466,7 +464,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     // // triggerDeleteBlock(
     //    //     (compApply($c, snap_val_Int($c,domain(m1)))),
     //    //     $f) &&
-    val triggerDelete = helper.applyDomainFunc("_triggerDeleteBlock",
+    val triggerDelete = helper.applyDomainFunc(DomainsGenerator.trigDelBlockKey,
       Seq(helper.compApplySnapApply(compVar, snapDecl, mapDomain), forallVarF.localVar),
       compDType.typVarsMap)
 
@@ -480,7 +478,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
       DomainFuncApp(compApply,
         Seq(compVar, forallVarM.localVar), compDType.typVarsMap
     )()
-    val triggerDeleteOld = helper.applyDomainFunc("_triggerDeleteBlock",
+    val triggerDeleteOld = helper.applyDomainFunc(DomainsGenerator.trigDelBlockKey,
       Seq(compAppliedOldM, forallVarF.localVar),
       compDType.typVarsMap)
     val outForall = Forall(

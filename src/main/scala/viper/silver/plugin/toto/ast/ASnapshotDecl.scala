@@ -105,7 +105,7 @@ case class ASnapshotDecl private(compType: (Type, Type, Type), fieldName: String
     val setContainsi2 = AnySetContains(forallVarInd2.localVar, f)()
     val i1Neqi2 = NeCmp(forallVarInd1.localVar, forallVarInd2.localVar)()
 
-    val getreceiver = input.findDomainFunction("getreceiver")
+    val getreceiver = input.findDomainFunction(DomainsGenerator.compGetRecvKey)
     // getreceiver($c)
     val getreceiverApplied = DomainFuncApp(getreceiver, Seq(c),
       compType.typVarsMap)()
@@ -149,8 +149,8 @@ case class ASnapshotDecl private(compType: (Type, Type, Type), fieldName: String
     // ensures domain(result) == indices
     val domainEqF = EqCmp(MapDomain(Result(outType)())(), f)()
 
-    // ensures getSnapFieldID(result) == int
-    val fieldIDApplied = helper.applyDomainFunc("getSnapFieldID",
+    // ensures getFieldID(result) == int
+    val fieldIDApplied = helper.applyDomainFunc(DomainsGenerator.getFieldIDKey,
       Seq(Result(outType)()),
       compType.typVarsMap)
     val fieldIDEq = EqCmp(fieldIDApplied, IntLit(ASnapshotDecl.getFieldInt(fieldName))())()

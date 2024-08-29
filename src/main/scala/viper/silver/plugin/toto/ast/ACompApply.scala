@@ -28,7 +28,7 @@ case class ACompApply(comp: AComprehension3Tuple, snap: ASnapshotApp)(val pos: P
 
   def includeMapping(inside: Cont, mapping: Exp): Cont = {
     val mapApplied = mapping.asInstanceOf[DomainFuncApp]
-    if (mapApplied.funcname == "mapIdenKey") {
+    if (mapApplied.funcname == DomainsGenerator.mapIdenKey) {
       inside
     } else {
       text(mapApplied.funcname) <> parens(ssep(inside +: (mapApplied.args map show), group(char (',') <> line)))
