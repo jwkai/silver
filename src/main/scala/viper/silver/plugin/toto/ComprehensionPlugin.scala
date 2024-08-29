@@ -168,12 +168,12 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
       input
     } else {
       val domainsToAdd = Seq(
+        fHeapDomainString(),
         compDomainString(),
         receiverDomainString(),
         opDomainString(),
         mappingDomainString(),
-        mapCustomDomainString(),
-        setFuncDomainString()
+        setEditDomainString()
       ).map(parseDomainString) // :+ convertUserDefs(input.extensions)
 
       val newInput = input.copy(
@@ -260,7 +260,7 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
           // Dont need to transform asserts
 //      case ori @ Assert(a) => Exhale(a)(ori.pos, ori.info, ori.errT)
     })
-//    print(pretty(newInput) + "\n\n")
+    print(pretty(newInput) + "\n\n")
 
     newInput
 
