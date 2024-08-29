@@ -26,7 +26,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     }).toSet
   }
 
-//  val allReleventFields = {
+//  val allRelevantFields = {
 //    snapshotDeclsUsed.map(snapDecl => program.findField(snapDecl.fieldName))
 //  }
 //
@@ -74,9 +74,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
 
   def convertMethodToInhaleExhale(methodCall: MethodCall): Seqn = {
     // Get method declaration
-
     val oldLabel = getUniqueLabelMethod()
-
     val methodDecl = program.findMethod(methodCall.methodName)
 
     // LocalVarsDecls for temporary return values
@@ -88,7 +86,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val returnDeclVars = methodDecl.formalReturns.zip(returnDecls).map{
       case (old, newVar) => newVar.localVar.copy()(old.pos, old.info, old.errT + NodeTrafo(old.localVar))
     }
-//    val returnDeclVars = returnDecls.map(td => td.localVar)
+    // val returnDeclVars = returnDecls.map(td => td.localVar)
 
     // Replace precondition and postcondition variables with actual arguments and return values
     val newPres = methodDecl.pres.map(p => Expressions.instantiateVariables(p,
@@ -109,6 +107,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
           errors.PreconditionInCallFalse(methodCall, reason, cached)
       })
     ))
+
     // Todo, remove the inhale failure, and make the error disappear (Carbon)
     // For silicon this is correct
     var inhales = newPost.map(p => Inhale(p)(p.pos, p.info,
@@ -128,14 +127,11 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
 
     // Assign targets with temporary return values
     val assigns = methodCall.targets.zip(returnDeclVars).map(
-      t => AbstractAssign(t._1, t._2)
-      (t._1.pos, t._1.info, t._1.errT)
+      t => AbstractAssign(t._1, t._2)(t._1.pos, t._1.info, t._1.errT)
     )
     Seqn(Seq(oldLabel) ++ exhales.reverse ++ inhales ++ assigns,
       returnDecls)(methodCall.pos, methodCall.info, methodCall.errT)
   }
-
-
 
   def generateExhaleAxioms(e: Exhale, relevantField: Set[Field]): Seqn = {
     labelIncrement()
@@ -145,8 +141,8 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val exhaleAxioms = relevantSnapDecls.map(snapDecl => generateExhaleAxiomsPerSnap(snapDecl, declaredFieldVars))
     val allLostVars = exhaleAxioms.flatMap(e => e.scopedSeqnDeclarations)
     val allExhaleAxioms = exhaleAxioms.flatMap(e => e.ss)
-    Seqn(e +: getCurrentLabel() +: allExhaleAxioms, allLostVars)(
-      e.pos, e.info, e.errT)
+
+    Seqn(e +: getCurrentLabel() +: allExhaleAxioms, allLostVars)(e.pos, e.info, e.errT)
   }
 
   def generateInhaleAxioms(i: Inhale, relevantField: Set[Field]): Seqn = {
@@ -155,8 +151,8 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
       relevantField.contains(snapDecl.findFieldInProgram(program)))
     val inhaleAxioms = relevantSnapDecls.map(snapDecl => generateInhaleAxiomsPerSnap(snapDecl))
     val allInhaleAxioms = inhaleAxioms.flatten
-    Seqn(i +: getCurrentLabel() +: allInhaleAxioms, Seq())(
-      i.pos, i.info, i.errT)
+
+    Seqn(i +: getCurrentLabel() +: allInhaleAxioms, Seq())(i.pos, i.info, i.errT)
   }
 
   def generateHeapWriteAxioms(writeStmt: Stmt): Seqn = {
@@ -169,8 +165,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
       snapshotDeclsUsed.filter(sd => sd.findFieldInProgram(program) == w.lhs.field).zipAll(Seq(),null,w)
     ).toSeq
     val out = snapsAndFields.flatMap(snapAndField =>
-      generateHeapWriteAxiomPerSnap(snapAndField._1,
-        snapAndField._2.lhs.rcv)
+      generateHeapWriteAxiomPerSnap(snapAndField._1, snapAndField._2.lhs.rcv)
     )
     Seqn(writeStmt +: getCurrentLabel() +: out, Seq())(writeStmt.pos, writeStmt.info, writeStmt.errT)
   }
@@ -179,36 +174,35 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
 
     var accLHS = Set[FieldAccess]()
 
-    val releventPart: Node = readStmt match {
+    val relevantPart: Node = readStmt match {
       case w : While =>
         w.copy(body = Seqn(Seq(), Seq())())(w.pos, w.info, w.errT)
       case i : If =>
         i.copy(thn = Seqn(Seq(), Seq())(), els = Seqn(Seq(), Seq())())(i.pos, i.info, i.errT)
       case out@ Seqn(_, _) => return out
       // Do this to ignore LHS in case of a heap write tgt with heap read. Could cause redundancy.
-      case a: FieldAssign => {
+      case a: FieldAssign =>
         accLHS = accLHS + a.lhs;
         a.rhs
-      }
       case generated: Assume => return generated
       case _ => readStmt
     }
-    // remove accessibility predicate
+
+    // Remove accessibility predicate
 
     // These reads cannot contained quantified vars
-    val allQuantifiedVars = releventPart.deepCollect({
-      case quanti: QuantifiedExp =>
-        quanti.variables
+    val allQuantifiedVars = relevantPart.deepCollect({
+      case qexp: QuantifiedExp =>
+        qexp.variables
     }).flatten
 
-
     // TODO: remove stuff in accessibility predicate TOO!!
-    val ignoreAcc = releventPart.deepCollect({
+    val ignoreAcc = relevantPart.deepCollect({
       case acc: FieldAccessPredicate =>
         acc.loc
     })
 
-    val allReads = releventPart.deepCollect({
+    val allReads = relevantPart.deepCollect({
       case fieldAccess: FieldAccess =>
         fieldAccess
     })
@@ -218,9 +212,8 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     var reads = allReads.filterNot(r => ignoreAcc.exists(p => p eq r)).toSet
     reads = reads.filterNot(r => allQuantifiedVars.exists(p =>  r.contains(p.localVar)))
     reads = reads -- accLHS
+
     // remove all reads with quantified var
-
-
     if (reads.isEmpty) {
       return readStmt
     }
@@ -228,79 +221,86 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val snapsAndFields = reads.flatMap(r =>
       snapshotDeclsUsed.filter(sd => sd.findFieldInProgram(program) == r.field).zipAll(Seq(),null,r)
     ).toSeq
-    val out = snapsAndFields.flatMap(snapAndField =>
-      generateHeapReadAxiomPerSnap(snapAndField._1,
-      snapAndField._2.rcv)
+    val out = snapsAndFields.flatMap(snapAndField => generateHeapReadAxiomPerSnap(snapAndField._1, snapAndField._2.rcv)
     )
-    Seqn(out :+ readStmt, Seq())(readStmt.pos, readStmt.info, readStmt.errT)
 
+    Seqn(out :+ readStmt, Seq())(readStmt.pos, readStmt.info, readStmt.errT)
   }
 
   private def generateHeapWriteAxiomPerSnap(snapADecl: ASnapshotDecl, writeTo: Exp) : Seq[Stmt] = {
     val field = program.findField(snapADecl.fieldName)
     // Extract the comp Domain type
     val compDType = snapADecl.compDType(program)
-    // Extract the snap func decl
+    // Extract the snap func declaration
     val snapDecl = snapADecl.viperDecl(program)
 
-    // Comp var decl
+    // Comp var declaration
     val forallVarC = LocalVarDecl("__c", compDType)()
     val compVar = forallVarC.localVar
 
-    // Filter Var decl
+    // Filter Var declaration
     val forallVarF = LocalVarDecl("__f", SetType(snapADecl.compType._1))()
     val trigger = Trigger(Seq(
-      LabelledOld(helper.compApplySnapApply(compVar, snapDecl, forallVarF.localVar), getLastLabel().name)())
+      LabelledOld(helper.compApplySnapApply(compVar, snapDecl, forallVarF.localVar),
+                  getLastLabel().name
+      )())
     )()
-    val trigger2 = Trigger(Seq(
-      helper.compApplySnapApply(compVar, snapDecl, forallVarF.localVar)
-    ))()
+    val trigger2 = Trigger(Seq(helper.compApplySnapApply(compVar, snapDecl, forallVarF.localVar)))()
 
     val fRGood = helper.filterReceiverGood(forallVarF.localVar, compVar)
-    val fAccess = helper.forallFilterHaveSomeAccess(forallVarF.localVar,
-      compVar, field.name, None)
+    val fAccess = helper.forallFilterHaveSomeAccess(forallVarF.localVar, compVar, field.name, None)
 
-    val receiverApp = helper.applyDomainFunc(DomainsGenerator.compGetRecvKey, Seq(compVar), compDType.typVarsMap)
-    val invApp = helper.applyDomainFunc(DomainsGenerator.recInvKey,
+    val receiverApp = helper.applyDomainFunc(
+      DomainsGenerator.compGetRecvKey,
+      Seq(compVar),
+      compDType.typVarsMap
+    )
+    val invApp = helper.applyDomainFunc(
+      DomainsGenerator.recInvKey,
       Seq(receiverApp, writeTo),
-      compDType.typVarsMap)
-    val triggerDeleteKeyNew = helper.applyDomainFunc(DomainsGenerator.trigDelKey1Key,
+      compDType.typVarsMap
+    )
+    val triggerDeleteKeyNew = helper.applyDomainFunc(
+      DomainsGenerator.trigDelKey1Key,
       Seq(helper.compApplySnapApply(compVar, snapDecl, forallVarF.localVar), invApp),
-      compDType.typVarsMap)
-    val triggerDeleteKeyOld = helper.applyDomainFunc(DomainsGenerator.trigDelKey1Key,
-      Seq(
-        LabelledOld(helper.compApplySnapApply(compVar, snapDecl, forallVarF.localVar), getLastLabel().name)(),
-        invApp),
-      compDType.typVarsMap)
+      compDType.typVarsMap
+    )
+    val triggerDeleteKeyOld = helper.applyDomainFunc(
+      DomainsGenerator.trigDelKey1Key,
+      Seq(LabelledOld(helper.compApplySnapApply(compVar, snapDecl, forallVarF.localVar), getLastLabel().name)(),
+          invApp),
+      compDType.typVarsMap
+    )
 
     val outForall = Forall(
       Seq(forallVarC, forallVarF),
       Seq(trigger, trigger2),
-      helper.andedImplies(
+      helper.foldedConjImplies(
         Seq(fRGood, fAccess),
         Seq(fRGood, triggerDeleteKeyNew, triggerDeleteKeyOld),
-      ))()
+      )
+    )()
+
     Seq(Assume(outForall)())
   }
 
   private def generateHeapReadAxiomPerSnap(snapADecl: ASnapshotDecl, readFrom: Exp) : Seq[Stmt] = {
     val field = program.findField(snapADecl.fieldName)
+
     // Extract the comp Domain type
     val compDType = snapADecl.compDType(program)
-    // Extract the snap func decl
+    // Extract the snap func declaration
     val snapDecl = snapADecl.viperDecl(program)
 
-    // Comp var decl
+    // Comp var declaration
     val forallVarC = LocalVarDecl("__c", compDType)()
     val compVar = forallVarC.localVar
 
-    // Filter Var decl
+    // Filter Var declaration
     val forallVarF = LocalVarDecl("__f", SetType(snapADecl.compType._1))()
-    val trigger = Trigger(Seq(helper.compApplySnapApply(compVar,
-      snapDecl, forallVarF.localVar)))()
+    val trigger = Trigger(Seq(helper.compApplySnapApply(compVar, snapDecl, forallVarF.localVar)))()
     val fRGood = helper.filterReceiverGood(forallVarF.localVar, compVar)
-    val fAccess = helper.forallFilterHaveSomeAccess(forallVarF.localVar,
-      compVar, field.name, None)
+    val fAccess = helper.forallFilterHaveSomeAccess(forallVarF.localVar, compVar, field.name, None)
 
     val receiverApp = helper.applyDomainFunc(DomainsGenerator.compGetRecvKey, Seq(compVar), compDType.typVarsMap)
     val invApp = helper.applyDomainFunc(DomainsGenerator.recInvKey,
@@ -313,10 +313,9 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val outForall = Forall(
       Seq(forallVarC, forallVarF),
       Seq(trigger),
-      helper.andedImplies(
-        Seq(fRGood, fAccess),
-        Seq(fRGood, triggerDeleteKey)
-      ))()
+      helper.foldedConjImplies(Seq(fRGood, fAccess), Seq(fRGood, triggerDeleteKey))
+    )()
+
     Seq(Assume(outForall)())
   }
 
@@ -362,25 +361,24 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     }
   }
 
-
   private def mainExhaleAxiom(snapADecl: ASnapshotDecl, lostPVal: LocalVar): Seq[Stmt] = {
     val field = program.findField(snapADecl.fieldName)
     // Extract the comp Domain type
     val compDType = snapADecl.compDType(program)
-    // Extract the snap func decl
+    // Extract the snap func declaration
     val snapDecl = snapADecl.viperDecl(program)
 
-    // Comp var decl
+    // Comp var declaration
     val forallVarC = LocalVarDecl("__c", compDType)()
     val compVar = forallVarC.localVar
 
-    // Filter Var decl
+    // Filter Var declaration
     val forallVarFilter = LocalVarDecl("__filter", SetType(snapADecl.compType._1))()
-    val trigger = Trigger(Seq(LabelledOld(
-      helper.compApplySnapApply(compVar,
-        snapDecl,
-        forallVarFilter.localVar),
-      getLastLabel().name)()))()
+    val trigger = Trigger(
+      Seq(LabelledOld(helper.compApplySnapApply(compVar, snapDecl, forallVarFilter.localVar),
+          getLastLabel().name)()
+      )
+    )()
 
     // ---------------Making the LHS---------------
     // FilterReceiverGood
@@ -417,10 +415,11 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val outForall = Forall(
       Seq(forallVarC, forallVarFilter),
       Seq(trigger),
-      helper.andedImplies(
+      helper.foldedConjImplies(
         Seq(frGood, forallOldHasPerm, forallNewStillHasPerm),
         Seq(frGood, triggerDelete, dummy1, exhaleCF)
-    ))()
+      )
+    )()
 
     Seq(Assume(outForall)())
   }
@@ -429,28 +428,23 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val field = program.findField(snapADecl.fieldName)
     // Extract the comp Domain type
     val compDType = snapADecl.compDType(program)
-    // Extract the snap func decl
+    // Extract the snap func declaration
     val snapDecl = snapADecl.viperDecl(program)
 
-    // Comp var decl
+    // Comp var declaration
     val forallVarC = LocalVarDecl("__c", compDType)()
     val compVar = forallVarC.localVar
 
-    // Filter Var decl
+    // Filter Var declaration
     val forallVarF = LocalVarDecl("__f", SetType(snapADecl.compType._1))()
     val forallVarM = LocalVarDecl("__m", MapType(snapADecl.compType._1, snapADecl.compType._3))()
 
     val trigger = Trigger(Seq(
       // First trigger
-      LabelledOld(helper.compApplySnapApply(compVar,
-        snapDecl,
-        forallVarF.localVar),
-        getLastLabel().name)(),
+      LabelledOld(helper.compApplySnapApply(compVar, snapDecl, forallVarF.localVar), getLastLabel().name)(),
       // Second trigger
       helper.applyDomainFunc(DomainsGenerator.exhaleFoldSetKey,
-        Seq(compVar, forallVarM.localVar,
-          IntLit(ASnapshotDecl.getFieldInt(field.name))()
-        ),
+        Seq(compVar, forallVarM.localVar, IntLit(ASnapshotDecl.getFieldInt(field.name))()),
         compDType.typVarsMap)))()
 
     val filter1ReceiverGood = helper.filterReceiverGood(forallVarF.localVar, compVar)
@@ -468,30 +462,25 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
       Seq(helper.compApplySnapApply(compVar, snapDecl, mapDomain), forallVarF.localVar),
       compDType.typVarsMap)
 
-
-
     // // triggerDeleteBlock(
     //    //     (compApply($c, m1)),
     //    //     $f)
     val compApply = program.findDomainFunction(DomainsGenerator.compApplyKey)
-    val compAppliedOldM =
-      DomainFuncApp(compApply,
-        Seq(compVar, forallVarM.localVar), compDType.typVarsMap
-    )()
-    val triggerDeleteOld = helper.applyDomainFunc(DomainsGenerator.trigDelBlockKey,
+    val compAppliedOldM = DomainFuncApp(compApply, Seq(compVar, forallVarM.localVar), compDType.typVarsMap)()
+    val triggerDeleteOld = helper.applyDomainFunc(
+      DomainsGenerator.trigDelBlockKey,
       Seq(compAppliedOldM, forallVarF.localVar),
-      compDType.typVarsMap)
+      compDType.typVarsMap
+    )
     val outForall = Forall(
       Seq(forallVarC, forallVarF, forallVarM),
       Seq(trigger),
-      helper.andedImplies(
+      helper.foldedConjImplies(
         Seq(filter1ReceiverGood, mapDomainReceiverGood, f1subsetM, mapDAccess),
         Seq(filter1ReceiverGood, mapDomainReceiverGood, f1subsetM, triggerDelete, triggerDeleteOld)
-      ))()
+      )
+    )()
     Seq(Assume(outForall)())
   }
-
-
-
 
 }

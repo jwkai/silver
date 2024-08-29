@@ -19,12 +19,6 @@ class AxiomHelper(program: Program) {
     "_methodLabel"
   }
 
-  //  def checkExhaleImpure(s: Stmt): Boolean = {
-  //    s match {
-  //      case Exhale(exp) => !exp.isPure
-  //      case other => false
-  //    }
-  //  }
   def extractFieldAcc(s: Stmt): Set[Field] = {
     s.deepCollect({
       case fieldAccessPredicate: FieldAccessPredicate =>
@@ -66,24 +60,26 @@ class AxiomHelper(program: Program) {
 
   def compApplySnapApply(comp: Exp, snapFunc: ast.Function, filter: Exp): DomainFuncApp = {
     val compApply = program.findDomainFunction(DomainsGenerator.compApplyKey)
-    val snapApplyF = FuncApp(snapFunc,
-      Seq(comp, filter))()
-    DomainFuncApp(compApply,
-      Seq(comp, snapApplyF), comp.typ.asInstanceOf[DomainType].typVarsMap
+    val snapApplyF = FuncApp(snapFunc, Seq(comp, filter))()
+
+    DomainFuncApp(
+      compApply,
+      Seq(comp, snapApplyF),
+      comp.typ.asInstanceOf[DomainType].typVarsMap
     )()
   }
 
-  def andedImplies(lhsExps: Seq[Exp], rhsExps: Seq[Exp]): Exp = {
-    def andedBig(exps: Seq[Exp]): Exp = {
+  def foldedConjImplies(lhsExps: Seq[Exp], rhsExps: Seq[Exp]): Exp = {
+    def foldConj(exps: Seq[Exp]): Exp = {
       if (exps.length == 1) {
         exps.head
       } else if (exps.length == 2) {
         And(exps(0), exps(1))()
       } else {
-        And(exps.head, andedBig(exps.tail))()
+        And(exps.head, foldConj(exps.tail))()
       }
     }
-    Implies(andedBig(lhsExps), andedBig(rhsExps))()
+    Implies(foldConj(lhsExps), foldConj(rhsExps))()
   }
 
   def filterReceiverGood(filter: Exp, compExp: Exp): DomainFuncApp = {
@@ -92,9 +88,13 @@ class AxiomHelper(program: Program) {
     val getreceiver = program.findDomainFunction(DomainsGenerator.compGetRecvKey)
 
     // getreceiver($c)
-    val getreceiverApplied = DomainFuncApp(getreceiver, Seq(compExp),
-      compType.typVarsMap)()
-    DomainFuncApp(filterReceiverGoodFunc,
+    val getreceiverApplied = DomainFuncApp(
+      getreceiver,
+      Seq(compExp),
+      compType.typVarsMap
+    )()
+    DomainFuncApp(
+      filterReceiverGoodFunc,
       Seq(filter, getreceiverApplied),
       compType.typVarsMap
     )()
@@ -132,9 +132,13 @@ class AxiomHelper(program: Program) {
     val field = program.findField(fieldName)
 
     // getreceiver($c)
-    val getreceiverApplied = DomainFuncApp(getreceiver, Seq(compExp),
-      compType.typVarsMap)()
-    val recApplied = DomainFuncApp(recApply,
+    val getreceiverApplied = DomainFuncApp(
+      getreceiver,
+      Seq(compExp),
+      compType.typVarsMap
+    )()
+    val recApplied = DomainFuncApp(
+      recApply,
       Seq(getreceiverApplied, forallVarInd.localVar),
       compType.typVarsMap
     )()
@@ -165,9 +169,13 @@ class AxiomHelper(program: Program) {
     val field = program.findField(fieldName)
 
     // getreceiver($c)
-    val getreceiverApplied = DomainFuncApp(getreceiver, Seq(compExp),
-      compType.typVarsMap)()
-    val recApplied = DomainFuncApp(recApply,
+    val getreceiverApplied = DomainFuncApp(
+      getreceiver,
+      Seq(compExp),
+      compType.typVarsMap
+    )()
+    val recApplied = DomainFuncApp(
+      recApply,
       Seq(getreceiverApplied, forallVarInd.localVar),
       compType.typVarsMap
     )()
@@ -197,9 +205,13 @@ class AxiomHelper(program: Program) {
     val field = program.findField(fieldName)
 
     // getreceiver($c)
-    val getreceiverApplied = DomainFuncApp(getreceiver, Seq(compExp),
-      compType.typVarsMap)()
-    val recApplied = DomainFuncApp(recApply,
+    val getreceiverApplied = DomainFuncApp(
+      getreceiver,
+      Seq(compExp),
+      compType.typVarsMap
+    )()
+    val recApplied = DomainFuncApp(
+      recApply,
       Seq(getreceiverApplied, forallVarInd.localVar),
       compType.typVarsMap
     )()
@@ -207,16 +219,19 @@ class AxiomHelper(program: Program) {
 
     val getmapping = program.findDomainFunction(DomainsGenerator.compGetMappingKey)
     val mapApply = program.findDomainFunction(DomainsGenerator.mapApplyKey)
-    val getmappingApplied = DomainFuncApp(getmapping, Seq(compExp),
-      compType.typVarsMap)()
-    val mappingApplied = DomainFuncApp(mapApply,
+    val getmappingApplied = DomainFuncApp(
+      getmapping,
+      Seq(compExp),
+      compType.typVarsMap
+    )()
+    val mappingApplied = DomainFuncApp(
+      mapApply,
       Seq(getmappingApplied, recAppliedVal),
       compType.typVarsMap
     )()
     val mapAccessEq = EqCmp(MapLookup(mapResult, forallVarInd.localVar)(), mappingApplied)()
     val forallTrigger = Trigger(Seq(MapLookup(mapResult, forallVarInd.localVar)()))()
-    val output = Forall(Seq(forallVarInd), Seq(forallTrigger),
-      Implies(setContains, mapAccessEq)())()
+    val output = Forall(Seq(forallVarInd), Seq(forallTrigger), Implies(setContains, mapAccessEq)())()
     output
   }
 
@@ -232,16 +247,18 @@ class AxiomHelper(program: Program) {
     val setNotEmpty = NeCmp(forallVarSet.localVar, EmptySet(fSetType.elementType)())()
 
     val primeAppSetMinus = FuncApp(primeDecl, Seq(compExp, AnySetMinus(filter, forallVarSet.localVar)()))()
-    val mapDeleteApplied = applyDomainFunc("mapDelete", Seq(mapResult, forallVarSet.localVar),
-      compType.typVarsMap)
+    val mapDeleteApplied = applyDomainFunc(
+      "mapDelete",
+      Seq(mapResult, forallVarSet.localVar),
+      compType.typVarsMap
+    )
     val primeEqDelete = EqCmp(primeAppSetMinus, mapDeleteApplied)()
 
     val implies = Implies(setNotEmpty, primeEqDelete)()
 
     val forallTrigger = Trigger(Seq(mapDeleteApplied))()
 
-    val output = Forall(Seq(forallVarSet), Seq(forallTrigger),
-      implies)()
+    val output = Forall(Seq(forallVarSet), Seq(forallTrigger), implies)()
     output
   }
 
@@ -261,11 +278,10 @@ class AxiomHelper(program: Program) {
     val mapSubmapApplied = applyDomainFunc("mapSubmap", Seq(mapResult, forallVarSet.localVar),
       compType.typVarsMap)
     val primeEqDelete = EqCmp(primeAppSet, mapSubmapApplied)()
-    val implies = andedImplies(Seq(subset, setNotEqual), Seq(subset, setNotEqual, primeEqDelete))
+    val implies = foldedConjImplies(Seq(subset, setNotEqual), Seq(subset, setNotEqual, primeEqDelete))
     val forallTrigger = Trigger(Seq(mapSubmapApplied))()
 
-    val output = Forall(Seq(forallVarSet), Seq(forallTrigger),
-      implies)()
+    val output = Forall(Seq(forallVarSet), Seq(forallTrigger), implies)()
     output
   }
 
@@ -276,18 +292,23 @@ class AxiomHelper(program: Program) {
       case setType: SetType => setType
       case _ => throw new Exception("Filter must be a set")
     }
+
     val forallVarSet = LocalVarDecl("__s", fSetType)()
     val primeApplied = FuncApp(primeDecl, Seq(compExp, forallVarSet.localVar))()
-    val compApplied1 = applyDomainFunc(DomainsGenerator.compApplyPrimeKey, Seq(compExp, primeApplied),
-      compType.typVarsMap)
-    val dummyApplied = applyDomainFunc(DomainsGenerator.compApplyDummyKey,
+    val compApplied1 = applyDomainFunc(
+      DomainsGenerator.compApplyPrimeKey,
+      Seq(compExp, primeApplied),
+      compType.typVarsMap
+    )
+    val dummyApplied = applyDomainFunc(
+      DomainsGenerator.compApplyDummyKey,
       Seq(EqCmp(forallVarSet.localVar, filter)()),
-      compType.typVarsMap)
+      compType.typVarsMap
+    )
 
     val forallTrigger = Trigger(Seq(compApplied1))()
 
-    val output = Forall(Seq(forallVarSet), Seq(forallTrigger),
-      dummyApplied)()
+    val output = Forall(Seq(forallVarSet), Seq(forallTrigger), dummyApplied)()
     output
   }
 
@@ -299,34 +320,43 @@ class AxiomHelper(program: Program) {
     }
     val forallVarSet1 = LocalVarDecl("__s1", fSetType)()
     val forallVarSet2 = LocalVarDecl("__s2", fSetType)()
-    val disjApplied = applyDomainFunc(DomainsGenerator.disjUnionKey,
+    val disjApplied = applyDomainFunc(
+      DomainsGenerator.disjUnionKey,
       Seq(forallVarSet1.localVar, forallVarSet2.localVar, filter),
-      compType.typVarsMap)
+      compType.typVarsMap
+    )
 
     val snapPrime1 = FuncApp(primeDecl, Seq(compExp, forallVarSet1.localVar))()
     val snapPrime2 = FuncApp(primeDecl, Seq(compExp, forallVarSet2.localVar))()
 
-    val compApplyPrime1 = applyDomainFunc(DomainsGenerator.compApplyPrimeKey,
+    val compApplyPrime1 = applyDomainFunc(
+      DomainsGenerator.compApplyPrimeKey,
       Seq(compExp, snapPrime1),
-      compType.typVarsMap)
-    val compApplyPrime2 = applyDomainFunc(DomainsGenerator.compApplyPrimeKey,
+      compType.typVarsMap
+    )
+    val compApplyPrime2 = applyDomainFunc(
+      DomainsGenerator.compApplyPrimeKey,
       Seq(compExp, snapPrime2),
-      compType.typVarsMap)
-    val compApplyResult = applyDomainFunc(DomainsGenerator.compApplyPrimeKey,
+      compType.typVarsMap
+    )
+    val compApplyResult = applyDomainFunc(
+      DomainsGenerator.compApplyPrimeKey,
       Seq(compExp, mapResult),
-      compType.typVarsMap)
+      compType.typVarsMap
+    )
 
     val getOpApplied = applyDomainFunc(DomainsGenerator.compGetOperKey, Seq(compExp), compType.typVarsMap)
 
-    val opApplied = applyDomainFunc(DomainsGenerator.opApplyKey,
+    val opApplied = applyDomainFunc(
+      DomainsGenerator.opApplyKey,
       Seq(getOpApplied, compApplyPrime1, compApplyPrime2),
-      compType.typVarsMap)
+      compType.typVarsMap
+    )
 
     val equals = EqCmp(compApplyResult, opApplied)()
-    val implies = andedImplies(Seq(disjApplied), Seq(disjApplied, equals))
+    val implies = foldedConjImplies(Seq(disjApplied), Seq(disjApplied, equals))
     val trigger = Trigger(Seq(disjApplied))()
-    val output = Forall(Seq(forallVarSet1, forallVarSet2), Seq(trigger),
-      implies)()
+    val output = Forall(Seq(forallVarSet1, forallVarSet2), Seq(trigger), implies)()
     output
   }
 

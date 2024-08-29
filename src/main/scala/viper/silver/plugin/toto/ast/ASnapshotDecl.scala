@@ -118,7 +118,7 @@ case class ASnapshotDecl private(compType: (Type, Type, Type), fieldName: String
     val recApplyNeq = NeCmp(recApplyInd1, recApplyInd2)()
     val injectiveFullCheck = Forall(Seq(forallVarInd1, forallVarInd2),
       Seq(Trigger(Seq(setContainsi1, setContainsi2))()),
-      helper.andedImplies(Seq(setContainsi1, setContainsi2, i1Neqi2),
+      helper.foldedConjImplies(Seq(setContainsi1, setContainsi2, i1Neqi2),
         Seq(recApplyNeq))
     )()
 
