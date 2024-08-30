@@ -24,9 +24,7 @@ case class ACompDecl private(compType: (Type, Type, Type), fieldName: String)(va
 
   override val scopedDecls: Seq[Declaration] = Seq()
 
-  val outType: Type = {
-    MapType(compType._1, compType._3)
-  }
+  val outType: Type = compType._3
 
   def compDType(input: Program) = {
     val compDomain = input.findDomain(DomainsGenerator.compDKey)
@@ -78,7 +76,6 @@ case class ACompDecl private(compType: (Type, Type, Type), fieldName: String)(va
     val args1 = LocalVarDecl("f", SetType(compType._1))()
     Function(name, Seq(args0, args1), outType, Seq(), Seq(), None)()
   }
-
 
   def viperDecl(input: Program): Function = {
     val decl = viperFuncSignature(input)

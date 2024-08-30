@@ -333,7 +333,7 @@ object ComprehensionPlugin {
       val axiomGenerator = new InlineAxiomGenerator(p, m.name)
 
       // If no comprehension is used in a method, keep the method the same
-      if (axiomGenerator.snapshotDeclsUsed.isEmpty) { return m }
+      if (axiomGenerator.compDeclsUsed.isEmpty) { return m }
 
       val helper = new AxiomHelper(p)
 

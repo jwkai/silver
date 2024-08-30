@@ -58,7 +58,7 @@ class AxiomHelper(program: Program) {
     DomainFuncApp(domainFunc, applyTo, typMap)()
   }
 
-  def compApplySnapApply(comp: Exp, snapFunc: ast.Function, filter: Exp): DomainFuncApp = {
+  def compApply(comp: Exp, snapFunc: ast.Function, filter: Exp): DomainFuncApp = {
     val compApply = program.findDomainFunction(DomainsGenerator.compApplyKey)
     val snapApplyF = FuncApp(snapFunc, Seq(comp, filter))()
 
