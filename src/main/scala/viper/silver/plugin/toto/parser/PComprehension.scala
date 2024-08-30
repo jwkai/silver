@@ -67,21 +67,19 @@ case class PComprehension(keyword: PReserved[PComprehensionKeyword.type], opUnit
   // Translate the parser node into an AST node
   override def translateExp(t: Translator): Exp = {
     val opTranslated = t.exp(opUnit)
-    //    val unitTranslated = t.exp(unit)
     val (mappingOut, fieldString, receiverTranslated) = mappingFieldReceiver.translateTo(t)
     val filterTranslated = t.exp(filter)
-    //    val mappingTranslated = mappingOpt.getOrElse(throw new Exception("Mapping should be defined."))
     val tuple = AComprehension3Tuple(receiverTranslated, mappingOut, opTranslated)(t.liftPos(this))
-    val snap = ASnapshotApp(tuple, filterTranslated, fieldString)(t.liftPos(this))
-    val compApply = ACompApply(tuple, snap)(t.liftPos(this))
-
+    val compApply = ACompApply(tuple, filterTranslated, fieldString)(t.liftPos(this))
     val errTFoldApply = ErrTrafo({
       case errors.PreconditionInAppFalse(offendingNode, reason, cached) =>
         FoldErrors.FoldApplyError(offendingNode, compApply, reason, cached)
     })
-    ACompApply(tuple.copy()(pos = t.liftPos(this), info = tuple.info, errT = errTFoldApply),
-      snap.copy()(pos = t.liftPos(this), info = snap.info, errT = errTFoldApply))(
-      pos = t.liftPos(this), info = compApply.info, errT = errTFoldApply)
+    ACompApply(
+      tuple.copy()(pos = t.liftPos(this), info = tuple.info, errT = errTFoldApply),
+      filterTranslated.withMeta((t.liftPos(this), filterTranslated.info, errTFoldApply)),
+      fieldString
+    )(pos = t.liftPos(this), info = compApply.info, errT = errTFoldApply)
   }
 }
 

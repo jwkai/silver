@@ -223,51 +223,19 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
   override def beforeVerify(input: Program) : Program = {
 //    val dfevalComp = input.findDomainFunction("evalComp")
 //    val dfcomp = input.findDomainFunction("comp")
-    var newInput =
-      input.copy(functions = input.functions.concat(ASnapshotDecl.getAllSnapDecls(input)))(
-        input.pos, input.info, input.errT
-      )
+//    var newInput =
+//      input.copy(functions = input.functions.concat(ASnapshotDecl.getAllSnapDecls(input)))(
+//        input.pos, input.info, input.errT
+//      )
 
-    // Change the thing to comp
-//    newInput = newInput.transform({
-//      case c@ASnapshotApp(comprehension4Tuple, filter, _) =>
-//        c.toViper
-//    })
-//    newInput = newInput.transform({
-//      case c@ AComprehension4Tuple(_, _, _, _) =>
-//        c.toViper
-//    })
-//    newInput = newInput.transform( {
-//      case c@ ACompApply(_, _) =>
-//        c.toViper(newInput)
-//    })
-//    print(pretty(newInput))
-
-//    val currbody = newInput.findMethod("test1").body.get
-
-//    val gen = new InlineAxiomGenerator(newInput, "test1")
-//    val newBody = currbody.copy(ss = currbody.ss.appended(gen.generateExhaleAxioms()))(
-//      currbody.pos, currbody.info, currbody.errT
-//    )
-
-    newInput = addInlinedAxioms(newInput)
-    newInput = newInput.transform( {
-      case c@ ACompApply(_, _) =>
-        c.toViper(newInput)
-    })
-    newInput = newInput.transform ( {
-      case ori @ Assume(a) => Inhale(a)(ori.pos, ori.info, ori.errT)
-          // Dont need to transform asserts
-//      case ori @ Assert(a) => Exhale(a)(ori.pos, ori.info, ori.errT)
+    var newInput = addInlinedAxioms(input)
+    newInput = newInput.transform({
+      case c@ACompApply(_, _, _) => c.toViper(newInput)
+      case e@Assume(a) => Inhale(a)(e.pos, e.info, e.errT)
     })
     print(pretty(newInput) + "\n\n")
 
     newInput
-
-
-    //    ViperStrategy.Slim({
-//      case c@Comprehension(exp) => exp
-//    }).execute(input)
   }
 
   /** Called after the verification. Error transformation should happen here.
@@ -354,8 +322,7 @@ object ComprehensionPlugin {
               t.messages ++= FastMessaging.message(exp,
                 s"Expected type ${expected.toString()}, but found $reportedActual at the expression at ${exp.pos._1}")
             }
-          case None =>
-            t.typeError(exp)
+          case None => t.typeError(exp)
         }
       }
     }
@@ -364,28 +331,27 @@ object ComprehensionPlugin {
   def addInlinedAxioms(p: Program) : Program = {
     def modifyMethod(m: Method) : Method = {
       val axiomGenerator = new InlineAxiomGenerator(p, m.name)
+
       // If no comprehension is used in a method, keep the method the same
-      if (axiomGenerator.snapshotDeclsUsed.isEmpty) {
-        return m
-      }
+      if (axiomGenerator.snapshotDeclsUsed.isEmpty) { return m }
+
       val helper = new AxiomHelper(p)
 
       // Convert all method calls to inhales and exhales
       var outM: Method = m.transform({
-        case e@MethodCall(_,_,_) =>
-          axiomGenerator.convertMethodToInhaleExhale(e)
+        case e@MethodCall(_,_,_) => axiomGenerator.convertMethodToInhaleExhale(e)
       })
 
       // Add the start label to the body
       outM = outM.body match {
         case Some(bodyBody) =>
-          outM.copy(body = Some(bodyBody.copy(ss =
-            helper.getStartLabel() +:
-              bodyBody.ss)(bodyBody.pos, bodyBody.info, bodyBody.errT)))(
-            outM.pos, outM.info, outM.errT)
+          outM.copy(body = Some(bodyBody.copy(
+            ss = helper.getStartLabel() +: bodyBody.ss)(bodyBody.pos, bodyBody.info, bodyBody.errT))
+          )(outM.pos, outM.info, outM.errT)
         case None => return m
       }
-      // add axioms for exhales inhales and heap writes.
+
+      // Add axioms for exhales inhales and heap writes.
       outM = outM.transform({
         case e : Exhale if !helper.checkIfPure(e) =>
           val fields = helper.extractFieldAcc(e)
@@ -397,15 +363,16 @@ object ComprehensionPlugin {
           axiomGenerator.generateHeapWriteAxioms(fa)
       })
       // add axioms for heap reads, using bottom up traversal
-      outM = outM.transform({
-        case s: Stmt  =>
-          axiomGenerator.generateHeapReadAxioms(s)
-      }, recurse = Traverse.BottomUp)
+      outM = outM.transform(
+        { case s: Stmt  => axiomGenerator.generateHeapReadAxioms(s) },
+        recurse = Traverse.BottomUp
+      )
       outM
     }
 
     // Modify all methods
     val outMethods = p.methods.map(m => modifyMethod(m))
+
     // Modify the program
     p.copy(methods = outMethods)(p.pos, p.info, p.errT)
   }

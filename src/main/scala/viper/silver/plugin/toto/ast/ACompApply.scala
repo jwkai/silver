@@ -6,24 +6,19 @@ import viper.silver.ast.{Position, _}
 import viper.silver.plugin.toto.DomainsGenerator
 import viper.silver.verifier.VerificationResult
 
-case class ACompApply(comp: AComprehension3Tuple, snap: ASnapshotApp)(val pos: Position = NoPosition, val info: Info = NoInfo,
-                                                                      val errT: ErrorTrafo = NoTrafos) extends ExtensionExp {
+case class ACompApply(comp: AComprehension3Tuple, filterExp: Exp, fieldString: String)
+                     (val pos: Position = NoPosition, val info: Info = NoInfo, val errT: ErrorTrafo = NoTrafos)
+  extends ExtensionExp {
 
-  def toViper(input: Program) : Exp = {
-
+  def toViper(input: Program): Exp = {
     val compEvalFunc = input.findDomainFunction(DomainsGenerator.compApplyKey)
     val compConstructed = comp.toViper(input)
-    val snapConstructed = snap.toViper(input)
 
-    DomainFuncApp(compEvalFunc,
-      Seq(compConstructed, snapConstructed), compConstructed.typVarMap
-    )(this.pos,
-      this.info,
-      this.errT + NodeTrafo(this))
-
-//    DomainFuncApp(DomainsGenerator.compEvalKey, Seq(comp.toViper(input), snap.toViper(input)), Map())(
-//      pos, info, comp.tripleType._3 , DomainsGenerator.compDKey , errT
-//    )
+    DomainFuncApp(
+      compEvalFunc,
+      Seq(compConstructed, filterExp),
+      compConstructed.typVarMap
+    )(this.pos, this.info, this.errT + NodeTrafo(this))
   }
 
   def includeMapping(inside: Cont, mapping: Exp): Cont = {
@@ -35,14 +30,12 @@ case class ACompApply(comp: AComprehension3Tuple, snap: ASnapshotApp)(val pos: P
     }
   }
 
-
   override lazy val prettyPrint: PrettyPrintPrimitives#Cont =
     text(DomainsGenerator.compConstructKey) <> brackets(show(comp.op)) <>
-      parens(includeMapping(show(comp.receiver) <> char('.') <> text(snap.field), comp.mapping) <+>
-        char('|') <+> show(snap.filter))
-  //parens(ssep(Seq(show(comp), show(snap)), group(char (',') <> line)))
+      parens(includeMapping(show(comp.receiver) <> char('.') <> text(fieldString), comp.mapping) <+>
+        char('|') <+> show(filter))
 
-  override val extensionSubnodes: Seq[Node] = Seq(comp, snap)
+  override val extensionSubnodes: Seq[Node] = Seq(comp, filterExp)
 
   override def extensionIsPure: Boolean = true
 
