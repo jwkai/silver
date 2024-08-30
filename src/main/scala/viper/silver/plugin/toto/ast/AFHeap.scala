@@ -6,7 +6,7 @@ import viper.silver.ast.pretty.PrettyPrintPrimitives
 import viper.silver.plugin.toto.DomainsGenerator
 import viper.silver.verifier.VerificationResult
 
-case class AFHeap(name: String)
+case class AFHeap(name: String, tag: Int)
                  (val pos: Position = NoPosition, val info: Info = NoInfo, val errT: ErrorTrafo = NoTrafos)
   extends ExtensionExp {
 

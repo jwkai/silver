@@ -38,6 +38,7 @@ object DomainsGenerator {
 
   final val filterRecvGoodKey = "filterReceiverGood"
   final val subsetNotInRefsKey = "subsetNotInRefs"
+  final val setDeleteKey = "setDelete"
 
   final val fHeapKey = "fHeap"
   final val recDKey = "Receiver"
@@ -268,7 +269,7 @@ object DomainsGenerator {
          |        (${prefix}key in ${prefix}fs) &&
          |        $compApplyKey(${prefix}fh, ${prefix}c, ${prefix}fs) ==
          |        $opApplyKey($compGetOperKey(${prefix}c),
-         |          $compApplyPrimeKey(${prefix}fh, ${prefix}c, setDelete(${prefix}fs, Set(${prefix}key))),
+         |          $compApplyPrimeKey(${prefix}fh, ${prefix}c, $setDeleteKey(${prefix}fs, Set(${prefix}key))),
          |          $fHeapElemKey(${prefix}fh, ${prefix}key))
          |    }
          |
@@ -282,7 +283,7 @@ object DomainsGenerator {
          |        (${prefix}keys subset ${prefix}fs) &&
          |        $compApplyKey(${prefix}fh, ${prefix}c, ${prefix}fs) ==
          |        $opApplyKey($compGetOperKey(${prefix}c),
-         |          $compApplyPrimeKey(${prefix}fh, ${prefix}c, setDelete(${prefix}fs, ${prefix}keys)),
+         |          $compApplyPrimeKey(${prefix}fh, ${prefix}c, $setDeleteKey(${prefix}fs, ${prefix}keys)),
          |          $compApplyPrimeKey(${prefix}fh, ${prefix}c, ${prefix}keys))
          |    }
          |
@@ -353,7 +354,7 @@ object DomainsGenerator {
   def setEditDomainString(): String = {
     val setOut =
       s"""domain SetEdit[$compDTV0] {
-         |    function setDelete(m: Set[$compDTV0], e: Set[$compDTV0]): Set[$compDTV0]
+         |    function $setDeleteKey(m: Set[$compDTV0], e: Set[$compDTV0]): Set[$compDTV0]
          |    function disjUnionEq(s1: Set[$compDTV0], s2: Set[$compDTV0], s3: Set[$compDTV0]): Bool
          |
          |    axiom _disjUnionEqDef {
@@ -366,14 +367,14 @@ object DomainsGenerator {
          |
          |    axiom _setDeleteAxiom {
          |        (forall ${prefix}s: Set[$compDTV0], ${prefix}e: Set[$compDTV0] ::
-         |            { (setDelete(${prefix}s, ${prefix}e): Set[$compDTV0]) }
-         |        (setDelete(${prefix}s, ${prefix}e): Set[$compDTV0]) == ${prefix}s setminus ${prefix}e)
+         |            { ($setDeleteKey(${prefix}s, ${prefix}e): Set[$compDTV0]) }
+         |        ($setDeleteKey(${prefix}s, ${prefix}e): Set[$compDTV0]) == ${prefix}s setminus ${prefix}e)
          |    }
          |
          |    axiom _setDeleteSubset {
          |        (forall ${prefix}s: Set[$compDTV0], ${prefix}e: Set[$compDTV0] ::
-         |            { (setDelete(${prefix}s, ${prefix}e): Set[$compDTV0]) }
-         |        (setDelete(${prefix}s, ${prefix}e): Set[$compDTV0]) subset ${prefix}s)
+         |            { ($setDeleteKey(${prefix}s, ${prefix}e): Set[$compDTV0]) }
+         |        ($setDeleteKey(${prefix}s, ${prefix}e): Set[$compDTV0]) subset ${prefix}s)
          |    }
          |}
          |

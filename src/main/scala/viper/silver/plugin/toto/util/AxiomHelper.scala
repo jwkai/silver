@@ -1,8 +1,10 @@
 package viper.silver.plugin.toto.util
 
 import viper.silver.ast
+import viper.silver.ast.Bool.foldLeft
 import viper.silver.ast.utility.Expressions
 import viper.silver.ast._
+import viper.silver.plugin.toto.ast.AFHeap
 import viper.silver.plugin.toto.{DomainsGenerator, FoldReasons}
 import viper.silver.verifier.reasons
 
@@ -58,13 +60,12 @@ class AxiomHelper(program: Program) {
     DomainFuncApp(domainFunc, applyTo, typMap)()
   }
 
-  def compApply(comp: Exp, snapFunc: ast.Function, filter: Exp): DomainFuncApp = {
+  def compApply(fHeap: Exp, comp: Exp, filter: Exp): DomainFuncApp = {
     val compApply = program.findDomainFunction(DomainsGenerator.compApplyKey)
-    val snapApplyF = FuncApp(snapFunc, Seq(comp, filter))()
 
     DomainFuncApp(
       compApply,
-      Seq(comp, snapApplyF),
+      Seq(fHeap, comp, filter),
       comp.typ.asInstanceOf[DomainType].typVarsMap
     )()
   }
@@ -115,17 +116,33 @@ class AxiomHelper(program: Program) {
     )()
   }
 
-  // generate a forall in the format:
-  // (forall $ind: Int :: {$ind in $f}  $ind in $f ==> perm(recApply(getreceiver($c), $ind).val) == write)
-  def forallFilterHaveSomeAccess(filter: Exp, compExp: Exp,
-                                 fieldName: String, oldOption: Option[String]): Forall = {
-    val fElemType = filter.typ match {
-      case setType : SetType => setType.elementType
-      case _ => throw new Exception("Filter must be a set")
-    }
-    val forallVarInd = LocalVarDecl("__ind", fElemType)()
-    val setContains = AnySetContains(forallVarInd.localVar, filter)()
-    val forallTrigger = Trigger(Seq(setContains))()
+  def fHeapElemApplyTo(fHeap: AFHeap, arg: Exp): DomainFuncApp = {
+    val fHeapType = AFHeap.getType.asInstanceOf[DomainType]
+    DomainFuncApp(
+      program.findDomainFunction(DomainsGenerator.fHeapElemKey),
+      Seq(fHeap, arg),
+      fHeapType.typVarsMap
+    )()
+  }
+
+  def mapApplyTo(compExp: Exp, arg: Exp): DomainFuncApp = {
+    val compType = compExp.typ.asInstanceOf[DomainType]
+    val getmapping = program.findDomainFunction(DomainsGenerator.compGetMappingKey)
+    val mapApply = program.findDomainFunction(DomainsGenerator.mapApplyKey)
+    // getmapping($c)
+    val getmappingApplied = DomainFuncApp(
+      getmapping,
+      Seq(compExp),
+      compType.typVarsMap
+    )()
+    DomainFuncApp(
+      mapApply,
+      Seq(getmappingApplied, arg),
+      compType.typVarsMap
+    )()
+  }
+
+  def permNonZeroCmp(forallVarInd: Exp, compExp: Exp, fieldName: String): GtCmp = {
     val compType = compExp.typ.asInstanceOf[DomainType]
     val getreceiver = program.findDomainFunction(DomainsGenerator.compGetRecvKey)
     val recApply = program.findDomainFunction(DomainsGenerator.recApplyKey)
@@ -139,17 +156,31 @@ class AxiomHelper(program: Program) {
     )()
     val recApplied = DomainFuncApp(
       recApply,
-      Seq(getreceiverApplied, forallVarInd.localVar),
+      Seq(getreceiverApplied, forallVarInd),
       compType.typVarsMap
     )()
     val permFieldAccessed = CurrentPerm(FieldAccess(recApplied, field)())()
-    val permNonZero = GtCmp(permFieldAccessed, NoPerm()())()
+    GtCmp(permFieldAccessed, NoPerm()())()
+  }
+
+  // generate a forall in the format:
+  // (forall $ind: Int :: {$ind in $f}  $ind in $f ==> perm(recApply(getreceiver($c), $ind).val) == write)
+  def forallFilterHaveSomeAccess(filter: Exp, compExp: Exp,
+                                 fieldName: String, oldOption: Option[String]): Forall = {
+    val fElemType = filter.typ match {
+      case setType : SetType => setType.elementType
+      case _ => throw new Exception("Filter must be a set")
+    }
+    val forallVarInd = LocalVarDecl("__ind", fElemType)()
+    val permNonZero = permNonZeroCmp(forallVarInd.localVar, compExp, fieldName)
     val oldApplied = oldOption match {
       case Some(lbl) => LabelledOld(permNonZero, lbl)()
       case None => permNonZero
     }
-    val output = Forall(Seq(forallVarInd), Seq(forallTrigger), Implies(setContains, oldApplied)())()
-    output
+    val setContains = AnySetContains(forallVarInd.localVar, filter)()
+    val forallTrigger = Trigger(Seq(setContains))()
+
+    Forall(Seq(forallVarInd), Seq(forallTrigger), Implies(setContains, oldApplied)())()
   }
 
   // generate a forall in the format:
