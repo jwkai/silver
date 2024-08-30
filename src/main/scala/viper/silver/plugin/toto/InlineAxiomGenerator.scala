@@ -2,7 +2,7 @@ package viper.silver.plugin.toto
 
 import viper.silver.ast._
 import viper.silver.ast.utility.Expressions
-import viper.silver.plugin.toto.ast.{ASnapshotApp, ASnapshotDecl}
+import viper.silver.plugin.toto.ast.{ACompApply, ACompDecl, ASnapshotApp, ASnapshotDecl}
 import viper.silver.plugin.toto.util.AxiomHelper
 import viper.silver.verifier.errors
 import viper.silver.verifier.errors.{ExhaleFailed, InhaleFailed}
@@ -14,7 +14,7 @@ import scala.collection.mutable
 
 class InlineAxiomGenerator(program: Program, methodName: String) {
 
-  val method = program.findMethod(methodName)
+  val method: Method = program.findMethod(methodName)
   val helper = new AxiomHelper(program)
 
 //  val fieldMaptoInt = program.fields.zipWithIndex.map(f => (f._1, f._2)).toMap
@@ -23,6 +23,12 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     method.deepCollect( {
       case fa: ASnapshotApp =>
         fa.snapshotFunctionDeclaration
+    }).toSet
+  }
+
+  val compDeclsUsed: Set[ACompDecl] = {
+    method.deepCollect({
+      case ca: ACompApply => ca.compFunctionDeclaration
     }).toSet
   }
 

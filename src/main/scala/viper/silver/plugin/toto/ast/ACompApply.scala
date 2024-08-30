@@ -6,9 +6,14 @@ import viper.silver.ast.{Position, _}
 import viper.silver.plugin.toto.DomainsGenerator
 import viper.silver.verifier.VerificationResult
 
-case class ACompApply(comp: AComprehension3Tuple, filterExp: Exp, fieldString: String)
+case class ACompApply(comp: AComprehension3Tuple, filterExp: Exp, fieldName: String)
                      (val pos: Position = NoPosition, val info: Info = NoInfo, val errT: ErrorTrafo = NoTrafos)
   extends ExtensionExp {
+
+  var compFunctionDeclaration: ACompDecl = {
+    val receiverType = comp.tripleType
+    ACompDecl(receiverType, fieldName)
+  }
 
   def toViper(input: Program): Exp = {
     val compEvalFunc = input.findDomainFunction(DomainsGenerator.compApplyKey)
@@ -32,7 +37,7 @@ case class ACompApply(comp: AComprehension3Tuple, filterExp: Exp, fieldString: S
 
   override lazy val prettyPrint: PrettyPrintPrimitives#Cont =
     text(DomainsGenerator.compConstructKey) <> brackets(show(comp.op)) <>
-      parens(includeMapping(show(comp.receiver) <> char('.') <> text(fieldString), comp.mapping) <+>
+      parens(includeMapping(show(comp.receiver) <> char('.') <> text(fieldName), comp.mapping) <+>
         char('|') <+> show(filter))
 
   override val extensionSubnodes: Seq[Node] = Seq(comp, filterExp)
