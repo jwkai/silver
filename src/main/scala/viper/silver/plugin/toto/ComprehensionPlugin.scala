@@ -339,19 +339,21 @@ object ComprehensionPlugin {
 
       // Convert all method calls to inhales and exhales
       var outM: Method = m.transform({
-        case e@MethodCall(_,_,_) => axiomGenerator.convertMethodToInhaleExhale(e)
+        case e: MethodCall => axiomGenerator.convertMethodToInhaleExhale(e)
       })
 
-      // Add the start label to the body
-      outM = outM.body match {
-        case Some(bodyBody) =>
-          outM.copy(body = Some(bodyBody.copy(
-            ss = helper.getStartLabel() +: bodyBody.ss)(bodyBody.pos, bodyBody.info, bodyBody.errT))
-          )(outM.pos, outM.info, outM.errT)
-        case None => return m
-      }
+//      // Add the start label to the body
+//      outM = outM.body match {
+//        case Some(bodyBody) =>
+//          outM.copy(body =
+//            Some(bodyBody.copy(ss =
+//              helper.getStartLabel +: bodyBody.ss
+//            )(bodyBody.pos, bodyBody.info, bodyBody.errT))
+//          )(outM.pos, outM.info, outM.errT)
+//        case None => return m
+//      }
 
-      // Add axioms for exhales inhales and heap writes.
+      // Add axioms for exhales, inhales and heap writes
       outM = outM.transform({
         case e : Exhale if !helper.checkIfPure(e) =>
           val fields = helper.extractFieldAcc(e)
@@ -362,7 +364,8 @@ object ComprehensionPlugin {
         case fa: FieldAssign =>
           axiomGenerator.generateHeapWriteAxioms(fa)
       })
-      // add axioms for heap reads, using bottom up traversal
+
+      // Add axioms for heap reads, using bottom-up traversal
       outM = outM.transform(
         { case s: Stmt  => axiomGenerator.generateHeapReadAxioms(s) },
         recurse = Traverse.BottomUp

@@ -8,9 +8,9 @@ import viper.silver.verifier.reasons
 
 class AxiomHelper(program: Program) {
 
-  def getStartLabel(): Label = {
-    Label(s"${labelPrefix}l0", Seq())()
-  }
+//  def getStartLabel: Label = {
+//    Label(s"${labelPrefix}l0", Seq())()
+//  }
 
   def labelPrefix: String = {
     "_compLabel"

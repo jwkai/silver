@@ -15,13 +15,15 @@ case class ACompApply(comp: AComprehension3Tuple, filterExp: Exp, fieldName: Str
     ACompDecl(receiverType, fieldName)
   }
 
+  var fHeap: AFHeap = null
+
   def toViper(input: Program): Exp = {
     val compEvalFunc = input.findDomainFunction(DomainsGenerator.compApplyKey)
     val compConstructed = comp.toViper(input)
 
     DomainFuncApp(
       compEvalFunc,
-      Seq(compConstructed, filterExp),
+      Seq(fHeap, compConstructed, filterExp),
       compConstructed.typVarMap
     )(this.pos, this.info, this.errT + NodeTrafo(this))
   }
