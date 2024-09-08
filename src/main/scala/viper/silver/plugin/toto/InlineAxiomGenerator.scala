@@ -399,16 +399,17 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     Seq(Assume(outForall)())
   }
 
-  private def generateExhaleAxiomsPerComp(compADecl:  ACompDecl, declaredLosts: mutable.Set[LocalVarDecl]): Seqn =  {
+  private def generateExhaleAxiomsPerComp(compADecl: ACompDecl, declaredLosts: mutable.Set[LocalVarDecl]): Seqn = {
     val field = program.findField(compADecl.fieldName)
 //    val fieldUniqueId = fieldMaptoInt(field)
+
     // Find if lostP already defined for this field
     // Ignoring the label number because using the `contains` check
     val alreadyDeclaredLost = declaredLosts.find(l => l.name.contains(s"lostP_${field.name}"))
     alreadyDeclaredLost match {
       // If already defined, just generate exhale axiom
       case Some(declared) =>
-        val mainAxiom = mainExhaleAxiom(compADecl, declared.localVar)
+        val mainAxiom = mainExhaleAxioms(compADecl, declared.localVar)
         Seqn(mainAxiom, Seq())()
       //  If not defined, generate lostP and exhale axiom
       case None =>
@@ -429,91 +430,177 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
         // old[l0](perm(iP.val) == write)
         val permOldWrite = GtCmp(oldExp, NoPerm()())()
         // (perm(iP.val) != write) && old[l0](perm(iP.val) == write)
-        val Anded = And(permNotWrite, permOldWrite)()
+        val permsConj = And(permNotWrite, permOldWrite)()
         // iP in lostP_val <==> (perm(iP.val) != write) && old[l0](perm(iP.val) == write)
-        val forallBody = EqCmp(AnySetContains(forallVars.localVar, declareLost.localVar)(),
-          Anded)()
+        val forallBody = EqCmp(AnySetContains(forallVars.localVar, declareLost.localVar)(), permsConj)()
         // forall iP : Ref:: {iP in lostP_val} ...
         val lostAxiom = Assume(Forall(Seq(forallVars), Seq(forallTriggers), forallBody)())()
-        val mainAxiom = mainExhaleAxiom(compADecl, declareLost.localVar)
+        val mainAxioms = mainExhaleAxioms(compADecl, declareLost.localVar)
 
-        Seqn(lostAxiom +: mainAxiom, Seq(declareLost))()
+        Seqn(lostAxiom +: mainAxioms, Seq(declareLost))()
     }
   }
 
-  private def mainExhaleAxiom(compADecl:  ACompDecl, lostPVal: LocalVar): Seq[Stmt] = {
+  private def mainExhaleAxioms(compADecl: ACompDecl, lostPVal: LocalVar): Seq[Stmt] = {
     val field = program.findField(compADecl.fieldName)
+
     // Extract the comp Domain type
     val compDType = compADecl.compDType(program)
+    val compIdxType = compADecl.compType._1
+
     // Extract the comp func declaration
     val compDecl = compADecl.viperDecl(program)
+
+    // fHeap declarations
+    val fhOld = getLastfHeap
+    val fhNew = getCurrentfHeap
 
     // Comp var declaration
     val forallVarC = LocalVarDecl("__c", compDType)()
     val compVar = forallVarC.localVar
 
     // Filter Var declaration
-    val forallVarFilter = LocalVarDecl("__filter", SetType(compADecl.compType._1))()
-    val trigger = Trigger(
-      Seq(LabelledOld(helper.compApply(compVar, compDecl, forallVarFilter.localVar),
-          getLastLabel.name)()
-      )
-    )()
+    val forallVarFS = LocalVarDecl("__fs", SetType(compIdxType))()
+
+    val trigger = Trigger(Seq(helper.compApply(fhOld, compVar, forallVarFS.localVar)))()
 
     // ---------------Making the LHS---------------
     // FilterReceiverGood
-    val frGood = helper.filterReceiverGood(forallVarFilter.localVar, compVar)
+    val frGood = helper.filterReceiverGood(forallVarFS.localVar, compVar)
     // Have access to the big filter in old
-    val forallOldHasPerm = helper.forallFilterHaveSomeAccess(forallVarFilter.localVar,
+    val forallOldHasPerm = helper.forallFilterHaveSomeAccess(forallVarFS.localVar,
       compVar, field.name, Some(getLastLabel.name))
-
     // filterNotLost
-    val filterNotLostApplied = helper.filterNotLost(forallVarFilter.localVar, compVar, lostPVal)
+    val filterNotLostApplied = helper.subsetNotInRefs(forallVarFS.localVar, compVar, lostPVal)
     // Have access to the remaining filter in new state
     val forallNewStillHasPerm = helper.forallFilterHaveSomeAccess(filterNotLostApplied,
       compVar, field.name, None)
 
     // ---------------Making the RHS---------------
-    val compApplyNotLost = helper.compApply(
-      compVar,
-      compDecl,
-      filterNotLostApplied
-    )
-    val compApplyF = helper.compApply(
-      compVar,
-      compDecl,
-      forallVarFilter.localVar
-    )
-    val dummy1 = helper.applyDomainFunc(
-      DomainsGenerator.compApplyDummyKey,
-      Seq(compApplyNotLost),
-      compDType.typVarsMap
-    )
-    val triggerDelete = helper.applyDomainFunc(
+    val triggerDeleteBlockOld = helper.applyDomainFunc(
       DomainsGenerator.trigDelBlockKey,
-      Seq(LabelledOld(compApplyF, getLastLabel.name)(), filterNotLostApplied),
+      Seq(helper.compApply(fhOld, compVar, forallVarFS.localVar), filterNotLostApplied),
       compDType.typVarsMap
     )
+    val dummyApplyNew = helper.applyDomainFunc(
+      DomainsGenerator.compApplyDummyKey,
+      Seq(helper.compApply(fhNew, compVar, forallVarFS.localVar), filterNotLostApplied),
+      compDType.typVarsMap
+    )
+    val framingEq = EqCmp(
+      helper.applyDomainFunc(
+        DomainsGenerator.compApplyPrimeKey,
+        Seq(fhOld, compVar, filterNotLostApplied),
+        compDType.typVarsMap
+      ),
+      helper.applyDomainFunc(
+        DomainsGenerator.compApplyPrimeKey,
+        Seq(fhNew, compVar, filterNotLostApplied),
+        compDType.typVarsMap
+      )
+    )()
     val exhaleCF = helper.applyDomainFunc(
       DomainsGenerator.exhaleFoldSetKey,
       Seq(
+        fhOld,
         compVar,
-        LabelledOld(FuncApp(compDecl, Seq(compVar, forallVarFilter.localVar))(), getLastLabel.name)(),
+        forallVarFS.localVar,
         IntLit(ACompDecl.getFieldInt(field.name))()
       ),
       compDType.typVarsMap
     )
 
-    val outForall = Forall(
-      Seq(forallVarC, forallVarFilter),
-      Seq(trigger),
-      helper.foldedConjImplies(
-        Seq(frGood, forallOldHasPerm, forallNewStillHasPerm),
-        Seq(frGood, triggerDelete, dummy1, exhaleCF)
-      )
+    val compFraming = Assume(
+      Forall(
+        Seq(forallVarC, forallVarFS),
+        Seq(trigger),
+        helper.foldedConjImplies(
+          Seq(frGood, forallOldHasPerm, forallNewStillHasPerm),
+          Seq(frGood, triggerDeleteBlockOld, dummyApplyNew, framingEq, exhaleCF)
+        )
+      )()
     )()
 
-    Seq(Assume(outForall)())
+    val receiverApp = helper.applyDomainFunc(
+      DomainsGenerator.compGetRecvKey,
+      Seq(compVar),
+      compDType.typVarsMap
+    )
+
+    // Index var declaration
+    val forallVarIdx = LocalVarDecl("__ind", compIdxType)()
+    val idxVar = forallVarIdx.localVar
+    val receiverAppIdx = helper.applyDomainFunc(
+      DomainsGenerator.recApplyKey,
+      Seq(receiverApp, idxVar),
+      compDType.typVarsMap
+    )
+
+    val idxNotInRefs = helper.applyDomainFunc(
+      DomainsGenerator.idxNotInRefsKey,
+      Seq(idxVar, receiverApp, lostPVal),
+      compDType.typVarsMap
+    )
+
+    val lookupInOldState = Assume(
+      Forall(
+        Seq(forallVarC),
+        Seq(Trigger(Seq(receiverApp))()),
+        Forall(
+          Seq(forallVarIdx),
+          Seq(
+            Trigger(Seq(helper.fHeapElemApplyTo(fhOld, idxVar)))()
+          ),
+          helper.foldedConjImplies(
+            Seq(
+              LabelledOld(
+                helper.permNonZeroCmp(idxVar, receiverApp, field.name),
+                getLastLabel.name
+              )()
+            ),
+            Seq(
+              EqCmp(
+                helper.fHeapElemApplyTo(fhOld, idxVar),
+                LabelledOld(
+                  helper.mapApplyTo(compVar, FieldAccess(receiverAppIdx, field)()),
+                  getLastLabel.name
+                )()
+              )()
+            ),
+          )
+        )()
+      )()
+    )()
+
+    val lookupUnmodified = Assume(
+      Forall(
+        Seq(forallVarC),
+        Seq(Trigger(Seq(receiverApp))()),
+        Forall(
+          Seq(forallVarIdx),
+          Seq(
+            Trigger(Seq(helper.fHeapElemApplyTo(fhOld, idxVar)))(),
+            Trigger(Seq(helper.fHeapElemApplyTo(fhNew, idxVar)))()
+          ),
+          helper.foldedConjImplies(
+            Seq(idxNotInRefs, helper.permNonZeroCmp(idxVar, receiverApp, field.name)),
+            Seq(
+              idxNotInRefs,
+              EqCmp(
+                helper.fHeapElemApplyTo(fhOld, idxVar),
+                helper.mapApplyTo(compVar, FieldAccess(receiverAppIdx, field)())
+              )(),
+              EqCmp(
+                helper.fHeapElemApplyTo(fhNew, idxVar),
+                helper.mapApplyTo(compVar, FieldAccess(receiverAppIdx, field)())
+              )()
+            ),
+          )
+        )()
+      )()
+    )()
+
+    Seq(compFraming, lookupInOldState, lookupUnmodified)
   }
 
   private def generateInhaleAxiomsPerComp(compADecl:  ACompDecl) : Seq[Stmt] = {

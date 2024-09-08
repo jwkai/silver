@@ -38,6 +38,7 @@ object DomainsGenerator {
 
   final val filterRecvGoodKey = "filterReceiverGood"
   final val subsetNotInRefsKey = "subsetNotInRefs"
+  final val idxNotInRefsKey = "idxNotInRefs"
   final val setDeleteKey = "setDelete"
 
   final val fHeapKey = "fHeap"
@@ -99,7 +100,7 @@ object DomainsGenerator {
          |    function $filterRecvGoodKey(f: Set[$compDTV0], r: $recDKey[$compDTV0]): Bool
          |
          |    function $subsetNotInRefsKey(f1: Set[$compDTV0], r: $recDKey[$compDTV0], lostR: Set[Ref]): Set[$compDTV0]
-         |    function idxNotInRefs(a: $compDTV0, r: $recDKey[$compDTV0], domR: Set[Ref]): Bool
+         |    function $idxNotInRefsKey(a: $compDTV0, r: $recDKey[$compDTV0], domR: Set[Ref]): Bool
          |
          |    axiom _inverse_receiver {
          |        forall ${prefix}a : $compDTV0, ${prefix}f: Set[$compDTV0], ${prefix}r: $recDKey[$compDTV0]
@@ -157,9 +158,9 @@ object DomainsGenerator {
          |
          |    axiom _idxNotInRefSetAxiom {
          |       (forall ${prefix}a: $compDTV0, ${prefix}recv: $recDKey[$compDTV0], ${prefix}domR: Set[Ref] ::
-         |         { (idxNotInRefs(${prefix}a, ${prefix}recv, ${prefix}domR): Bool) }
+         |         { ($idxNotInRefsKey(${prefix}a, ${prefix}recv, ${prefix}domR): Bool) }
          |       !((recApply(${prefix}recv, ${prefix}a): Ref) in ${prefix}domR) ==>
-         |           idxNotInRefs(${prefix}a, ${prefix}recv, ${prefix}domR))
+         |           $idxNotInRefsKey(${prefix}a, ${prefix}recv, ${prefix}domR))
          |    }
          |
          |}\n """.stripMargin

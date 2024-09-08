@@ -101,7 +101,7 @@ class AxiomHelper(program: Program) {
     )()
   }
 
-  def filterNotLost(filter: Exp, compExp: Exp, lostPVal: LocalVar): DomainFuncApp = {
+  def subsetNotInRefs(fs: Exp, compExp: Exp, refs: LocalVar): DomainFuncApp = {
     val compType = compExp.typ.asInstanceOf[DomainType]
     val filterNotLostFunc = program.findDomainFunction(DomainsGenerator.subsetNotInRefsKey)
     val getreceiver = program.findDomainFunction(DomainsGenerator.compGetRecvKey)
@@ -111,7 +111,7 @@ class AxiomHelper(program: Program) {
       compType.typVarsMap)()
 
     DomainFuncApp(filterNotLostFunc,
-      Seq(filter, getreceiverApplied, lostPVal),
+      Seq(fs, getreceiverApplied, refs),
       compType.typVarsMap
     )()
   }
