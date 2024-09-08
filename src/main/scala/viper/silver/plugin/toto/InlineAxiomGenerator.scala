@@ -139,12 +139,15 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
 
   def generateInhaleAxioms(i: Inhale, relevantField: Set[Field]): Seqn = {
     labelIncrement()
+    val declaredFieldVars = mutable.Set[LocalVarDecl]()
     val relevantCompDecls = compDeclsUsed.toSeq.filter(compDecl =>
       relevantField.contains(compDecl.findFieldInProgram(program)))
-    val inhaleAxioms = relevantCompDecls.map(compDecl => generateInhaleAxiomsPerComp(compDecl))
-    val allInhaleAxioms = inhaleAxioms.flatten
+    val inhaleAxioms = relevantCompDecls.map(compDecl => generateInhaleAxiomsPerComp(compDecl, declaredFieldVars))
+    val allLostVars = inhaleAxioms.flatMap(i => i.scopedSeqnDeclarations)
+    val allInhaleAxioms = inhaleAxioms.flatMap(i => i.ss)
 
-    Seqn(i +: getCurrentLabel +: allInhaleAxioms, Seq())(i.pos, i.info, i.errT)
+
+    Seqn(i +: getCurrentLabel +: allInhaleAxioms, allLostVars)(i.pos, i.info, i.errT)
   }
 
   def generateHeapWriteAxioms(writeStmt: Stmt): Seqn = {
@@ -356,9 +359,6 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val compDType = compADecl.compDType(program)
     val compIdxType = compADecl.compType._1
 
-    // Extract the comp func declaration
-    val compDecl = compADecl.viperDecl(program)
-
     // Comp var declaration
     val forallVarC = LocalVarDecl("__c", compDType)()
     val compVar = forallVarC.localVar
@@ -401,7 +401,6 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
 
   private def generateExhaleAxiomsPerComp(compADecl: ACompDecl, declaredLosts: mutable.Set[LocalVarDecl]): Seqn = {
     val field = program.findField(compADecl.fieldName)
-//    val fieldUniqueId = fieldMaptoInt(field)
 
     // Find if lostP already defined for this field
     // Ignoring the label number because using the `contains` check
@@ -447,9 +446,6 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     // Extract the comp Domain type
     val compDType = compADecl.compDType(program)
     val compIdxType = compADecl.compType._1
-
-    // Extract the comp func declaration
-    val compDecl = compADecl.viperDecl(program)
 
     // fHeap declarations
     val fhOld = getLastfHeap
@@ -603,63 +599,290 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     Seq(compFraming, lookupInOldState, lookupUnmodified)
   }
 
-  private def generateInhaleAxiomsPerComp(compADecl:  ACompDecl) : Seq[Stmt] = {
+  private def generateInhaleAxiomsPerComp(compADecl: ACompDecl, declaredGains: mutable.Set[LocalVarDecl]): Seqn = {
     val field = program.findField(compADecl.fieldName)
+
+    // Find if newP already defined for this field
+    // Ignoring the label number because using the `contains` check
+    val alreadyDeclaredGained = declaredGains.find(l => l.name.contains(s"gainedP_${field.name}"))
+    alreadyDeclaredGained match {
+      // If already defined, just generate inhale axioms
+      case Some(declared) =>
+        val mainAxiom = mainInhaleAxioms(compADecl, declared.localVar)
+        Seqn(mainAxiom, Seq())()
+      //  If not defined, generate gainedP and inhale axioms
+      case None =>
+        val declareGained = LocalVarDecl(s"gainedP_${field.name}_$getLabNumForLost", SetType(Ref))()
+        // Add this to the set
+        declaredGains.add(declareGained)
+        //Forall(variables: Seq[LocalVarDecl], triggers: Seq[Trigger], exp: Exp)(val pos: Position = NoPosition, val info: Info = NoInfo, val errT: ErrorTrafo = NoTrafos)
+        val forallVars = LocalVarDecl("__pElem", Ref)()
+        val forallTriggers = Trigger(Seq(AnySetContains(forallVars.localVar, declareGained.localVar)()))()
+        //var gainedP_Val : Set[Ref]
+        //  assume forall iP : Ref:: {iP in lostP_val}
+        //    iP in gainedP_Val <==> (perm(iP.val) != write) && old[l0](perm(iP.val) == write)
+        //perm(iP.val)
+        val insidePerm = CurrentPerm(FieldAccess(forallVars.localVar, field)())()
+        val oldExp = LabelledOld(insidePerm, getLastLabel.name)()
+        // (perm(iP.val) == write)
+        val permWrite = EqCmp(insidePerm, FullPerm()())()
+        // old[l0](perm(iP.val) != write)
+        val permOldNotWrite = PermLtCmp(oldExp, FullPerm()())()
+        // (perm(iP.val) == write) && old[l0](perm(iP.val) != write)
+        val permsConj = And(permWrite, permOldNotWrite)()
+        // iP in lostP_val <==> (perm(iP.val) == write) && old[l0](perm(iP.val) != write)
+        val forallBody = EqCmp(AnySetContains(forallVars.localVar, declareGained.localVar)(), permsConj)()
+        // forall iP : Ref:: {iP in lostP_val} ...
+        val lostAxiom = Assume(Forall(Seq(forallVars), Seq(forallTriggers), forallBody)())()
+        val mainAxioms = mainInhaleAxioms(compADecl, declareGained.localVar)
+
+        Seqn(lostAxiom +: mainAxioms, Seq(declareGained))()
+    }
+  }
+
+  private def mainInhaleAxioms(compADecl: ACompDecl, gainedPVal: LocalVar): Seq[Stmt] = {
+    val field = program.findField(compADecl.fieldName)
+
     // Extract the comp Domain type
     val compDType = compADecl.compDType(program)
-    // Extract the comp func declaration
-    val compDecl = compADecl.viperDecl(program)
+    val compIdxType = compADecl.compType._1
+
+    // fHeap declarations
+    val fhOld = getLastfHeap
+    val fhNew = getCurrentfHeap
+    val forallVarfH = LocalVarDecl("__exfh", AFHeap.getType)()
 
     // Comp var declaration
     val forallVarC = LocalVarDecl("__c", compDType)()
     val compVar = forallVarC.localVar
 
     // Filter Var declaration
-    val forallVarF = LocalVarDecl("__f", SetType(compADecl.compType._1))()
-    val forallVarM = LocalVarDecl("__m", MapType(compADecl.compType._1, compADecl.compType._3))()
+    val forallVarFS = LocalVarDecl("__fs", SetType(compIdxType))()
+    val forallVarExFS = LocalVarDecl("__exfs", SetType(compIdxType))()
 
-    val trigger = Trigger(Seq(
-      // First trigger
-      LabelledOld(helper.compApply(compVar, compDecl, forallVarF.localVar), getLastLabel.name)(),
-      // Second trigger
-      helper.applyDomainFunc(DomainsGenerator.exhaleFoldSetKey,
-        Seq(compVar, forallVarM.localVar, IntLit(ACompDecl.getFieldInt(field.name))()),
-        compDType.typVarsMap)))()
+    val triggerOld = Trigger(Seq(helper.compApply(fhOld, compVar, forallVarFS.localVar)))()
+    val triggerNew = Trigger(Seq(helper.compApply(fhNew, compVar, forallVarFS.localVar)))()
 
-    val filter1ReceiverGood = helper.filterReceiverGood(forallVarF.localVar, compVar)
-    val mapDomain = MapDomain(forallVarM.localVar)()
-    val mapDomainReceiverGood = helper.filterReceiverGood(mapDomain, compVar)
-    val f1subsetM = AnySetSubset(forallVarF.localVar, mapDomain)()
+    // ---------------Making the LHS---------------
+    // FilterReceiverGood
+    val frGood = helper.filterReceiverGood(forallVarFS.localVar, compVar)
+    // Have access to the big filter in new
+    val forallOldHasPerm = helper.forallFilterHaveSomeAccess(forallVarFS.localVar,
+      compVar, field.name, Some(getLastLabel.name))
 
-    val mapDAccess = helper.forallFilterHaveSomeAccess(mapDomain,
-      compVar, field.name, None)
-
-    // // triggerDeleteBlock(
-    //    //     (compApply($c, snap_val_Int($c,domain(m1)))),
-    //    //     $f) &&
-    val triggerDelete = helper.applyDomainFunc(DomainsGenerator.trigDelBlockKey,
-      Seq(helper.compApply(compVar, compDecl, mapDomain), forallVarF.localVar),
-      compDType.typVarsMap)
-
-    // // triggerDeleteBlock(
-    //    //     (compApply($c, m1)),
-    //    //     $f)
-    val compApply = program.findDomainFunction(DomainsGenerator.compApplyKey)
-    val compAppliedOldM = DomainFuncApp(compApply, Seq(compVar, forallVarM.localVar), compDType.typVarsMap)()
-    val triggerDeleteOld = helper.applyDomainFunc(
-      DomainsGenerator.trigDelBlockKey,
-      Seq(compAppliedOldM, forallVarF.localVar),
-      compDType.typVarsMap
-    )
-    val outForall = Forall(
-      Seq(forallVarC, forallVarF, forallVarM),
-      Seq(trigger),
-      helper.foldedConjImplies(
-        Seq(filter1ReceiverGood, mapDomainReceiverGood, f1subsetM, mapDAccess),
-        Seq(filter1ReceiverGood, mapDomainReceiverGood, f1subsetM, triggerDelete, triggerDeleteOld)
+    // ---------------Making the RHS---------------
+    val framingEq = EqCmp(
+      helper.applyDomainFunc(
+        DomainsGenerator.compApplyPrimeKey,
+        Seq(fhOld, compVar, forallVarFS.localVar),
+        compDType.typVarsMap
+      ),
+      helper.applyDomainFunc(
+        DomainsGenerator.compApplyKey,
+        Seq(fhNew, compVar, forallVarFS.localVar),
+        compDType.typVarsMap
       )
     )()
-    Seq(Assume(outForall)())
+
+    val compFraming = Assume(
+      Forall(
+        Seq(forallVarC, forallVarFS),
+        Seq(triggerOld),
+        helper.foldedConjImplies(
+          Seq(frGood, forallOldHasPerm),
+          Seq(frGood, framingEq)
+        )
+      )()
+    )()
+
+    val triggerDeleteBlockNew = helper.applyDomainFunc(
+      DomainsGenerator.trigDelBlockKey,
+      Seq(helper.compApply(fhNew, compVar, forallVarExFS.localVar), forallVarExFS.localVar),
+      compDType.typVarsMap
+    )
+
+    val triggerDeleteBlockExFS = helper.applyDomainFunc(
+      DomainsGenerator.trigDelBlockKey,
+      Seq(helper.compApply(forallVarfH.localVar, compVar, forallVarExFS.localVar), forallVarExFS.localVar),
+      compDType.typVarsMap
+    )
+
+    val setDelExFSFS = helper.applyDomainFunc(
+      DomainsGenerator.setDeleteKey,
+      Seq(forallVarExFS.localVar, forallVarFS.localVar),
+      compDType.typVarsMap
+    )
+
+    val triggerExtOldExFS = helper.applyDomainFunc(
+      DomainsGenerator.trigExtKey,
+      Seq(
+        helper.applyDomainFunc(
+          DomainsGenerator.compApplyPrimeKey,
+          Seq(fhNew, compVar, setDelExFSFS),
+          compDType.typVarsMap
+        ),
+        helper.applyDomainFunc(
+          DomainsGenerator.compApplyPrimeKey,
+          Seq(forallVarfH.localVar, compVar, setDelExFSFS),
+          compDType.typVarsMap
+        )
+      ),
+      compDType.typVarsMap
+    )
+
+    val receiverApp = helper.applyDomainFunc(
+      DomainsGenerator.compGetRecvKey,
+      Seq(compVar),
+      compDType.typVarsMap
+    )
+
+    val subsetNotInRefsGained = helper.applyDomainFunc(
+      DomainsGenerator.subsetNotInRefsKey,
+      Seq(forallVarFS.localVar, receiverApp, gainedPVal),
+      compDType.typVarsMap
+    )
+
+    val triggerDeleteBlockNotGained = helper.applyDomainFunc(
+      DomainsGenerator.trigDelBlockKey,
+      Seq(helper.compApply(fhNew, compVar, forallVarFS.localVar), subsetNotInRefsGained),
+      compDType.typVarsMap
+    )
+
+    val dummyApplyOldNotGained = helper.applyDomainFunc(
+      DomainsGenerator.compApplyDummyKey,
+      Seq(helper.compApply(fhOld, compVar, subsetNotInRefsGained)),
+      compDType.typVarsMap
+    )
+
+    val forallVarIdxHasPerm = helper.forallFilterHaveSomeAccess(
+      forallVarFS.localVar,
+      compVar,
+      field.name,
+      None
+    )
+
+    val forallVarFieldId = LocalVarDecl("__id", Int)()
+
+    val getFieldIdEq = EqCmp(
+      helper.applyDomainFunc(
+        DomainsGenerator.getFieldIDKey,
+        Seq(forallVarC.localVar),
+        compDType.typVarsMap
+      ),
+      forallVarFieldId.localVar
+    )()
+
+    val blockDecompOverPrevExhales = Assume(
+      Forall(
+        Seq(forallVarfH, forallVarC, forallVarFieldId, forallVarFS, forallVarExFS),
+        Seq(Trigger(Seq(receiverApp))()),
+        helper.foldedConjImplies(
+          Seq(
+            getFieldIdEq,
+            frGood,
+            AnySetSubset(forallVarFS.localVar, forallVarExFS.localVar)(),
+            forallVarIdxHasPerm
+          ),
+          Seq(
+            getFieldIdEq,
+            frGood,
+            AnySetSubset(forallVarFS.localVar, forallVarExFS.localVar)(),
+            triggerDeleteBlockNew,
+            triggerDeleteBlockExFS,
+            triggerExtOldExFS
+          ),
+        )
+      )()
+    )()
+
+    val blockDecompOverGainedPerms = Assume(
+      Forall(
+        Seq(forallVarC, forallVarFS),
+        Seq(triggerNew),
+        helper.foldedConjImplies(
+          Seq(
+            frGood,
+            forallVarIdxHasPerm
+          ),
+          Seq(
+            frGood,
+            triggerDeleteBlockNotGained,
+            dummyApplyOldNotGained
+          ),
+        )
+      )()
+    )()
+
+    // Index var declaration
+    val forallVarIdx = LocalVarDecl("__ind", compIdxType)()
+    val idxVar = forallVarIdx.localVar
+    val receiverAppIdx = helper.applyDomainFunc(
+      DomainsGenerator.recApplyKey,
+      Seq(receiverApp, idxVar),
+      compDType.typVarsMap
+    )
+
+    val lookupInOldState = Assume(
+      Forall(
+        Seq(forallVarC),
+        Seq(Trigger(Seq(receiverApp))()),
+        Forall(
+          Seq(forallVarIdx),
+          Seq(
+            Trigger(Seq(helper.fHeapElemApplyTo(fhOld, idxVar)))()
+          ),
+          helper.foldedConjImplies(
+            Seq(
+              LabelledOld(
+                helper.permNonZeroCmp(idxVar, receiverApp, field.name),
+                getLastLabel.name
+              )()
+            ),
+            Seq(
+              EqCmp(
+                helper.fHeapElemApplyTo(fhOld, idxVar),
+                LabelledOld(
+                  helper.mapApplyTo(compVar, FieldAccess(receiverAppIdx, field)()),
+                  getLastLabel.name
+                )()
+              )(),
+              EqCmp(
+                helper.fHeapElemApplyTo(fhNew, idxVar),
+                LabelledOld(
+                  helper.mapApplyTo(compVar, FieldAccess(receiverAppIdx, field)()),
+                  getLastLabel.name
+                )()
+              )()
+            ),
+          )
+        )()
+      )()
+    )()
+
+    val lookupInNewState = Assume(
+      Forall(
+        Seq(forallVarC),
+        Seq(Trigger(Seq(receiverApp))()),
+        Forall(
+          Seq(forallVarIdx),
+          Seq(
+            Trigger(Seq(helper.fHeapElemApplyTo(fhNew, idxVar)))()
+          ),
+          helper.foldedConjImplies(
+            Seq(helper.permNonZeroCmp(idxVar, receiverApp, field.name)),
+            Seq(
+              EqCmp(
+                helper.fHeapElemApplyTo(fhNew, idxVar),
+                helper.mapApplyTo(compVar, FieldAccess(receiverAppIdx, field)())
+              )()
+            ),
+          )
+        )()
+      )()
+    )()
+
+    Seq(compFraming, blockDecompOverPrevExhales, blockDecompOverGainedPerms, lookupInOldState, lookupInNewState)
   }
+
 
 }

@@ -34,6 +34,7 @@ object DomainsGenerator {
   final val exhaleFoldSetKey = "exhaleFoldSet"
   final val trigDelKey1Key = "triggerDeleteKey1"
   final val trigDelBlockKey = "triggerDeleteBlock"
+  final val trigExtKey = "triggerExt"
   final val getFieldIDKey = "getFieldID"
 
   final val filterRecvGoodKey = "filterReceiverGood"
@@ -315,7 +316,7 @@ object DomainsGenerator {
          |    }
          |
          |    function _skExt(hfA1: $compDTV2, hfA2: $compDTV2): $compDTV0
-         |    function _trigExt(hfA1: $compDTV2, hfA2: $compDTV2): Bool
+         |    function $trigExtKey(hfA1: $compDTV2, hfA2: $compDTV2): Bool
          |
          |    axiom _trigExtensionality {
          |        forall ${prefix}fh_old: $fHeapKey,
@@ -325,7 +326,7 @@ object DomainsGenerator {
          |        { ($compApplyKey(${prefix}fh_old, ${prefix}c, ${prefix}fs): $compDTV2),
          |          ($compApplyKey(${prefix}fh_new, ${prefix}c, ${prefix}fs): $compDTV2),
          |          ($fHeapSTKey(${prefix}fh_old, ${prefix}fh_new): Bool) }
-         |        (_trigExt(($compApplyPrimeKey(${prefix}fh_old, ${prefix}c, ${prefix}fs): $compDTV2),
+         |        ($trigExtKey(($compApplyPrimeKey(${prefix}fh_old, ${prefix}c, ${prefix}fs): $compDTV2),
          |                  ($compApplyPrimeKey(${prefix}fh_new, ${prefix}c, ${prefix}fs): $compDTV2)))
          |    }
          |
@@ -334,7 +335,7 @@ object DomainsGenerator {
          |               ${prefix}fh_new: $fHeapKey,
          |               ${prefix}c: $compDKey[$compDTV0,$compDTV1,$compDTV2],
          |               ${prefix}fs: Set[$compDTV0] ::
-         |        { (_trigExt(($compApplyPrimeKey(${prefix}fh_old, ${prefix}c, ${prefix}fs)),
+         |        { ($trigExtKey(($compApplyPrimeKey(${prefix}fh_old, ${prefix}c, ${prefix}fs)),
          |                    ($compApplyPrimeKey(${prefix}fh_new, ${prefix}c, ${prefix}fs))): Bool) }
          |        ($compApplyKey(${prefix}fh_old, ${prefix}c, ${prefix}fs) == $compApplyKey(${prefix}fh_new, ${prefix}c, ${prefix}fs)) ||
          |        ((_skExt($compApplyPrimeKey(${prefix}fh_old, ${prefix}c, ${prefix}fs), $compApplyPrimeKey(${prefix}fh_new, ${prefix}c, ${prefix}fs)) in ${prefix}fs ==>
