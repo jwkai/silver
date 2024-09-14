@@ -10,7 +10,7 @@ import viper.silver.parser.FastParser
 import viper.silver.parser._
 import viper.silver.plugin.toto.ComprehensionPlugin.{addInlinedAxioms, defaultMappingIden}
 import viper.silver.plugin.toto.DomainsGenerator._
-import viper.silver.plugin.toto.ast.{ACompApply, ASnapshotDecl}
+import viper.silver.plugin.toto.ast.ACompApply
 import viper.silver.plugin.toto.parser.PComprehension.PComprehensionKeywordType
 import viper.silver.plugin.toto.parser._
 import viper.silver.plugin.toto.util.AxiomHelper
@@ -229,12 +229,14 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
 //      )
 
     var newInput = addInlinedAxioms(input)
+    print(pretty(newInput) + "\n\n")
     newInput = newInput.transform({
       case c@ACompApply(_, _, _) => c.toViper(newInput)
+    })
+    newInput = newInput.transform({
       case e@Assume(a) => Inhale(a)(e.pos, e.info, e.errT)
     })
     print(pretty(newInput) + "\n\n")
-
     newInput
   }
 
@@ -370,7 +372,16 @@ object ComprehensionPlugin {
         { case s: Stmt  => axiomGenerator.generateHeapReadAxioms(s) },
         recurse = Traverse.BottomUp
       )
-      outM
+
+      // Add fHeap declarations and assignments to beginning of method
+      val out = outM.copy(
+        body = Some(Seqn(
+          axiomGenerator.fHeapDecls ++ outM.body.getOrElse(Seqn(Seq(), Seq())()),
+          outM.scopedDecls
+        )())
+      )()
+
+      out
     }
 
     // Modify all methods

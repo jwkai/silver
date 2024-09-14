@@ -4,7 +4,7 @@ import viper.silver.ast.{ErrTrafo, Exp, NoPosition, Position}
 import viper.silver.parser._
 import viper.silver.plugin.toto.parser.PComprehension.getNewTypeVariable
 import viper.silver.plugin.toto._
-import viper.silver.plugin.toto.ast.{ACompApply, AComprehension3Tuple, ASnapshotApp}
+import viper.silver.plugin.toto.ast.{ACompApply, AComprehension3Tuple}
 import viper.silver.verifier.errors
 
 case object PComprehensionKeyword extends PKw("hfold") with PKeywordLang

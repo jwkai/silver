@@ -46,7 +46,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
   }
 
   private def getCurrentfHeap: AFHeap = {
-    AFHeap(s"${helper.labelPrefix}l$currentLabelNum", currentLabelNum)()
+    AFHeap(s"${helper.fHeapPrefix}$currentLabelNum", currentLabelNum)()
   }
 
   private def getLabNumForLost: String = {
@@ -62,7 +62,30 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
   }
 
   private def getLastfHeap: AFHeap = {
-    AFHeap(s"${helper.labelPrefix}l${currentLabelNum-1}", currentLabelNum-1)()
+    AFHeap(s"${helper.fHeapPrefix}${currentLabelNum-1}", currentLabelNum-1)()
+  }
+
+  def fHeapDecls: Seq[Stmt] = {
+    val fhs: Seq[Stmt] = Seq.range(0, currentLabelNum).flatMap(fh => {
+      val fhDecl = LocalVarDecl(
+        s"${helper.fHeapPrefix}$fh",
+        AFHeap.getType
+      )()
+      Seq[Stmt](
+        LocalVarDeclStmt(fhDecl)(),
+        Assume(
+          EqCmp(
+            helper.applyDomainFunc(
+              DomainsGenerator.fHeapIdxKey,
+              Seq(fhDecl.localVar),
+              Map()
+            ),
+            IntLit(fh)()
+          )()
+        )()
+      )
+    })
+    fhs
   }
 
   def convertMethodToInhaleExhale(methodCall: MethodCall): Seqn = {
@@ -312,7 +335,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
             Trigger(Seq(helper.fHeapElemApplyTo(fhNew, idxVar)))()
           ),
           helper.foldedConjImplies(
-            Seq(NeCmp(idxVar, invRecvApp)(), helper.permNonZeroCmp(invRecvApp, idxVar, field.name)),
+            Seq(NeCmp(idxVar, invRecvApp)(), helper.permNonZeroCmp(invRecvApp, compVar, field.name)),
             Seq(
               NeCmp(idxVar, invRecvApp)(),
               EqCmp(

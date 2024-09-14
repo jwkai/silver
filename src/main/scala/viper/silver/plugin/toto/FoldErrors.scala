@@ -28,11 +28,11 @@ object FoldErrors {
     override def withReason(reason: ErrorReason): AbstractVerificationError = {
       reason match {
         case ie @ FoldReasons.InjectivityError(_) =>
-          ie.filter = foldNode.snap.filter
+          ie.filter = foldNode.filter
           ie.rec = foldNode.comp.receiver
           FoldApplyError(offendingNode, foldNode, ie, cached)
         case pe @ FoldReasons.PermissionsError(_, _) =>
-          pe.filter = foldNode.snap.filter
+          pe.filter = foldNode.filter
           pe.rec = foldNode.comp.receiver
           FoldApplyError(offendingNode, foldNode, pe, cached)
         case _ =>

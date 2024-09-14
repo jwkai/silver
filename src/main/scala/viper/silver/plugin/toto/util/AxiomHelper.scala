@@ -1,7 +1,6 @@
 package viper.silver.plugin.toto.util
 
 import viper.silver.ast
-import viper.silver.ast.Bool.foldLeft
 import viper.silver.ast.utility.Expressions
 import viper.silver.ast._
 import viper.silver.plugin.toto.ast.AFHeap
@@ -17,6 +16,11 @@ class AxiomHelper(program: Program) {
   def labelPrefix: String = {
     "_compLabel"
   }
+
+  def fHeapPrefix: String = {
+    "_fh"
+  }
+
   def methodLabelPrefix : String = {
     "_methodLabel"
   }

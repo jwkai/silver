@@ -6,7 +6,7 @@ import viper.silver.ast.{Position, _}
 import viper.silver.plugin.toto.DomainsGenerator
 import viper.silver.verifier.VerificationResult
 
-case class ACompApply(comp: AComprehension3Tuple, filterExp: Exp, fieldName: String)
+case class ACompApply(comp: AComprehension3Tuple, filter: Exp, fieldName: String)
                      (val pos: Position = NoPosition, val info: Info = NoInfo, val errT: ErrorTrafo = NoTrafos)
   extends ExtensionExp {
 
@@ -23,7 +23,7 @@ case class ACompApply(comp: AComprehension3Tuple, filterExp: Exp, fieldName: Str
 
     DomainFuncApp(
       compEvalFunc,
-      Seq(fHeap, compConstructed, filterExp),
+      Seq(fHeap, compConstructed, filter),
       compConstructed.typVarMap
     )(this.pos, this.info, this.errT + NodeTrafo(this))
   }
@@ -42,7 +42,7 @@ case class ACompApply(comp: AComprehension3Tuple, filterExp: Exp, fieldName: Str
       parens(includeMapping(show(comp.receiver) <> char('.') <> text(fieldName), comp.mapping) <+>
         char('|') <+> show(filter))
 
-  override val extensionSubnodes: Seq[Node] = Seq(comp, filterExp)
+  override val extensionSubnodes: Seq[Node] = Seq(comp, filter)
 
   override def extensionIsPure: Boolean = true
 
