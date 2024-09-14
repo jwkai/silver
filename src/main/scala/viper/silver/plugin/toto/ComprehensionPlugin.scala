@@ -229,14 +229,13 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
 //      )
 
     var newInput = addInlinedAxioms(input)
-    print(pretty(newInput) + "\n\n")
     newInput = newInput.transform({
       case c@ACompApply(_, _, _) => c.toViper(newInput)
     })
     newInput = newInput.transform({
       case e@Assume(a) => Inhale(a)(e.pos, e.info, e.errT)
     })
-    print(pretty(newInput) + "\n\n")
+//    print(pretty(newInput) + "\n\n")
     newInput
   }
 
@@ -344,27 +343,38 @@ object ComprehensionPlugin {
         case e: MethodCall => axiomGenerator.convertMethodToInhaleExhale(e)
       })
 
-//      // Add the start label to the body
-//      outM = outM.body match {
-//        case Some(bodyBody) =>
-//          outM.copy(body =
-//            Some(bodyBody.copy(ss =
-//              helper.getStartLabel +: bodyBody.ss
-//            )(bodyBody.pos, bodyBody.info, bodyBody.errT))
-//          )(outM.pos, outM.info, outM.errT)
-//        case None => return m
-//      }
+      // Add the start label to the body
+      outM = outM.body match {
+        case Some(bodyBody) =>
+          outM.copy(body =
+            Some(bodyBody.copy(ss =
+              axiomGenerator.getOldLabel +: bodyBody.ss
+            )(bodyBody.pos, bodyBody.info, bodyBody.errT))
+          )(outM.pos, outM.info, outM.errT)
+        case None => return m
+      }
 
       // Add axioms for exhales, inhales and heap writes
       outM = outM.transform({
         case e : Exhale if !helper.checkIfPure(e) =>
           val fields = helper.extractFieldAcc(e)
           axiomGenerator.generateExhaleAxioms(e, fields)
-        case i@ Inhale(_) if !helper.checkIfPure(i) =>
+        case i: Inhale if !helper.checkIfPure(i) =>
           val fields = helper.extractFieldAcc(i)
           axiomGenerator.generateInhaleAxioms(i, fields)
         case fa: FieldAssign =>
           axiomGenerator.generateHeapWriteAxioms(fa)
+        case lo@Old(e) =>
+          Old(
+            e.transform({
+              case ca: ACompApply =>
+                ca.fHeap = axiomGenerator.getOldfHeap
+                ca
+            })
+          )(lo.pos, lo.info, lo.errT)
+        case ca: ACompApply =>
+          ca.fHeap = axiomGenerator.getCurrentfHeap
+          ca
       })
 
       // Add axioms for heap reads, using bottom-up traversal
@@ -376,10 +386,10 @@ object ComprehensionPlugin {
       // Add fHeap declarations and assignments to beginning of method
       val out = outM.copy(
         body = Some(Seqn(
-          axiomGenerator.fHeapDecls ++ outM.body.getOrElse(Seqn(Seq(), Seq())()),
+          axiomGenerator.fHeapDecls ++ outM.body.getOrElse(Seqn(Seq(), Seq())()).ss,
           outM.scopedDecls
         )())
-      )()
+      )(outM.pos, outM.info, outM.errT)
 
       out
     }

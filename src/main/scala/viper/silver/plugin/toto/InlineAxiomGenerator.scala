@@ -45,7 +45,15 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     Label(s"${helper.labelPrefix}l$currentLabelNum", Seq())()
   }
 
-  private def getCurrentfHeap: AFHeap = {
+  def getOldLabel: Label = {
+    Label(s"${helper.labelPrefix}l0", Seq())()
+  }
+
+  def getOldfHeap: AFHeap = {
+    AFHeap(s"${helper.fHeapPrefix}0", 0)()
+  }
+
+  def getCurrentfHeap: AFHeap = {
     AFHeap(s"${helper.fHeapPrefix}$currentLabelNum", currentLabelNum)()
   }
 
@@ -66,26 +74,23 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
   }
 
   def fHeapDecls: Seq[Stmt] = {
-    val fhs: Seq[Stmt] = Seq.range(0, currentLabelNum).flatMap(fh => {
+    Seq.range(0, currentLabelNum).flatMap(fh => {
       val fhDecl = LocalVarDecl(
         s"${helper.fHeapPrefix}$fh",
         AFHeap.getType
       )()
       Seq[Stmt](
         LocalVarDeclStmt(fhDecl)(),
-        Assume(
-          EqCmp(
+        Assume(EqCmp(
             helper.applyDomainFunc(
               DomainsGenerator.fHeapIdxKey,
               Seq(fhDecl.localVar),
               Map()
             ),
             IntLit(fh)()
-          )()
-        )()
+        )())()
       )
     })
-    fhs
   }
 
   def convertMethodToInhaleExhale(methodCall: MethodCall): Seqn = {

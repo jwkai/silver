@@ -3,8 +3,8 @@ package viper.silver.plugin.toto.ast
 import viper.silver.ast._
 import viper.silver.ast.pretty.FastPrettyPrinter.text
 import viper.silver.ast.pretty.PrettyPrintPrimitives
-import viper.silver.plugin.toto.ast.ASnapshotDecl.tupleFieldToString
 import viper.silver.plugin.toto.DomainsGenerator
+import viper.silver.plugin.toto.ast.ACompDecl.tupleFieldToString
 
 // Constructor should not be called directly, use getOrMakeNewSnapDecl
 case class ACompDecl private(compType: (Type, Type, Type), fieldName: String)(val pos : Position = NoPosition)
