@@ -364,9 +364,18 @@ object ComprehensionPlugin {
           axiomGenerator.generateInhaleAxioms(i, fields)
         case fa: FieldAssign =>
           axiomGenerator.generateHeapWriteAxioms(fa)
-        case lo@Old(e) =>
+        case l@Label(name, _) =>
+          axiomGenerator.mapUserLabelToCurrentAFHeap(name)
+          l
+        case lo@LabelledOld(exp, labelName) =>
+          lo.copy(exp = exp.transform({
+            case ca: ACompApply =>
+              ca.fHeap = axiomGenerator.getAFHeapFromUserLabel(labelName)
+              ca
+          }))(lo.pos, lo.info, lo.errT)
+        case lo@Old(exp) =>
           Old(
-            e.transform({
+            exp.transform({
               case ca: ACompApply =>
                 ca.fHeap = axiomGenerator.getOldfHeap
                 ca

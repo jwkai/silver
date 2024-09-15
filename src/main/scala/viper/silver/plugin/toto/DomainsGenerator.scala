@@ -335,12 +335,12 @@ object DomainsGenerator {
          |               ${prefix}fh_new: $fHeapKey,
          |               ${prefix}c: $compDKey[$compDTV0,$compDTV1,$compDTV2],
          |               ${prefix}fs: Set[$compDTV0] ::
-         |        { ($trigExtKey(($compApplyPrimeKey(${prefix}fh_old, ${prefix}c, ${prefix}fs)),
-         |                    ($compApplyPrimeKey(${prefix}fh_new, ${prefix}c, ${prefix}fs))): Bool) }
+         |        { ($trigExtKey(($compApplyPrimeKey(${prefix}fh_old, ${prefix}c, ${prefix}fs): $compDTV2),
+         |                       ($compApplyPrimeKey(${prefix}fh_new, ${prefix}c, ${prefix}fs): $compDTV2)): Bool) }
          |        ($compApplyKey(${prefix}fh_old, ${prefix}c, ${prefix}fs) == $compApplyKey(${prefix}fh_new, ${prefix}c, ${prefix}fs)) ||
          |        ((_skExt($compApplyPrimeKey(${prefix}fh_old, ${prefix}c, ${prefix}fs), $compApplyPrimeKey(${prefix}fh_new, ${prefix}c, ${prefix}fs)) in ${prefix}fs ==>
-         |            ($fHeapElemKey(${prefix}fh_old, _skExt($compApplyPrimeKey(${prefix}fh_old, ${prefix}c, ${prefix}fs), $compApplyPrimeKey(${prefix}fh_new, ${prefix}c, ${prefix}fs)))) ==
-         |            ($fHeapElemKey(${prefix}fh_new, _skExt($compApplyPrimeKey(${prefix}fh_old, ${prefix}c, ${prefix}fs), $compApplyPrimeKey(${prefix}fh_new, ${prefix}c, ${prefix}fs)))))
+         |            (($fHeapElemKey(${prefix}fh_old, _skExt($compApplyPrimeKey(${prefix}fh_old, ${prefix}c, ${prefix}fs), $compApplyPrimeKey(${prefix}fh_new, ${prefix}c, ${prefix}fs))): $compDTV2)) ==
+         |            (($fHeapElemKey(${prefix}fh_new, _skExt($compApplyPrimeKey(${prefix}fh_old, ${prefix}c, ${prefix}fs), $compApplyPrimeKey(${prefix}fh_new, ${prefix}c, ${prefix}fs))): $compDTV2)))
          |        ==>
          |        ($compApplyPrimeKey(${prefix}fh_old, ${prefix}c, ${prefix}fs) == $compApplyPrimeKey(${prefix}fh_new, ${prefix}c, ${prefix}fs)))
          |    }

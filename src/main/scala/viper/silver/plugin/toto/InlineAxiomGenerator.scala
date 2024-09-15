@@ -28,6 +28,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
   private var currentLabelNum = 0
   private var uniqueIDMethodOut = 0
   private var uniqueLabelMethod = 0
+  private val userLabelToLabelNum: mutable.Map[String, Int] = mutable.Map()
 //  private var uniqueIDLost = 0
 
   private def getUniqueIDMethodOut: String = {
@@ -43,6 +44,18 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
 
   private def getCurrentLabel: Label = {
     Label(s"${helper.labelPrefix}l$currentLabelNum", Seq())()
+  }
+
+  def mapUserLabelToCurrentAFHeap(name: String): Option[Int] = {
+    userLabelToLabelNum.put(name, currentLabelNum)
+  }
+
+  def getAFHeapFromUserLabel(name: String): AFHeap = {
+    val fHeapLabelNum = userLabelToLabelNum.get(name) match {
+      case Some(i) => i
+      case None => throw new Exception(s"User-defined label $name not found during fold heap mapping")
+    }
+    AFHeap(s"${helper.fHeapPrefix}$fHeapLabelNum", fHeapLabelNum)()
   }
 
   def getOldLabel: Label = {
