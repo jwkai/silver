@@ -396,7 +396,7 @@ object ComprehensionPlugin {
       val out = outM.copy(
         body = Some(Seqn(
           axiomGenerator.fHeapDecls ++ outM.body.getOrElse(Seqn(Seq(), Seq())()).ss,
-          outM.scopedDecls
+          outM.body.getOrElse(Seqn(Seq(), Seq())()).scopedDecls
         )())
       )(outM.pos, outM.info, outM.errT)
 
