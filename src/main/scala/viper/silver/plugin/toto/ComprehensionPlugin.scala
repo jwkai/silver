@@ -386,11 +386,11 @@ object ComprehensionPlugin {
           ca
       })
 
-      // Add axioms for heap reads, using bottom-up traversal
-      outM = outM.transform(
-        { case s: Stmt  => axiomGenerator.generateHeapReadAxioms(s) },
-        recurse = Traverse.BottomUp
-      )
+//      // Add axioms for heap reads, using bottom-up traversal
+//      outM = outM.transform(
+//        { case s: Stmt  => axiomGenerator.generateHeapReadAxioms(s) },
+//        recurse = Traverse.BottomUp
+//      )
 
       // Add fHeap declarations and assignments to beginning of method
       val out = outM.copy(

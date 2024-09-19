@@ -57,12 +57,13 @@ object DomainsGenerator {
          |    axiom _iso {
          |        forall ${prefix}h1: fHeap, ${prefix}h2: fHeap ::
          |            { $fHeapIdxKey(${prefix}h1), $fHeapIdxKey(${prefix}h2) }
-         |            $fHeapIdxKey(${prefix}h1) == $fHeapIdxKey(${prefix}h2) ==> ${prefix}h1 == ${prefix}h2
+         |            $fHeapIdxKey(${prefix}h1) == $fHeapIdxKey(${prefix}h2) <==> ${prefix}h1 == ${prefix}h2
          |    }
          |
          |    axiom _idxSucc {
          |        forall ${prefix}h1: fHeap, ${prefix}h2: fHeap ::
          |            { $fHeapIdxKey(${prefix}h1), $fHeapIdxKey(${prefix}h2) }
+         |            { $fHeapSKey(${prefix}h1, ${prefix}h2) }
          |            $fHeapIdxKey(${prefix}h2) == $fHeapIdxKey(${prefix}h1) + 1 ==>
          |                $fHeapSKey(${prefix}h1, ${prefix}h2)
          |    }

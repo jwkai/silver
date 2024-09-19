@@ -87,6 +87,45 @@ class AxiomHelper(program: Program) {
     Implies(foldConj(lhsExps), foldConj(rhsExps))()
   }
 
+  def injectiveFullCheck(filter: Exp, compExp: Exp): QuantifiedExp = {
+    val compType = compExp.typ.asInstanceOf[DomainType]
+    val getreceiver = program.findDomainFunction(DomainsGenerator.compGetRecvKey)
+
+    // getreceiver($c)
+    val getreceiverApplied = DomainFuncApp(
+      getreceiver,
+      Seq(compExp),
+      compType.typVarsMap
+    )()
+
+    val recvElemType = filter.typ match {
+      case setType: SetType => setType.elementType
+      case _ => throw new Exception("Filter must be a set")
+    }
+    // Make the injectivity checks
+    val forallVarInd1 = LocalVarDecl("__ind1", recvElemType)()
+    val forallVarInd2 = LocalVarDecl("__ind2", recvElemType)()
+    val setContains1 = AnySetContains(forallVarInd1.localVar, filter)()
+    val setContains2 = AnySetContains(forallVarInd2.localVar, filter)()
+    val idxsNeq = NeCmp(forallVarInd1.localVar, forallVarInd2.localVar)()
+    val recApplyInd1 = applyDomainFunc(DomainsGenerator.recApplyKey,
+      Seq(getreceiverApplied, forallVarInd1.localVar),
+      compType.typVarsMap)
+    val recApplyInd2 = applyDomainFunc(DomainsGenerator.recApplyKey,
+      Seq(getreceiverApplied, forallVarInd2.localVar),
+      compType.typVarsMap)
+    val recApplyNeq = NeCmp(recApplyInd1, recApplyInd2)()
+    val injectiveFullCheck = Forall(
+      Seq(forallVarInd1, forallVarInd2),
+      Seq(Trigger(Seq(setContains1, setContains2))()),
+      foldedConjImplies(
+        Seq(setContains1, setContains2, idxsNeq),
+        Seq(recApplyNeq)
+      )
+    )()
+    injectiveFullCheck
+  }
+
   def filterReceiverGood(filter: Exp, compExp: Exp): DomainFuncApp = {
     val compType = compExp.typ.asInstanceOf[DomainType]
     val filterReceiverGoodFunc = program.findDomainFunction(DomainsGenerator.filterRecvGoodKey)
@@ -105,6 +144,14 @@ class AxiomHelper(program: Program) {
     )()
   }
 
+
+  def filterRecvGoodOrInjCheck(filter: Exp, compExp: Exp): DomainBinExp = {
+    Or(
+      filterReceiverGood(filter, compExp),
+      injectiveFullCheck(filter, compExp)
+    )()
+  }
+
   def subsetNotInRefs(fs: Exp, compExp: Exp, refs: LocalVar): DomainFuncApp = {
     val compType = compExp.typ.asInstanceOf[DomainType]
     val filterNotLostFunc = program.findDomainFunction(DomainsGenerator.subsetNotInRefsKey)
@@ -120,12 +167,12 @@ class AxiomHelper(program: Program) {
     )()
   }
 
-  def fHeapElemApplyTo(fHeap: AFHeap, arg: Exp): DomainFuncApp = {
-    val fHeapType = AFHeap.getType.asInstanceOf[DomainType]
+  def fHeapElemApplyTo(fHeap: AFHeap, arg: Exp, retTyp: Type): DomainFuncApp = {
+    val fHeapFunc: DomainFunc = program.findDomainFunction(DomainsGenerator.fHeapElemKey)
     DomainFuncApp(
-      program.findDomainFunction(DomainsGenerator.fHeapElemKey),
+      fHeapFunc,
       Seq(fHeap, arg),
-      fHeapType.typVarsMap
+      Map().withDefaultValue(retTyp)
     )()
   }
 
