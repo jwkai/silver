@@ -23,7 +23,7 @@ case class ACompApply(comp: AComprehension3Tuple, filter: Exp, fieldName: String
 
     DomainFuncApp(
       compEvalFunc,
-      Seq(fHeap, compConstructed, filter),
+      Seq(fHeap.toLocalVar, compConstructed, filter),
       compConstructed.typVarMap
     )(this.pos, this.info, this.errT + NodeTrafo(this))
   }

@@ -171,7 +171,7 @@ class AxiomHelper(program: Program) {
     val fHeapFunc: DomainFunc = program.findDomainFunction(DomainsGenerator.fHeapElemKey)
     DomainFuncApp(
       fHeapFunc,
-      Seq(fHeap, arg),
+      Seq(fHeap.toLocalVar, arg),
       Map().withDefaultValue(retTyp)
     )()
   }

@@ -393,12 +393,18 @@ object ComprehensionPlugin {
 //      )
 
       // Add fHeap declarations and assignments to beginning of method
-      val out = outM.copy(
-        body = Some(Seqn(
-          axiomGenerator.fHeapDecls ++ outM.body.getOrElse(Seqn(Seq(), Seq())()).ss,
-          outM.body.getOrElse(Seqn(Seq(), Seq())()).scopedDecls
-        )())
-      )(outM.pos, outM.info, outM.errT)
+      val out = outM.body match {
+        case Some(bodyM) =>
+          val fhDecls = axiomGenerator.fHeapDecls
+          outM.copy(body =
+            Some(bodyM.copy(
+              ss = fhDecls.map(_._2) ++ bodyM.ss,
+              scopedSeqnDeclarations = fhDecls.map(_._1) ++ bodyM.scopedDecls
+            )(bodyM.pos, bodyM.info, bodyM.errT)),
+
+          )(outM.pos, outM.info, outM.errT)
+        case None => return outM
+      }
 
       out
     }
