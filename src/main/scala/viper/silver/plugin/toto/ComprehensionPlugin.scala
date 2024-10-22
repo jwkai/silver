@@ -10,7 +10,7 @@ import viper.silver.parser.FastParser
 import viper.silver.parser._
 import viper.silver.plugin.toto.ComprehensionPlugin.{addInlinedAxioms, defaultMappingIden}
 import viper.silver.plugin.toto.DomainsGenerator._
-import viper.silver.plugin.toto.ast.ACompApply
+import viper.silver.plugin.toto.ast.{ACompApply, ACompDecl}
 import viper.silver.plugin.toto.parser.PComprehension.PComprehensionKeywordType
 import viper.silver.plugin.toto.parser._
 import viper.silver.plugin.toto.util.AxiomHelper
@@ -227,10 +227,14 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
 //      input.copy(functions = input.functions.concat(ASnapshotDecl.getAllSnapDecls(input)))(
 //        input.pos, input.info, input.errT
 //      )
+    val inputWithDecls =
+      input.copy(functions = input.functions.concat(ACompDecl.getAllCompDecls(input)))(
+        input.pos, input.info, input.errT
+      )
 
-    var newInput = addInlinedAxioms(input)
+    var newInput = addInlinedAxioms(inputWithDecls)
     newInput = newInput.transform({
-      case c@ACompApply(_, _, _) => c.toViper(newInput)
+      case c: ACompApply => c.toViper(newInput)
     })
     newInput = newInput.transform({
       case e@Assume(a) => Inhale(a)(e.pos, e.info, e.errT)
@@ -370,19 +374,19 @@ object ComprehensionPlugin {
         case lo@LabelledOld(exp, labelName) =>
           lo.copy(exp = exp.transform({
             case ca: ACompApply =>
-              ca.fHeap = axiomGenerator.getAFHeapFromUserLabel(labelName)
+              ca.fHeap = axiomGenerator.getAFHeapFromUserLabel(labelName).toLocalVar
               ca
           }))(lo.pos, lo.info, lo.errT)
         case lo@Old(exp) =>
           Old(
             exp.transform({
               case ca: ACompApply =>
-                ca.fHeap = axiomGenerator.getOldfHeap
+                ca.fHeap = axiomGenerator.getOldfHeap.toLocalVar
                 ca
             })
           )(lo.pos, lo.info, lo.errT)
         case ca: ACompApply =>
-          ca.fHeap = axiomGenerator.getCurrentfHeap
+          ca.fHeap = axiomGenerator.getCurrentfHeap.toLocalVar
           ca
       })
 
@@ -393,7 +397,7 @@ object ComprehensionPlugin {
 //      )
 
       // Add fHeap declarations and assignments to beginning of method
-      val out = outM.body match {
+      val outD = outM.body match {
         case Some(bodyM) =>
           val fhDecls = axiomGenerator.fHeapDecls
           outM.copy(body =
@@ -401,10 +405,34 @@ object ComprehensionPlugin {
               ss = fhDecls.map(_._2) ++ bodyM.ss,
               scopedSeqnDeclarations = fhDecls.map(_._1) ++ bodyM.scopedDecls
             )(bodyM.pos, bodyM.info, bodyM.errT)),
-
           )(outM.pos, outM.info, outM.errT)
         case None => return outM
       }
+
+      val setFHeapApply: PartialFunction[Node, Node] = {
+        case ca@ACompApply(comp, filter, fieldName) =>
+          ca.fHeap = axiomGenerator.getFHApply(comp, filter, fieldName)
+          ca
+      }
+
+      // Add heap-dependent function to pre-/post-conditions and loop invariants
+      val out = outD.copy(
+        pres =
+          outD.pres.map(pre => pre.transform(setFHeapApply)),
+        posts =
+          outD.posts.map(post => post.transform(setFHeapApply)),
+        body =
+          outD.body match {
+            case Some(bodyD) =>
+              Some(bodyD.transform({
+                case w@While(cond, invs, body) =>
+                  While(cond,
+                    invs.map(inv => inv.transform(setFHeapApply)),
+                    body)(w.pos, w.info, w.errT)},
+                recurse = Traverse.BottomUp))
+            case None => None
+          }
+      )(outD.pos, outD.info, outD.errT)
 
       out
     }

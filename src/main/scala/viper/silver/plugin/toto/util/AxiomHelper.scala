@@ -58,6 +58,11 @@ class AxiomHelper(program: Program) {
   //-----------------------------------------------------------------
   //-----------------------------------------------------------------
   // Helper functions
+  def applyFunc(funcName: String, applyTo: Seq[Exp]): FuncApp = {
+    val func = program.findFunction(funcName)
+    FuncApp(func, applyTo)()
+  }
+
   def applyDomainFunc(domainFuncName: String, applyTo: Seq[Exp],
                       typMap: Map[TypeVar, Type]): DomainFuncApp = {
     val domainFunc = program.findDomainFunction(domainFuncName)
@@ -442,4 +447,12 @@ class AxiomHelper(program: Program) {
     output
   }
 
+}
+
+object AxiomHelper {
+  def tupleFieldToString(t: (Type, Type, Type), fieldID: String): String = {
+    // replace letters [ and ] with _
+    ("__getfh_" + t._1.toString() + "_" + t._2.toString() + "_" + t._3.toString() + "_" + fieldID
+      ).replaceAll("[\\[\\]]", "_")
+  }
 }

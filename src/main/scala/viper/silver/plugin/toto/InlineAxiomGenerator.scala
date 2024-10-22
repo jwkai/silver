@@ -2,7 +2,7 @@ package viper.silver.plugin.toto
 
 import viper.silver.ast._
 import viper.silver.ast.utility.Expressions
-import viper.silver.plugin.toto.ast.{ACompApply, ACompDecl, AFHeap}
+import viper.silver.plugin.toto.ast.{ACompApply, ACompDecl, AComprehension3Tuple, AFHeap}
 import viper.silver.plugin.toto.util.AxiomHelper
 import viper.silver.verifier.errors
 import viper.silver.verifier.errors.{ExhaleFailed, InhaleFailed}
@@ -106,6 +106,11 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     })
   }
 
+  def getFHApply(comp: AComprehension3Tuple, filter: Exp, fieldName: String): Exp = {
+    helper.applyFunc(AxiomHelper.tupleFieldToString(comp.tripleType, fieldName),
+      Seq(comp.toViper(program), filter))
+  }
+
   def convertMethodToInhaleExhale(methodCall: MethodCall): Seqn = {
     // Get method declaration
     val oldLabel = getUniqueLabelMethod
@@ -172,10 +177,12 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val relevantCompDecls = compDeclsUsed.toSeq.filter(compDecl =>
       relevantField.contains(compDecl.findFieldInProgram(program)))
     val exhaleAxioms = relevantCompDecls.map(compDecl => generateExhaleAxiomsPerComp(compDecl, declaredFieldVars))
+    val allFHAxioms = relevantCompDecls.map(generateFHAssumptions)
     val allLostVars = exhaleAxioms.flatMap(e => e.scopedSeqnDeclarations)
     val allExhaleAxioms = exhaleAxioms.flatMap(e => e.ss)
+    val newss = allFHAxioms.map(_._1) :+ e :+ getCurrentLabel :++ allFHAxioms.map(_._2) :++ allExhaleAxioms
 
-    Seqn(e +: getCurrentLabel +: allExhaleAxioms, allLostVars)(e.pos, e.info, e.errT)
+    Seqn(newss, allLostVars)(e.pos, e.info, e.errT)
   }
 
   def generateInhaleAxioms(i: Inhale, relevantField: Set[Field]): Seqn = {
@@ -184,11 +191,12 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val relevantCompDecls = compDeclsUsed.toSeq.filter(compDecl =>
       relevantField.contains(compDecl.findFieldInProgram(program)))
     val inhaleAxioms = relevantCompDecls.map(compDecl => generateInhaleAxiomsPerComp(compDecl, declaredFieldVars))
+    val allFHAxioms = relevantCompDecls.map(generateFHAssumptions)
     val allLostVars = inhaleAxioms.flatMap(i => i.scopedSeqnDeclarations)
     val allInhaleAxioms = inhaleAxioms.flatMap(i => i.ss)
+    val newss = allFHAxioms.map(_._1) :+ i :+ getCurrentLabel :++ allFHAxioms.map(_._2) :++ allInhaleAxioms
 
-
-    Seqn(i +: getCurrentLabel +: allInhaleAxioms, allLostVars)(i.pos, i.info, i.errT)
+    Seqn(newss, allLostVars)(i.pos, i.info, i.errT)
   }
 
   def generateHeapWriteAxioms(writeStmt: Stmt): Seqn = {
@@ -203,7 +211,10 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val out = compsAndFields.flatMap(compAndField =>
       generateHeapWriteAxiomPerComp(compAndField._1, compAndField._2.lhs.rcv, compAndField._2.rhs)
     )
-    Seqn(out :+ writeStmt :+ getCurrentLabel, Seq())(writeStmt.pos, writeStmt.info, writeStmt.errT)
+    val allFHAxioms = compsAndFields.map(_._1).map(generateFHAssumptions)
+    val newss = out :++ allFHAxioms.map(_._1) :+ writeStmt :+ getCurrentLabel :++ allFHAxioms.map(_._2)
+
+    Seqn(newss, Seq())(writeStmt.pos, writeStmt.info, writeStmt.errT)
   }
 
   //  def generateHeapReadAxioms(readStmt: Stmt): Stmt = {
@@ -255,6 +266,40 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
   //    )
   //    Seqn(out :+ readStmt, Seq())(readStmt.pos, readStmt.info, readStmt.errT)
   //  }
+
+  private def generateFHAssumptions(compADecl: ACompDecl): (Stmt, Stmt) = {
+    // Extract the comp Domain type
+    val compDType = compADecl.compDType(program)
+    val compIdxType = compADecl.compType._1
+
+    // fHeap declarations
+    val fhOld = getLastfHeap
+    val fhNew = getCurrentfHeap
+
+    // Comp var declaration
+    val forallVarC = LocalVarDecl("__c", compDType)()
+    val compVar = forallVarC.localVar
+
+    // Filter Var declaration
+    val forallVarFS = LocalVarDecl("__fs", SetType(compIdxType))()
+
+    val fhApply = helper.applyFunc(AxiomHelper.tupleFieldToString(compADecl.compType, compADecl.fieldName),
+      Seq(compVar, forallVarFS.localVar))
+
+    val trigger = Trigger(Seq(fhApply))()
+
+    def genFHAssume(fh: AFHeap): Assume = {
+      Assume(
+        Forall(
+          Seq(forallVarC, forallVarFS),
+          Seq(trigger),
+          EqCmp(fhApply, fh.toLocalVar)()
+        )()
+      )()
+    }
+
+    (genFHAssume(fhOld), genFHAssume(fhNew))
+  }
 
   private def generateHeapWriteAxiomPerComp(compADecl: ACompDecl, writeTo: Exp, writeExp: Exp): Seq[Stmt] = {
     val field = program.findField(compADecl.fieldName)
