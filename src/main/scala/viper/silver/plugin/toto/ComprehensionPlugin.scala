@@ -234,9 +234,6 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
 
     var newInput = addInlinedAxioms(inputWithDecls)
     newInput = newInput.transform({
-      case c: ACompApply => c.toViper(newInput)
-    })
-    newInput = newInput.transform({
       case e@Assume(a) => Inhale(a)(e.pos, e.info, e.errT)
     })
 //    print(pretty(newInput) + "\n\n")
@@ -416,11 +413,11 @@ object ComprehensionPlugin {
       }
 
       // Add heap-dependent function to pre-/post-conditions and loop invariants
-      val out = outD.copy(
+      val outF = outD.copy(
         pres =
-          outD.pres.map(pre => pre.transform(setFHeapApply)),
+          outD.pres.map(pre => pre.transform(setFHeapApply, recurse = Traverse.BottomUp)),
         posts =
-          outD.posts.map(post => post.transform(setFHeapApply)),
+          outD.posts.map(post => post.transform(setFHeapApply, recurse = Traverse.BottomUp)),
         body =
           outD.body match {
             case Some(bodyD) =>
@@ -433,6 +430,10 @@ object ComprehensionPlugin {
             case None => None
           }
       )(outD.pos, outD.info, outD.errT)
+
+      val out = outF.transform({
+        case c: ACompApply => c.toViper(p)
+      })
 
       out
     }
