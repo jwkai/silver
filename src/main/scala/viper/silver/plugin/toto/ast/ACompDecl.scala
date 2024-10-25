@@ -65,7 +65,7 @@ case class ACompDecl private(compType: (Type, Type, Type), fieldName: String)(va
       throw new Exception("Comp domain must have 3 type variables")
     }
     val typeVarMap = Map(
-//      typeVars(0) -> compType._1,
+      typeVars(0) -> compType._1,
       typeVars(1) -> compType._2,
       typeVars(2) -> compType._3
     )
