@@ -271,6 +271,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     // Extract the comp Domain type
     val compDType = compADecl.compDType(program)
     val compIdxType = compADecl.compType._1
+    val compFieldName = compADecl.fieldName
 
     // fHeap declarations
     val fhOld = getLastfHeap
@@ -288,12 +289,22 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
 
     val trigger = Trigger(Seq(fhApply))()
 
+    // ---------------Making the LHS---------------
+    // FilterReceiverGood
+    val frGood = helper.filterReceiverGood(forallVarFS.localVar, compVar)
+    val frGoodOrInj = helper.filterRecvGoodOrInjCheck(forallVarFS.localVar, compVar)
+    // Have access to the big filter in new
+    val forallCurrHasPerm = helper.forallFilterHaveSomeAccess(forallVarFS.localVar,
+      compVar, compFieldName, None)
+
     def genFHAssume(fh: AFHeap): Assume = {
       Assume(
         Forall(
           Seq(forallVarC, forallVarFS),
           Seq(trigger),
-          EqCmp(fhApply, fh.toLocalVar)()
+          helper.foldedConjImplies(
+            Seq(frGoodOrInj, forallCurrHasPerm),
+            Seq(frGood, EqCmp(fhApply, fh.toLocalVar)()))
         )()
       )()
     }
