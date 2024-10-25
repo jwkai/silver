@@ -306,7 +306,6 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     // Extract the comp Domain type
     val compDType = compADecl.compDType(program)
     val compIdxType = compADecl.compType._1
-    val compRtnType = compADecl.compType._3
 
     // fHeap declarations
     val fhOld = getLastfHeap
@@ -394,19 +393,19 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
         Forall(
           Seq(forallVarIdx),
           Seq(
-            Trigger(Seq(helper.fHeapElemApplyTo(fhOld, idxVar, compRtnType)))(),
-            Trigger(Seq(helper.fHeapElemApplyTo(fhNew, idxVar, compRtnType)))()
+            Trigger(Seq(helper.fHeapElemApplyTo(compVar, fhOld, idxVar)))(),
+            Trigger(Seq(helper.fHeapElemApplyTo(compVar, fhNew, idxVar)))()
           ),
           helper.foldedConjImplies(
             Seq(NeCmp(idxVar, invRecvApp)(), helper.permNonZeroCmp(idxVar, compVar, field.name)),
             Seq(
               NeCmp(idxVar, invRecvApp)(),
               EqCmp(
-                helper.fHeapElemApplyTo(fhOld, idxVar, compRtnType),
+                helper.fHeapElemApplyTo(compVar, fhOld, idxVar),
                 helper.mapApplyTo(compVar, FieldAccess(receiverAppIdx, field)())
               )(),
               EqCmp(
-                helper.fHeapElemApplyTo(fhNew, idxVar, compRtnType),
+                helper.fHeapElemApplyTo(compVar, fhNew, idxVar),
                 helper.mapApplyTo(compVar, FieldAccess(receiverAppIdx, field)())
               )()
             ),
@@ -423,11 +422,11 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
           Seq(helper.permNonZeroCmp(invRecvApp, compVar, field.name)),
           Seq(
             EqCmp(
-              helper.fHeapElemApplyTo(fhOld, invRecvApp, compRtnType),
+              helper.fHeapElemApplyTo(compVar, fhOld, invRecvApp),
               helper.mapApplyTo(compVar, FieldAccess(writeTo, field)())
             )(),
             EqCmp(
-              helper.fHeapElemApplyTo(fhNew, invRecvApp, compRtnType),
+              helper.fHeapElemApplyTo(compVar, fhNew, invRecvApp),
               helper.mapApplyTo(compVar, writeExp)
             )()
           )
@@ -532,7 +531,6 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     // Extract the comp Domain type
     val compDType = compADecl.compDType(program)
     val compIdxType = compADecl.compType._1
-    val compRtnType = compADecl.compType._3
 
     // fHeap declarations
     val fhOld = getLastfHeap
@@ -639,7 +637,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
         Forall(
           Seq(forallVarIdx),
           Seq(
-            Trigger(Seq(helper.fHeapElemApplyTo(fhOld, idxVar, compRtnType)))()
+            Trigger(Seq(helper.fHeapElemApplyTo(compVar, fhOld, idxVar)))()
           ),
           helper.foldedConjImplies(
             Seq(
@@ -650,7 +648,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
             ),
             Seq(
               EqCmp(
-                helper.fHeapElemApplyTo(fhOld, invRecvIndApp, compRtnType),
+                helper.fHeapElemApplyTo(compVar, fhOld, invRecvIndApp),
                 LabelledOld(
                   helper.mapApplyTo(compVar, FieldAccess(receiverAppIdx, field)()),
                   getLastLabel.name
@@ -669,19 +667,19 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
         Forall(
           Seq(forallVarIdx),
           Seq(
-            Trigger(Seq(helper.fHeapElemApplyTo(fhOld, idxVar, compRtnType)))(),
-            Trigger(Seq(helper.fHeapElemApplyTo(fhNew, idxVar, compRtnType)))()
+            Trigger(Seq(helper.fHeapElemApplyTo(compVar, fhOld, idxVar)))(),
+            Trigger(Seq(helper.fHeapElemApplyTo(compVar, fhNew, idxVar)))()
           ),
           helper.foldedConjImplies(
             Seq(idxNotInRefs, helper.permNonZeroCmp(idxVar, compVar, field.name)),
             Seq(
               idxNotInRefs,
               EqCmp(
-                helper.fHeapElemApplyTo(fhOld, invRecvIndApp, compRtnType),
+                helper.fHeapElemApplyTo(compVar, fhOld, invRecvIndApp),
                 helper.mapApplyTo(compVar, FieldAccess(receiverAppIdx, field)())
               )(),
               EqCmp(
-                helper.fHeapElemApplyTo(fhNew, invRecvIndApp, compRtnType),
+                helper.fHeapElemApplyTo(compVar, fhNew, invRecvIndApp),
                 helper.mapApplyTo(compVar, FieldAccess(receiverAppIdx, field)())
               )()
             ),
@@ -740,7 +738,6 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     // Extract the comp Domain type
     val compDType = compADecl.compDType(program)
     val compIdxType = compADecl.compType._1
-    val compRtnType = compADecl.compType._3
 
     // fHeap declarations
     val fhOld = getLastfHeap
@@ -954,7 +951,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
         Forall(
           Seq(forallVarIdx),
           Seq(
-            Trigger(Seq(helper.fHeapElemApplyTo(fhOld, idxVar, compRtnType)))()
+            Trigger(Seq(helper.fHeapElemApplyTo(compVar, fhOld, idxVar)))()
           ),
           helper.foldedConjImplies(
             Seq(
@@ -965,14 +962,14 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
             ),
             Seq(
               EqCmp(
-                helper.fHeapElemApplyTo(fhOld, invRecvIndApp, compRtnType),
+                helper.fHeapElemApplyTo(compVar, fhOld, invRecvIndApp),
                 LabelledOld(
                   helper.mapApplyTo(compVar, FieldAccess(receiverAppIdx, field)()),
                   getLastLabel.name
                 )()
               )(),
               EqCmp(
-                helper.fHeapElemApplyTo(fhNew, invRecvIndApp, compRtnType),
+                helper.fHeapElemApplyTo(compVar, fhNew, invRecvIndApp),
                 LabelledOld(
                   helper.mapApplyTo(compVar, FieldAccess(receiverAppIdx, field)()),
                   getLastLabel.name
@@ -991,13 +988,13 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
         Forall(
           Seq(forallVarIdx),
           Seq(
-            Trigger(Seq(helper.fHeapElemApplyTo(fhNew, idxVar, compRtnType)))()
+            Trigger(Seq(helper.fHeapElemApplyTo(compVar, fhNew, idxVar)))()
           ),
           helper.foldedConjImplies(
             Seq(helper.permNonZeroCmp(idxVar, compVar, field.name)),
             Seq(
               EqCmp(
-                helper.fHeapElemApplyTo(fhNew, invRecvIndApp, compRtnType),
+                helper.fHeapElemApplyTo(compVar, fhNew, invRecvIndApp),
                 helper.mapApplyTo(compVar, FieldAccess(receiverAppIdx, field)())
               )()
             ),

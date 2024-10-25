@@ -172,12 +172,13 @@ class AxiomHelper(program: Program) {
     )()
   }
 
-  def fHeapElemApplyTo(fHeap: AFHeap, arg: Exp, retTyp: Type): DomainFuncApp = {
+  def fHeapElemApplyTo(compExp: Exp, fHeap: AFHeap, arg: Exp): DomainFuncApp = {
+    val compType = compExp.typ.asInstanceOf[DomainType]
     val fHeapFunc: DomainFunc = program.findDomainFunction(DomainsGenerator.fHeapElemKey)
     DomainFuncApp(
       fHeapFunc,
-      Seq(fHeap.toLocalVar, arg),
-      Map().withDefaultValue(retTyp)
+      Seq(compExp, fHeap.toLocalVar, arg),
+      compType.typVarsMap
     )()
   }
 
