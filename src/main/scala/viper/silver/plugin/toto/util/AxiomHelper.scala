@@ -3,7 +3,6 @@ package viper.silver.plugin.toto.util
 import viper.silver.ast
 import viper.silver.ast.utility.Expressions
 import viper.silver.ast._
-import viper.silver.plugin.toto.ast.AFHeap
 import viper.silver.plugin.toto.{DomainsGenerator, FoldReasons}
 import viper.silver.verifier.reasons
 
@@ -172,12 +171,12 @@ class AxiomHelper(program: Program) {
     )()
   }
 
-  def fHeapElemApplyTo(compExp: Exp, fHeap: AFHeap, arg: Exp): DomainFuncApp = {
+  def fHeapElemApplyTo(compExp: Exp, fHeap: Exp, arg: Exp): DomainFuncApp = {
     val compType = compExp.typ.asInstanceOf[DomainType]
     val fHeapFunc: DomainFunc = program.findDomainFunction(DomainsGenerator.fHeapElemKey)
     DomainFuncApp(
       fHeapFunc,
-      Seq(compExp, fHeap.toLocalVar, arg),
+      Seq(compExp, fHeap, arg),
       compType.typVarsMap
     )()
   }

@@ -2,7 +2,7 @@ package viper.silver.plugin.toto
 
 import viper.silver.ast._
 import viper.silver.ast.utility.Expressions
-import viper.silver.plugin.toto.ast.{ACompApply, ACompDecl, AComprehension3Tuple, AFHeap}
+import viper.silver.plugin.toto.ast.{ACompApply, ACompDecl, AComprehension3Tuple}
 import viper.silver.plugin.toto.util.AxiomHelper
 import viper.silver.verifier.errors
 import viper.silver.verifier.errors.{ExhaleFailed, InhaleFailed}
@@ -50,24 +50,27 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     userLabelToLabelNum.put(name, currentLabelNum)
   }
 
-  def getAFHeapFromUserLabel(name: String): AFHeap = {
+  def getAFHeapFromUserLabel(name: String): IntLit = {
     val fHeapLabelNum = userLabelToLabelNum.get(name) match {
       case Some(i) => i
       case None => throw new Exception(s"User-defined label $name not found during fold heap mapping")
     }
-    AFHeap(s"${helper.fHeapPrefix}$fHeapLabelNum", fHeapLabelNum)
+    IntLit(fHeapLabelNum)()
+//    AFHeap(s"${helper.fHeapPrefix}$fHeapLabelNum", fHeapLabelNum)
   }
 
   def getOldLabel: Label = {
     Label(s"${helper.labelPrefix}l0", Seq())()
   }
 
-  def getOldfHeap: AFHeap = {
-    AFHeap(s"${helper.fHeapPrefix}0", 0)
+  def getOldfHeap: IntLit = {
+    IntLit(0)()
+//    AFHeap(s"${helper.fHeapPrefix}0", 0)
   }
 
-  def getCurrentfHeap: AFHeap = {
-    AFHeap(s"${helper.fHeapPrefix}$currentLabelNum", currentLabelNum)
+  def getCurrentfHeap: IntLit = {
+    IntLit(currentLabelNum)()
+//    AFHeap(s"${helper.fHeapPrefix}$currentLabelNum", currentLabelNum)
   }
 
   private def getLabNumForLost: String = {
@@ -82,29 +85,30 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     Label(s"${helper.labelPrefix}l${currentLabelNum-1}", Seq())()
   }
 
-  private def getLastfHeap: AFHeap = {
-    AFHeap(s"${helper.fHeapPrefix}${currentLabelNum-1}", currentLabelNum-1)
+  private def getLastfHeap: IntLit = {
+    IntLit(currentLabelNum-1)()
+//    AFHeap(s"${helper.fHeapPrefix}${currentLabelNum-1}", currentLabelNum-1)
   }
 
-  def fHeapDecls: Seq[(LocalVarDecl,Stmt)] = {
-    Seq.range(0, currentLabelNum + 1).flatMap(fhNum => {
-      val fhDecl = LocalVarDecl(
-        s"${helper.fHeapPrefix}$fhNum",
-        AFHeap.getType
-      )()
-      Seq[(LocalVarDecl,Stmt)](
-        (fhDecl,
-          Assume(EqCmp(
-            helper.applyDomainFunc(
-              DomainsGenerator.fHeapIdxKey,
-              Seq(fhDecl.localVar),
-              Map()
-            ),
-            IntLit(fhNum)()
-          )())())
-      )
-    })
-  }
+//  def fHeapDecls: Seq[(LocalVarDecl,Stmt)] = {
+//    Seq.range(0, currentLabelNum + 1).flatMap(fhNum => {
+//      val fhDecl = LocalVarDecl(
+//        s"${helper.fHeapPrefix}$fhNum",
+//        AFHeap.getType
+//      )()
+//      Seq[(LocalVarDecl,Stmt)](
+//        (fhDecl,
+//          Assume(EqCmp(
+//            helper.applyDomainFunc(
+//              DomainsGenerator.fHeapIdxKey,
+//              Seq(fhDecl.localVar),
+//              Map()
+//            ),
+//            IntLit(fhNum)()
+//          )())())
+//      )
+//    })
+//  }
 
   def getFHApply(comp: AComprehension3Tuple, filter: Exp, fieldName: String): Exp = {
     helper.applyFunc(AxiomHelper.tupleFieldToString(comp.tripleType, fieldName),
@@ -297,14 +301,14 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val forallCurrHasPerm = helper.forallFilterHaveSomeAccess(forallVarFS.localVar,
       compVar, compFieldName, None)
 
-    def genFHAssume(fh: AFHeap): Assume = {
+    def genFHAssume(fh: IntLit): Assume = {
       Assume(
         Forall(
           Seq(forallVarC, forallVarFS),
           Seq(trigger),
           helper.foldedConjImplies(
             Seq(frGoodOrInj, forallCurrHasPerm),
-            Seq(frGood, EqCmp(fhApply, fh.toLocalVar)()))
+            Seq(frGood, EqCmp(fhApply, fh)()))
         )()
       )()
     }
@@ -339,7 +343,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
       compDType.typVarsMap
     )
 
-    val trigger1 = Trigger(Seq(helper.compApply(fhOld.toLocalVar, compVar, forallVarFS.localVar)))()
+    val trigger1 = Trigger(Seq(helper.compApply(fhOld, compVar, forallVarFS.localVar)))()
 
     val invRecvApp = helper.applyDomainFunc(
       DomainsGenerator.recInvKey,
@@ -349,12 +353,12 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
 
     val triggerDeleteKeyNew = helper.applyDomainFunc(
       DomainsGenerator.trigDelKey1Key,
-      Seq(helper.compApply(fhNew.toLocalVar, compVar, forallVarFS.localVar), invRecvApp),
+      Seq(helper.compApply(fhNew, compVar, forallVarFS.localVar), invRecvApp),
       compDType.typVarsMap
     )
     val triggerDeleteKeyOld = helper.applyDomainFunc(
       DomainsGenerator.trigDelKey1Key,
-      Seq(helper.compApply(fhOld.toLocalVar, compVar, forallVarFS.localVar), invRecvApp),
+      Seq(helper.compApply(fhOld, compVar, forallVarFS.localVar), invRecvApp),
       compDType.typVarsMap
     )
 
@@ -367,12 +371,12 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val framingEq = EqCmp(
       helper.applyDomainFunc(
         DomainsGenerator.compApplyPrimeKey,
-        Seq(fhOld.toLocalVar, compVar, setDeleteFSInv),
+        Seq(fhOld, compVar, setDeleteFSInv),
         compDType.typVarsMap
       ),
       helper.applyDomainFunc(
         DomainsGenerator.compApplyPrimeKey,
-        Seq(fhNew.toLocalVar, compVar, setDeleteFSInv),
+        Seq(fhNew, compVar, setDeleteFSInv),
         compDType.typVarsMap
       )
     )()
@@ -554,7 +558,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     // Filter Var declaration
     val forallVarFS = LocalVarDecl("__fs", SetType(compIdxType))()
 
-    val trigger = Trigger(Seq(helper.compApply(fhOld.toLocalVar, compVar, forallVarFS.localVar)))()
+    val trigger = Trigger(Seq(helper.compApply(fhOld, compVar, forallVarFS.localVar)))()
 
     // ---------------Making the LHS---------------
     // FilterReceiverGood
@@ -572,30 +576,30 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     // ---------------Making the RHS---------------
     val triggerDeleteBlockOld = helper.applyDomainFunc(
       DomainsGenerator.trigDelBlockKey,
-      Seq(helper.compApply(fhOld.toLocalVar, compVar, forallVarFS.localVar), filterNotLostApplied),
+      Seq(helper.compApply(fhOld, compVar, forallVarFS.localVar), filterNotLostApplied),
       compDType.typVarsMap
     )
     val dummyApplyNew = helper.applyDomainFunc(
       DomainsGenerator.compApplyDummyKey,
-      Seq(helper.compApply(fhNew.toLocalVar, compVar, filterNotLostApplied)),
+      Seq(helper.compApply(fhNew, compVar, filterNotLostApplied)),
       compDType.typVarsMap
     )
     val framingEq = EqCmp(
       helper.applyDomainFunc(
         DomainsGenerator.compApplyPrimeKey,
-        Seq(fhOld.toLocalVar, compVar, filterNotLostApplied),
+        Seq(fhOld, compVar, filterNotLostApplied),
         compDType.typVarsMap
       ),
       helper.applyDomainFunc(
         DomainsGenerator.compApplyPrimeKey,
-        Seq(fhNew.toLocalVar, compVar, filterNotLostApplied),
+        Seq(fhNew, compVar, filterNotLostApplied),
         compDType.typVarsMap
       )
     )()
     val exhaleCF = helper.applyDomainFunc(
       DomainsGenerator.exhaleFoldSetKey,
       Seq(
-        fhOld.toLocalVar,
+        fhOld,
         compVar,
         forallVarFS.localVar,
         IntLit(ACompDecl.getFieldInt(field.name))()
@@ -753,7 +757,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     // fHeap declarations
     val fhOld = getLastfHeap
     val fhNew = getCurrentfHeap
-    val forallVarfH = LocalVarDecl("__exfh", AFHeap.getType)()
+    val forallVarfH = LocalVarDecl("__exfh", Int)()
 
     // Comp var declaration
     val forallVarC = LocalVarDecl("__c", compDType)()
@@ -763,8 +767,8 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val forallVarFS = LocalVarDecl("__fs", SetType(compIdxType))()
     val forallVarExFS = LocalVarDecl("__exfs", SetType(compIdxType))()
 
-    val triggerOld = Trigger(Seq(helper.compApply(fhOld.toLocalVar, compVar, forallVarFS.localVar)))()
-    val triggerNew = Trigger(Seq(helper.compApply(fhNew.toLocalVar, compVar, forallVarFS.localVar)))()
+    val triggerOld = Trigger(Seq(helper.compApply(fhOld, compVar, forallVarFS.localVar)))()
+    val triggerNew = Trigger(Seq(helper.compApply(fhNew, compVar, forallVarFS.localVar)))()
 
     // ---------------Making the LHS---------------
     // FilterReceiverGood
@@ -778,12 +782,12 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val framingEq = EqCmp(
       helper.applyDomainFunc(
         DomainsGenerator.compApplyPrimeKey,
-        Seq(fhOld.toLocalVar, compVar, forallVarFS.localVar),
+        Seq(fhOld, compVar, forallVarFS.localVar),
         compDType.typVarsMap
       ),
       helper.applyDomainFunc(
         DomainsGenerator.compApplyKey,
-        Seq(fhNew.toLocalVar, compVar, forallVarFS.localVar),
+        Seq(fhNew, compVar, forallVarFS.localVar),
         compDType.typVarsMap
       )
     )()
@@ -801,7 +805,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
 
     val triggerDeleteBlockNew = helper.applyDomainFunc(
       DomainsGenerator.trigDelBlockKey,
-      Seq(helper.compApply(fhNew.toLocalVar, compVar, forallVarExFS.localVar), forallVarFS.localVar),
+      Seq(helper.compApply(fhNew, compVar, forallVarExFS.localVar), forallVarFS.localVar),
       compDType.typVarsMap
     )
 
@@ -822,7 +826,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
       Seq(
         helper.applyDomainFunc(
           DomainsGenerator.compApplyPrimeKey,
-          Seq(fhNew.toLocalVar, compVar, setDelExFSFS),
+          Seq(fhNew, compVar, setDelExFSFS),
           compDType.typVarsMap
         ),
         helper.applyDomainFunc(
@@ -848,13 +852,13 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
 
     val triggerDeleteBlockNotGained = helper.applyDomainFunc(
       DomainsGenerator.trigDelBlockKey,
-      Seq(helper.compApply(fhNew.toLocalVar, compVar, forallVarFS.localVar), subsetNotInRefsGained),
+      Seq(helper.compApply(fhNew, compVar, forallVarFS.localVar), subsetNotInRefsGained),
       compDType.typVarsMap
     )
 
     val dummyApplyOldNotGained = helper.applyDomainFunc(
       DomainsGenerator.compApplyDummyKey,
-      Seq(helper.compApply(fhOld.toLocalVar, compVar, subsetNotInRefsGained)),
+      Seq(helper.compApply(fhOld, compVar, subsetNotInRefsGained)),
       compDType.typVarsMap
     )
 
@@ -887,25 +891,25 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
       compDType.typVarsMap
     )
 
-    val succfHeap = helper.applyDomainFunc(
-      DomainsGenerator.fHeapSTKey,
-      Seq(forallVarfH.localVar, fhOld.toLocalVar),
-      compDType.typVarsMap
-    )
+//    val succfHeap = helper.applyDomainFunc(
+//      DomainsGenerator.fHeapSTKey,
+//      Seq(forallVarfH.localVar, fhOld),
+//      compDType.typVarsMap
+//    )
 
     val blockDecompOverPrevExhales = Assume(
       Forall(
         Seq(forallVarfH, forallVarC, forallVarFS, forallVarExFS),
         Seq(
           Trigger(Seq(
-            helper.compApply(fhOld.toLocalVar, compVar, forallVarFS.localVar),
-            exhaleCF,
-            succfHeap
+            helper.compApply(fhOld, compVar, forallVarFS.localVar),
+            exhaleCF
           ))()
         ),
         helper.foldedConjImplies(
           Seq(
             //            getFieldIdEq,
+            LtCmp(forallVarfH.localVar, fhOld)(),
             frGoodOrInj,
             AnySetSubset(forallVarFS.localVar, forallVarExFS.localVar)(),
             forallVarIdxHasPerm

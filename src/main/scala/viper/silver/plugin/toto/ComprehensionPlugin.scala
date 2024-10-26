@@ -168,7 +168,7 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
       input
     } else {
       val domainsToAdd = Seq(
-        fHeapDomainString(),
+//        fHeapDomainString(),
         compDomainString(),
         receiverDomainString(),
         opDomainString(),
@@ -227,16 +227,16 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
 //      input.copy(functions = input.functions.concat(ASnapshotDecl.getAllSnapDecls(input)))(
 //        input.pos, input.info, input.errT
 //      )
-    val inputWithDecls =
-      input.copy(functions = input.functions.concat(ACompDecl.getAllCompDecls(input)))(
-        input.pos, input.info, input.errT
-      )
+//    val inputWithDecls =
+//      input.copy(functions = input.functions.concat(ACompDecl.getAllCompDecls(input)))(
+//        input.pos, input.info, input.errT
+//      )
 
-    var newInput = addInlinedAxioms(inputWithDecls)
+    var newInput = addInlinedAxioms(input)
     newInput = newInput.transform({
       case e@Assume(a) => Inhale(a)(e.pos, e.info, e.errT)
     })
-//    print(pretty(newInput) + "\n\n")
+    print(pretty(newInput) + "\n\n")
     newInput
   }
 
@@ -371,19 +371,19 @@ object ComprehensionPlugin {
         case lo@LabelledOld(exp, labelName) =>
           lo.copy(exp = exp.transform({
             case ca: ACompApply =>
-              ca.fHeap = axiomGenerator.getAFHeapFromUserLabel(labelName).toLocalVar
+              ca.fHeap = axiomGenerator.getAFHeapFromUserLabel(labelName)
               ca
           }))(lo.pos, lo.info, lo.errT)
         case lo@Old(exp) =>
           Old(
             exp.transform({
               case ca: ACompApply =>
-                ca.fHeap = axiomGenerator.getOldfHeap.toLocalVar
+                ca.fHeap = axiomGenerator.getOldfHeap
                 ca
             })
           )(lo.pos, lo.info, lo.errT)
         case ca: ACompApply =>
-          ca.fHeap = axiomGenerator.getCurrentfHeap.toLocalVar
+          ca.fHeap = axiomGenerator.getCurrentfHeap
           ca
       })
 
@@ -393,18 +393,18 @@ object ComprehensionPlugin {
 //        recurse = Traverse.BottomUp
 //      )
 
-      // Add fHeap declarations and assignments to beginning of method
-      val outD = outM.body match {
-        case Some(bodyM) =>
-          val fhDecls = axiomGenerator.fHeapDecls
-          outM.copy(body =
-            Some(bodyM.copy(
-              ss = fhDecls.map(_._2) ++ bodyM.ss,
-              scopedSeqnDeclarations = fhDecls.map(_._1) ++ bodyM.scopedDecls
-            )(bodyM.pos, bodyM.info, bodyM.errT)),
-          )(outM.pos, outM.info, outM.errT)
-        case None => return outM
-      }
+//      // Add fHeap declarations and assignments to beginning of method
+//      val outD = outM.body match {
+//        case Some(bodyM) =>
+//          val fhDecls = axiomGenerator.fHeapDecls
+//          outM.copy(body =
+//            Some(bodyM.copy(
+//              ss = fhDecls.map(_._2) ++ bodyM.ss,
+//              scopedSeqnDeclarations = fhDecls.map(_._1) ++ bodyM.scopedDecls
+//            )(bodyM.pos, bodyM.info, bodyM.errT)),
+//          )(outM.pos, outM.info, outM.errT)
+//        case None => return outM
+//      }
 
       val setFHeapApply: PartialFunction[Node, Node] = {
         case ca@ACompApply(comp, filter, fieldName) =>
@@ -413,13 +413,13 @@ object ComprehensionPlugin {
       }
 
       // Add heap-dependent function to pre-/post-conditions and loop invariants
-      val outF = outD.copy(
+      val outF = outM.copy(
         pres =
-          outD.pres.map(pre => pre.transform(setFHeapApply, recurse = Traverse.BottomUp)),
+          outM.pres.map(pre => pre.transform(setFHeapApply, recurse = Traverse.BottomUp)),
         posts =
-          outD.posts.map(post => post.transform(setFHeapApply, recurse = Traverse.BottomUp)),
+          outM.posts.map(post => post.transform(setFHeapApply, recurse = Traverse.BottomUp)),
         body =
-          outD.body match {
+          outM.body match {
             case Some(bodyD) =>
               Some(bodyD.transform({
                 case w@While(cond, invs, body) =>
@@ -429,7 +429,7 @@ object ComprehensionPlugin {
                 recurse = Traverse.BottomUp))
             case None => None
           }
-      )(outD.pos, outD.info, outD.errT)
+      )(outM.pos, outM.info, outM.errT)
 
       val out = outF.transform({
         case c: ACompApply => c.toViper(p)

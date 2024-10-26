@@ -7,6 +7,7 @@ import viper.silver.parser.{FastParser, PDomain, PKw, PNode, PReserved}
 case class ParseException(msg: String, pos: (Position, Position)) extends Exception
 
 object DomainsGenerator {
+  final val intKey = "Int"
   final val compDKey = "Fold"
   final val compDTV0 = "A"
   final val compDTV1 = "V"
@@ -21,9 +22,9 @@ object DomainsGenerator {
   final val compGetOperKey = "getoperator"
   final val compGetMappingKey = "getmapping"
   final val fHeapElemKey = "fHeapElem"
-  final val fHeapIdxKey = "heapIdx"
-  final val fHeapSKey = "fHeapSucc"
-  final val fHeapSTKey = "fHeapSuccTransitive"
+//  final val fHeapIdxKey = "heapIdx"
+//  final val fHeapSKey = "fHeapSucc"
+//  final val fHeapSTKey = "fHeapSuccTransitive"
   final val recApplyKey = "recApply"
   final val recInvKey = "recInv"
   final val opApplyKey = "opApply"
@@ -42,57 +43,57 @@ object DomainsGenerator {
   final val idxNotInRefsKey = "idxNotInRefs"
   final val setDeleteKey = "setDelete"
 
-  final val fHeapKey = "fHeap"
+//  final val fHeapKey = "fHeap"
   final val recDKey = "Receiver"
   final val mapDKey = "Mapping"
   final val opDKey = "Operator"
 
-  def fHeapDomainString(): String = {
-    val fHeapOut =
-      s"""domain $fHeapKey {
-         |    function $fHeapIdxKey(h: $fHeapKey): Int
-         |    function $fHeapSKey(h1: $fHeapKey, h2: $fHeapKey): Bool
-         |    function $fHeapSTKey(h1: $fHeapKey, h2: $fHeapKey): Bool
-         |
-         |    axiom _iso {
-         |        forall ${prefix}h1: fHeap, ${prefix}h2: fHeap ::
-         |            { $fHeapIdxKey(${prefix}h1), $fHeapIdxKey(${prefix}h2) }
-         |            $fHeapIdxKey(${prefix}h1) == $fHeapIdxKey(${prefix}h2) <==> ${prefix}h1 == ${prefix}h2
-         |    }
-         |
-         |    axiom _idxSucc {
-         |        forall ${prefix}h1: fHeap, ${prefix}h2: fHeap ::
-         |            { $fHeapIdxKey(${prefix}h1), $fHeapIdxKey(${prefix}h2) }
-         |            { $fHeapSKey(${prefix}h1, ${prefix}h2) }
-         |            $fHeapIdxKey(${prefix}h2) == $fHeapIdxKey(${prefix}h1) + 1 ==>
-         |                $fHeapSKey(${prefix}h1, ${prefix}h2)
-         |    }
-         |
-         |    axiom _succIsIrreflexive {
-         |        forall ${prefix}h:fHeap :: { $fHeapSKey(${prefix}h, ${prefix}h) }
-         |            !$fHeapSKey(${prefix}h, ${prefix}h)
-         |    }
-         |
-         |    axiom _transIsIrreflexive {
-         |        forall ${prefix}h:fHeap :: { $fHeapSTKey(${prefix}h, ${prefix}h) }
-         |            !$fHeapSTKey(${prefix}h, ${prefix}h)
-         |    }
-         |
-         |    axiom _succIsTransitive {
-         |        forall ${prefix}h1: fHeap, ${prefix}h2: fHeap ::
-         |            { $fHeapSKey(${prefix}h1, ${prefix}h2) }
-         |            $fHeapSKey(${prefix}h1, ${prefix}h2) ==> $fHeapSTKey(${prefix}h1, ${prefix}h2)
-         |    }
-         |
-         |    axiom _transitive {
-         |        forall ${prefix}h1: fHeap, ${prefix}h2: fHeap, ${prefix}h3: fHeap ::
-         |            { $fHeapSTKey(${prefix}h1, ${prefix}h2), $fHeapSTKey(${prefix}h2, ${prefix}h3) }
-         |            $fHeapSTKey(${prefix}h1, ${prefix}h2) && $fHeapSTKey(${prefix}h2, ${prefix}h3) ==>
-         |                $fHeapSTKey(${prefix}h1, ${prefix}h3)
-         |    }
-         |}\n """.stripMargin
-    fHeapOut
-  }
+//  def fHeapDomainString(): String = {
+//    val fHeapOut =
+//      s"""domain $fHeapKey {
+//         |    function $fHeapIdxKey(h: $fHeapKey): Int
+//         |    function $fHeapSKey(h1: $fHeapKey, h2: $fHeapKey): Bool
+//         |    function $fHeapSTKey(h1: $fHeapKey, h2: $fHeapKey): Bool
+//         |
+//         |    axiom _iso {
+//         |        forall ${prefix}h1: fHeap, ${prefix}h2: fHeap ::
+//         |            { $fHeapIdxKey(${prefix}h1), $fHeapIdxKey(${prefix}h2) }
+//         |            $fHeapIdxKey(${prefix}h1) == $fHeapIdxKey(${prefix}h2) <==> ${prefix}h1 == ${prefix}h2
+//         |    }
+//         |
+//         |    axiom _idxSucc {
+//         |        forall ${prefix}h1: fHeap, ${prefix}h2: fHeap ::
+//         |            { $fHeapIdxKey(${prefix}h1), $fHeapIdxKey(${prefix}h2) }
+//         |            { $fHeapSKey(${prefix}h1, ${prefix}h2) }
+//         |            $fHeapIdxKey(${prefix}h2) == $fHeapIdxKey(${prefix}h1) + 1 ==>
+//         |                $fHeapSKey(${prefix}h1, ${prefix}h2)
+//         |    }
+//         |
+//         |    axiom _succIsIrreflexive {
+//         |        forall ${prefix}h:fHeap :: { $fHeapSKey(${prefix}h, ${prefix}h) }
+//         |            !$fHeapSKey(${prefix}h, ${prefix}h)
+//         |    }
+//         |
+//         |    axiom _transIsIrreflexive {
+//         |        forall ${prefix}h:fHeap :: { $fHeapSTKey(${prefix}h, ${prefix}h) }
+//         |            !$fHeapSTKey(${prefix}h, ${prefix}h)
+//         |    }
+//         |
+//         |    axiom _succIsTransitive {
+//         |        forall ${prefix}h1: fHeap, ${prefix}h2: fHeap ::
+//         |            { $fHeapSKey(${prefix}h1, ${prefix}h2) }
+//         |            $fHeapSKey(${prefix}h1, ${prefix}h2) ==> $fHeapSTKey(${prefix}h1, ${prefix}h2)
+//         |    }
+//         |
+//         |    axiom _transitive {
+//         |        forall ${prefix}h1: fHeap, ${prefix}h2: fHeap, ${prefix}h3: fHeap ::
+//         |            { $fHeapSTKey(${prefix}h1, ${prefix}h2), $fHeapSTKey(${prefix}h2, ${prefix}h3) }
+//         |            $fHeapSTKey(${prefix}h1, ${prefix}h2) && $fHeapSTKey(${prefix}h2, ${prefix}h3) ==>
+//         |                $fHeapSTKey(${prefix}h1, ${prefix}h3)
+//         |    }
+//         |}\n """.stripMargin
+//    fHeapOut
+//  }
 
   def receiverDomainString(): String = {
     val receiverOut =
@@ -205,11 +206,11 @@ object DomainsGenerator {
       s"""domain $compDKey[$compDTV0,$compDTV1,$compDTV2] {
          |
          |    function $compConstructKey(r:$recDKey[$compDTV0], m: $mapDKey[$compDTV1,$compDTV2], op: $opDKey[$compDTV2]): $compDKey[$compDTV0,$compDTV1,$compDTV2]
-         |    function $compApplyKey(fh: $fHeapKey, c: $compDKey[$compDTV0,$compDTV1,$compDTV2], fs: Set[$compDTV0]): $compDTV2
-         |    function $compApplyPrimeKey(fh: $fHeapKey, c: $compDKey[$compDTV0,$compDTV1,$compDTV2], fs: Set[$compDTV0]): $compDTV2
+         |    function $compApplyKey(fh: $intKey, c: $compDKey[$compDTV0,$compDTV1,$compDTV2], fs: Set[$compDTV0]): $compDTV2
+         |    function $compApplyPrimeKey(fh: $intKey, c: $compDKey[$compDTV0,$compDTV1,$compDTV2], fs: Set[$compDTV0]): $compDTV2
          |
          |    axiom applyComp1Eq {
-         |        forall ${prefix}fh: $fHeapKey, ${prefix}c: $compDKey[$compDTV0,$compDTV1,$compDTV2], ${prefix}fs: Set[$compDTV0] ::
+         |        forall ${prefix}fh: $intKey, ${prefix}c: $compDKey[$compDTV0,$compDTV1,$compDTV2], ${prefix}fs: Set[$compDTV0] ::
          |            { ($compApplyKey(${prefix}fh, ${prefix}c, ${prefix}fs): $compDTV2) }
          |        $compApplyKey(${prefix}fh, ${prefix}c, ${prefix}fs) == $compApplyPrimeKey(${prefix}fh, ${prefix}c, ${prefix}fs)
          |    }
@@ -220,12 +221,12 @@ object DomainsGenerator {
          |
          |    function $compApplyDummyKey(a:$compDTV2): Bool
          |    function setEqDummy(b: Bool): Bool
-         |    function $fHeapElemKey(c: $compDKey[$compDTV0,$compDTV1,$compDTV2], h: $fHeapKey, a: $compDTV0): $compDTV2
+         |    function $fHeapElemKey(c: $compDKey[$compDTV0,$compDTV1,$compDTV2], h: $intKey, a: $compDTV0): $compDTV2
          |
          |    function $trigDelBlockKey(applyC: $compDTV2, block: Set[$compDTV0]): Bool
          |    function $trigDelKey1Key(applyC: $compDTV2, key: $compDTV0): Bool
          |
-         |    function $exhaleFoldSetKey(fh: $fHeapKey,
+         |    function $exhaleFoldSetKey(fh: $intKey,
          |                           c: $compDKey[$compDTV0,$compDTV1,$compDTV2],
          |                           fs: Set[$compDTV0],
          |                           fieldID: Int): Bool
@@ -243,7 +244,7 @@ object DomainsGenerator {
          |    }
          |
          |    axiom _emptyFold {
-         |        forall ${prefix}fh: $fHeapKey,
+         |        forall ${prefix}fh: $intKey,
          |               ${prefix}c: $compDKey[$compDTV0,$compDTV1,$compDTV2],
          |               ${prefix}fs: Set[$compDTV0] ::
          |        { ($compApplyKey(${prefix}fh, ${prefix}c, ${prefix}fs): $compDTV2) }
@@ -253,7 +254,7 @@ object DomainsGenerator {
          |    }
          |
          |    axiom _singleton {
-         |        forall ${prefix}fh: $fHeapKey,
+         |        forall ${prefix}fh: $intKey,
          |               ${prefix}c: $compDKey[$compDTV0,$compDTV1,$compDTV2],
          |               ${prefix}elem: $compDTV0 ::
          |        { ($compApplyKey(${prefix}fh, ${prefix}c, Set(${prefix}elem)): $compDTV2),
@@ -262,7 +263,7 @@ object DomainsGenerator {
          |    }
          |
          |    axiom _dropOne1 {
-         |        forall ${prefix}fh: $fHeapKey,
+         |        forall ${prefix}fh: $intKey,
          |               ${prefix}c: $compDKey[$compDTV0,$compDTV1,$compDTV2],
          |               ${prefix}fs: Set[$compDTV0],
          |               ${prefix}key: $compDTV0 ::
@@ -277,7 +278,7 @@ object DomainsGenerator {
          |    }
          |
          |    axiom _loseMany {
-         |        forall ${prefix}fh: $fHeapKey,
+         |        forall ${prefix}fh: $intKey,
          |               ${prefix}c: $compDKey[$compDTV0,$compDTV1,$compDTV2],
          |               ${prefix}fs: Set[$compDTV0],
          |               ${prefix}keys: Set[$compDTV0] ::
@@ -291,7 +292,7 @@ object DomainsGenerator {
          |    }
          |
          |    axiom _setExtEq {
-         |        forall ${prefix}fh: $fHeapKey,
+         |        forall ${prefix}fh: $intKey,
          |               ${prefix}c: $compDKey[$compDTV0,$compDTV1,$compDTV2],
          |               ${prefix}fs1: Set[$compDTV0],
          |               ${prefix}fs2: Set[$compDTV0] ::
@@ -301,7 +302,7 @@ object DomainsGenerator {
          |    }
          |
          |    axiom _disjUnion {
-         |        forall ${prefix}fh: $fHeapKey,
+         |        forall ${prefix}fh: $intKey,
          |               ${prefix}c: $compDKey[$compDTV0,$compDTV1,$compDTV2],
          |               ${prefix}fs1: Set[$compDTV0],
          |               ${prefix}fs2: Set[$compDTV0],
@@ -320,20 +321,19 @@ object DomainsGenerator {
          |    function $trigExtKey(hfA1: $compDTV2, hfA2: $compDTV2): Bool
          |
          |    axiom _trigExtensionality {
-         |        forall ${prefix}fh_old: $fHeapKey,
-         |               ${prefix}fh_new: $fHeapKey,
+         |        forall ${prefix}fh_old: $intKey,
+         |               ${prefix}fh_new: $intKey,
          |               ${prefix}c: $compDKey[$compDTV0,$compDTV1,$compDTV2],
          |               ${prefix}fs: Set[$compDTV0] ::
          |        { ($compApplyKey(${prefix}fh_old, ${prefix}c, ${prefix}fs): $compDTV2),
-         |          ($compApplyKey(${prefix}fh_new, ${prefix}c, ${prefix}fs): $compDTV2),
-         |          ($fHeapSTKey(${prefix}fh_old, ${prefix}fh_new): Bool) }
+         |          ($compApplyKey(${prefix}fh_new, ${prefix}c, ${prefix}fs): $compDTV2) }
          |        ($trigExtKey(($compApplyPrimeKey(${prefix}fh_old, ${prefix}c, ${prefix}fs): $compDTV2),
          |                  ($compApplyPrimeKey(${prefix}fh_new, ${prefix}c, ${prefix}fs): $compDTV2)))
          |    }
          |
          |    axiom _extensionality {
-         |        forall ${prefix}fh_old: $fHeapKey,
-         |               ${prefix}fh_new: $fHeapKey,
+         |        forall ${prefix}fh_old: $intKey,
+         |               ${prefix}fh_new: $intKey,
          |               ${prefix}c: $compDKey[$compDTV0,$compDTV1,$compDTV2],
          |               ${prefix}fs: Set[$compDTV0] ::
          |        { ($trigExtKey(($compApplyPrimeKey(${prefix}fh_old, ${prefix}c, ${prefix}fs): $compDTV2),
