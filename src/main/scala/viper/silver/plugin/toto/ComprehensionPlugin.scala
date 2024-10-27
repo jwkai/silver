@@ -346,46 +346,68 @@ object ComprehensionPlugin {
 
       // Add the start label to the body
       outM = outM.body match {
-        case Some(bodyBody) =>
+        case Some(mBody) =>
           outM.copy(body =
-            Some(bodyBody.copy(ss =
-              axiomGenerator.getOldLabel +: bodyBody.ss
-            )(bodyBody.pos, bodyBody.info, bodyBody.errT))
+            Some(mBody.copy(ss =
+              axiomGenerator.getOldLabel +: mBody.ss
+            )(mBody.pos, mBody.info, mBody.errT))
           )(outM.pos, outM.info, outM.errT)
         case None => return m
       }
 
       // Add axioms for exhales, inhales and heap writes
-      outM = outM.transform({
-        case e : Exhale if !helper.checkIfPure(e) =>
-          val fields = helper.extractFieldAcc(e)
-          axiomGenerator.generateExhaleAxioms(e, fields)
-        case i: Inhale if !helper.checkIfPure(i) =>
-          val fields = helper.extractFieldAcc(i)
-          axiomGenerator.generateInhaleAxioms(i, fields)
-        case fa: FieldAssign =>
-          axiomGenerator.generateHeapWriteAxioms(fa)
-        case l@Label(name, _) =>
-          axiomGenerator.mapUserLabelToCurrentAFHeap(name)
-          l
-        case lo@LabelledOld(exp, labelName) =>
-          lo.copy(exp = exp.transform({
-            case ca: ACompApply =>
-              ca.fHeap = axiomGenerator.getAFHeapFromUserLabel(labelName)
-              ca
-          }))(lo.pos, lo.info, lo.errT)
-        case lo@Old(exp) =>
-          Old(
-            exp.transform({
+      outM = outM.body match {
+        case Some(mBody) =>
+          outM.copy(body =
+            Some(mBody.transform({
+              case e : Exhale if !helper.checkIfPure(e) =>
+                val fields = helper.extractFieldAcc(e)
+                axiomGenerator.generateExhaleAxioms(e, fields)
+              case i: Inhale if !helper.checkIfPure(i) =>
+                val fields = helper.extractFieldAcc(i)
+                axiomGenerator.generateInhaleAxioms(i, fields)
+              case fa: FieldAssign =>
+                axiomGenerator.generateHeapWriteAxioms(fa)
+              case l@Label(name, _) =>
+                axiomGenerator.mapUserLabelToCurrentAFHeap(name)
+                l
+              case lo@LabelledOld(exp, labelName) =>
+                exp match {
+                  case ca: ACompApply =>
+                    val c = ca.copy()(lo.pos, lo.info, lo.errT)
+                    c.fHeap = axiomGenerator.getAFHeapFromUserLabel(labelName)
+                    c
+                  case _ =>
+                    LabelledOld(
+                      exp.transform({
+                        case ca: ACompApply =>
+                          ca.fHeap = axiomGenerator.getAFHeapFromUserLabel(labelName)
+                          ca
+                      }),
+                      labelName
+                    )(lo.pos, lo.info, lo.errT)
+                }
+              case o@Old(exp) =>
+                exp match {
+                  case ca: ACompApply =>
+                    val c = ca.copy()(o.pos, o.info, o.errT)
+                    c.fHeap = axiomGenerator.getOldfHeap
+                    c
+                  case _ =>
+                    Old(
+                      exp.transform({
+                        case ca: ACompApply =>
+                          ca.fHeap = axiomGenerator.getOldfHeap
+                          ca
+                      })
+                    )(o.pos, o.info, o.errT)
+                }
               case ca: ACompApply =>
-                ca.fHeap = axiomGenerator.getOldfHeap
+                ca.fHeap = axiomGenerator.getCurrentfHeap
                 ca
-            })
-          )(lo.pos, lo.info, lo.errT)
-        case ca: ACompApply =>
-          ca.fHeap = axiomGenerator.getCurrentfHeap
-          ca
-      })
+            })))(outM.pos, outM.info, outM.errT)
+        case None => return m
+      }
 
 //      // Add axioms for heap reads, using bottom-up traversal
 //      outM = outM.transform(
@@ -393,31 +415,33 @@ object ComprehensionPlugin {
 //        recurse = Traverse.BottomUp
 //      )
 
-//      // Add fHeap declarations and assignments to beginning of method
-//      val outD = outM.body match {
-//        case Some(bodyM) =>
-//          val fhDecls = axiomGenerator.fHeapDecls
-//          outM.copy(body =
-//            Some(bodyM.copy(
-//              ss = fhDecls.map(_._2) ++ bodyM.ss,
-//              scopedSeqnDeclarations = fhDecls.map(_._1) ++ bodyM.scopedDecls
-//            )(bodyM.pos, bodyM.info, bodyM.errT)),
-//          )(outM.pos, outM.info, outM.errT)
-//        case None => return outM
-//      }
-
       val setFHeapApply: PartialFunction[Node, Node] = {
-        case ca@ACompApply(comp, filter, fieldName) =>
-          ca.fHeap = axiomGenerator.getFHApply(comp, filter, fieldName)
+        case lo@Old(exp) =>
+          exp match {
+            case ca: ACompApply =>
+              val c = ca.copy()(lo.pos, lo.info, lo.errT)
+              c.fHeap = axiomGenerator.getOldfHeap
+              c
+            case _ =>
+              Old(
+                exp.transform({
+                  case ca: ACompApply =>
+                    ca.fHeap = axiomGenerator.getOldfHeap
+                    ca
+                })
+              )(lo.pos, lo.info, lo.errT)
+          }
+        case ca: ACompApply =>
+          ca.fHeap = axiomGenerator.getCurrentfHeap
           ca
       }
 
       // Add heap-dependent function to pre-/post-conditions and loop invariants
-      val outF = outM.copy(
+      outM = outM.copy(
         pres =
-          outM.pres.map(pre => pre.transform(setFHeapApply, recurse = Traverse.BottomUp)),
+          outM.pres.map(pre => pre.transform(setFHeapApply, recurse = Traverse.Innermost)),
         posts =
-          outM.posts.map(post => post.transform(setFHeapApply, recurse = Traverse.BottomUp)),
+          outM.posts.map(post => post.transform(setFHeapApply, recurse = Traverse.Innermost)),
         body =
           outM.body match {
             case Some(bodyD) =>
@@ -431,7 +455,7 @@ object ComprehensionPlugin {
           }
       )(outM.pos, outM.info, outM.errT)
 
-      val out = outF.transform({
+      val out = outM.transform({
         case c: ACompApply => c.toViper(p)
       })
 

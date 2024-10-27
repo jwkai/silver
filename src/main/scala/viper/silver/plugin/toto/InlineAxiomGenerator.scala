@@ -181,12 +181,10 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val relevantCompDecls = compDeclsUsed.toSeq.filter(compDecl =>
       relevantField.contains(compDecl.findFieldInProgram(program)))
     val exhaleAxioms = relevantCompDecls.map(compDecl => generateExhaleAxiomsPerComp(compDecl, declaredFieldVars))
-    val allFHAxioms = relevantCompDecls.map(generateFHAssumptions)
     val allLostVars = exhaleAxioms.flatMap(e => e.scopedSeqnDeclarations)
     val allExhaleAxioms = exhaleAxioms.flatMap(e => e.ss)
-    val newss = allFHAxioms.map(_._1) :+ e :+ getCurrentLabel :++ allFHAxioms.map(_._2) :++ allExhaleAxioms
 
-    Seqn(newss, allLostVars)(e.pos, e.info, e.errT)
+    Seqn(e +: getCurrentLabel +: allExhaleAxioms, allLostVars)(e.pos, e.info, e.errT)
   }
 
   def generateInhaleAxioms(i: Inhale, relevantField: Set[Field]): Seqn = {
@@ -195,12 +193,10 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val relevantCompDecls = compDeclsUsed.toSeq.filter(compDecl =>
       relevantField.contains(compDecl.findFieldInProgram(program)))
     val inhaleAxioms = relevantCompDecls.map(compDecl => generateInhaleAxiomsPerComp(compDecl, declaredFieldVars))
-    val allFHAxioms = relevantCompDecls.map(generateFHAssumptions)
     val allLostVars = inhaleAxioms.flatMap(i => i.scopedSeqnDeclarations)
     val allInhaleAxioms = inhaleAxioms.flatMap(i => i.ss)
-    val newss = allFHAxioms.map(_._1) :+ i :+ getCurrentLabel :++ allFHAxioms.map(_._2) :++ allInhaleAxioms
 
-    Seqn(newss, allLostVars)(i.pos, i.info, i.errT)
+    Seqn(i +: getCurrentLabel +: allInhaleAxioms, allLostVars)(i.pos, i.info, i.errT)
   }
 
   def generateHeapWriteAxioms(writeStmt: Stmt): Seqn = {
@@ -215,10 +211,8 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val out = compsAndFields.flatMap(compAndField =>
       generateHeapWriteAxiomPerComp(compAndField._1, compAndField._2.lhs.rcv, compAndField._2.rhs)
     )
-    val allFHAxioms = compsAndFields.map(_._1).map(generateFHAssumptions)
-    val newss = out :++ allFHAxioms.map(_._1) :+ writeStmt :+ getCurrentLabel :++ allFHAxioms.map(_._2)
 
-    Seqn(newss, Seq())(writeStmt.pos, writeStmt.info, writeStmt.errT)
+    Seqn(out :+ writeStmt :+ getCurrentLabel, Seq())(writeStmt.pos, writeStmt.info, writeStmt.errT)
   }
 
   //  def generateHeapReadAxioms(readStmt: Stmt): Stmt = {
@@ -270,51 +264,6 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
   //    )
   //    Seqn(out :+ readStmt, Seq())(readStmt.pos, readStmt.info, readStmt.errT)
   //  }
-
-  private def generateFHAssumptions(compADecl: ACompDecl): (Stmt, Stmt) = {
-    // Extract the comp Domain type
-    val compDType = compADecl.compDType(program)
-    val compIdxType = compADecl.compType._1
-    val compFieldName = compADecl.fieldName
-
-    // fHeap declarations
-    val fhOld = getLastfHeap
-    val fhNew = getCurrentfHeap
-
-    // Comp var declaration
-    val forallVarC = LocalVarDecl("__c", compDType)()
-    val compVar = forallVarC.localVar
-
-    // Filter Var declaration
-    val forallVarFS = LocalVarDecl("__fs", SetType(compIdxType))()
-
-    val fhApply = helper.applyFunc(AxiomHelper.tupleFieldToString(compADecl.compType, compADecl.fieldName),
-      Seq(compVar, forallVarFS.localVar))
-
-    val trigger = Trigger(Seq(fhApply))()
-
-    // ---------------Making the LHS---------------
-    // FilterReceiverGood
-    val frGood = helper.filterReceiverGood(forallVarFS.localVar, compVar)
-    val frGoodOrInj = helper.filterRecvGoodOrInjCheck(forallVarFS.localVar, compVar)
-    // Have access to the big filter in new
-    val forallCurrHasPerm = helper.forallFilterHaveSomeAccess(forallVarFS.localVar,
-      compVar, compFieldName, None)
-
-    def genFHAssume(fh: IntLit): Assume = {
-      Assume(
-        Forall(
-          Seq(forallVarC, forallVarFS),
-          Seq(trigger),
-          helper.foldedConjImplies(
-            Seq(frGoodOrInj, forallCurrHasPerm),
-            Seq(frGood, EqCmp(fhApply, fh)()))
-        )()
-      )()
-    }
-
-    (genFHAssume(fhOld), genFHAssume(fhNew))
-  }
 
   private def generateHeapWriteAxiomPerComp(compADecl: ACompDecl, writeTo: Exp, writeExp: Exp): Seq[Stmt] = {
     val field = program.findField(compADecl.fieldName)
