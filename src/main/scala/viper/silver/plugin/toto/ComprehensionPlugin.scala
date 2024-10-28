@@ -374,9 +374,9 @@ object ComprehensionPlugin {
               case lo@LabelledOld(exp, labelName) =>
                 exp match {
                   case ca: ACompApply =>
-                    val c = ca.copy()(lo.pos, lo.info, lo.errT)
-                    c.fHeap = axiomGenerator.getAFHeapFromUserLabel(labelName)
-                    c
+                    val cap = ca.copy()(lo.pos, lo.info, lo.errT)
+                    cap.fHeap = axiomGenerator.getAFHeapFromUserLabel(labelName)
+                    cap
                   case _ =>
                     LabelledOld(
                       exp.transform({
@@ -390,9 +390,9 @@ object ComprehensionPlugin {
               case o@Old(exp) =>
                 exp match {
                   case ca: ACompApply =>
-                    val c = ca.copy()(o.pos, o.info, o.errT)
-                    c.fHeap = axiomGenerator.getOldfHeap
-                    c
+                    val cap = ca.copy()(o.pos, o.info, o.errT)
+                    cap.fHeap = axiomGenerator.getOldfHeap
+                    cap
                   case _ =>
                     Old(
                       exp.transform({
@@ -405,7 +405,9 @@ object ComprehensionPlugin {
               case ca: ACompApply =>
                 ca.fHeap = axiomGenerator.getCurrentfHeap
                 ca
-            })))(outM.pos, outM.info, outM.errT)
+            },
+            recurse = Traverse.Innermost))
+          )(outM.pos, outM.info, outM.errT)
         case None => return m
       }
 

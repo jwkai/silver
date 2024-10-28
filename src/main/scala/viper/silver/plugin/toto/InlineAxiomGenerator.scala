@@ -46,6 +46,11 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     Label(s"${helper.labelPrefix}l$currentLabelNum", Seq())()
   }
 
+  def getCurrentfHeap: IntLit = {
+    IntLit(currentLabelNum)()
+    //    AFHeap(s"${helper.fHeapPrefix}$currentLabelNum", currentLabelNum)
+  }
+
   def mapUserLabelToCurrentAFHeap(name: String): Option[Int] = {
     userLabelToLabelNum.put(name, currentLabelNum)
   }
@@ -66,11 +71,6 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
   def getOldfHeap: IntLit = {
     IntLit(0)()
 //    AFHeap(s"${helper.fHeapPrefix}0", 0)
-  }
-
-  def getCurrentfHeap: IntLit = {
-    IntLit(currentLabelNum)()
-//    AFHeap(s"${helper.fHeapPrefix}$currentLabelNum", currentLabelNum)
   }
 
   private def getLabNumForLost: String = {
