@@ -483,6 +483,13 @@ object ComprehensionPlugin {
           outM.body match {
             case Some(bodyD) =>
               Some(bodyD.transform({
+                // TODO: deal with tricky invariant situations -
+                //  symbolic state (fHeap) is not well-defined at entry.
+                //  It's possible to manually convert these invariants:
+                //  - Add assert (in old fHeap) prior to the while statement,
+                //    and (in current fHeap) the end of the while body.
+                //  - Add assumes (in current fHeap) at start of while body
+                //    and immediately after the while statement.
                 case w@While(cond, invs, body) =>
                   While(cond,
                     invs.map(inv => inv.transform(setFHeapApply)),
