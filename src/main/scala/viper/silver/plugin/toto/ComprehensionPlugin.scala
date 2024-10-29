@@ -168,7 +168,6 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
       input
     } else {
       val domainsToAdd = Seq(
-//        fHeapDomainString(),
         compDomainString(),
         receiverDomainString(),
         opDomainString(),
@@ -221,17 +220,6 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
     * @return Modified AST
     */
   override def beforeVerify(input: Program) : Program = {
-//    val dfevalComp = input.findDomainFunction("evalComp")
-//    val dfcomp = input.findDomainFunction("comp")
-//    var newInput =
-//      input.copy(functions = input.functions.concat(ASnapshotDecl.getAllSnapDecls(input)))(
-//        input.pos, input.info, input.errT
-//      )
-//    val inputWithDecls =
-//      input.copy(functions = input.functions.concat(ACompDecl.getAllCompDecls(input)))(
-//        input.pos, input.info, input.errT
-//      )
-
     var newInput = addInlinedAxioms(input)
     newInput = newInput.transform({
       case e@Assume(a) => Inhale(a)(e.pos, e.info, e.errT)
@@ -400,51 +388,69 @@ object ComprehensionPlugin {
         case None => return m
       }
 
+      // Now, transform ACompApply nodes in context of fHeap annotations
       outM = outM.body match {
         case Some(mBody) =>
           outM.copy(body =
-            Some(mBody.transform({
-              case n@NodeWithFHeapInfo(fHeapInfo(fh)) =>
-                n.transform({
-                 case lo@LabelledOld(exp, labelName) =>
-                   exp match {
-                     case ca: ACompApply =>
-                       val cap = ca.copy()(lo.pos, lo.info, lo.errT)
-                       cap.fHeap = Some(axiomGenerator.getAFHeapFromUserLabel(labelName))
-                       cap.toViper(p)
-                     case _ =>
-                       LabelledOld(
-                         exp.transform({
-                           case ca: ACompApply =>
-                             ca.fHeap = Some(axiomGenerator.getAFHeapFromUserLabel(labelName))
-                             ca.toViper(p)
-                         }),
-                         labelName
-                       )(lo.pos, lo.info, lo.errT)
-                   }
-                 case o@Old(exp) =>
-                   exp match {
-                     case ca: ACompApply =>
-                       val cap = ca.copy()(o.pos, o.info, o.errT)
-                       cap.fHeap = Some(axiomGenerator.getOldfHeap)
-                       cap.toViper(p)
-                     case _ =>
-                       Old(
-                         exp.transform({
-                           case ca: ACompApply =>
-                             ca.fHeap = Some(axiomGenerator.getOldfHeap)
-                             ca.toViper(p)
-                         })
-                       )(o.pos, o.info, o.errT)
-                   }
-                 case ca: ACompApply =>
-                   ca.fHeap = Some(fh)
-                   ca.toViper(p)
-               })
-            }))
+            Some(mBody.transformWithContext[AFHeap]({
+              case (n@NodeWithFHeapInfo(fHeapInfo(fh)), _) =>
+                (n, fh)
+              case (lo@LabelledOld(exp, labelName), fh) =>
+                exp match {
+                  case ca: ACompApply =>
+                    val cap = ca.copy()(lo.pos, lo.info, lo.errT)
+                    cap.fHeap = Some(axiomGenerator.getAFHeapFromUserLabel(labelName))
+                    (cap.toViper(p), fh)
+                  case _ =>
+                    val newLO = LabelledOld(
+                      exp.transform({
+                        case ca: ACompApply =>
+                          ca.fHeap = Some(axiomGenerator.getAFHeapFromUserLabel(labelName))
+                          ca.toViper(p)
+                      }),
+                      labelName
+                    )(lo.pos, lo.info, lo.errT)
+                    (newLO, fh)
+                }
+              case (o@Old(exp), fh) =>
+                exp match {
+                  case ca: ACompApply =>
+                    val cap = ca.copy()(o.pos, o.info, o.errT)
+                    cap.fHeap = Some(axiomGenerator.getOldfHeap)
+                    (cap.toViper(p), fh)
+                  case _ =>
+                    val newO = Old(
+                      exp.transform({
+                        case ca: ACompApply =>
+                          ca.fHeap = Some(axiomGenerator.getOldfHeap)
+                          ca.toViper(p)
+                      })
+                    )(o.pos, o.info, o.errT)
+                    (newO, fh)
+                }
+              case (ca: ACompApply, fh) =>
+                ca.fHeap = Some(fh)
+                (ca.toViper(p), fh)
+            }, initialContext = axiomGenerator.getOldfHeap))
           )(outM.pos, outM.info, outM.errT)
         case None => return m
       }
+
+      // TODO: figure out why this doesn't work...
+//      def stripfHeapInfo(n: Node) = {
+//        val nMeta = n.meta.copy(_2 = n.meta._2.removeUniqueInfo[fHeapInfo])
+//        n.withMeta(nMeta)
+//      }
+//      outM = outM.body match {
+//        case Some(mBody) =>
+//          outM.copy(body =
+//            Some(mBody.transform({
+//              case n@NodeWithFHeapInfo(fHeapInfo(_)) =>
+//                stripfHeapInfo(n)
+//            }))
+//          )(outM.pos, outM.info, outM.errT)
+//        case None => return m
+//      }
 
       val setFHeapApply: PartialFunction[Node, Node] = {
         case lo@Old(exp) =>
