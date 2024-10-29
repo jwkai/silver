@@ -356,34 +356,47 @@ object ComprehensionPlugin {
       }
 
       // Add axioms for exhales, inhales and heap writes, tracking fHeap insertions
-      // TODO: use slim transform here, and apply info to all statement types
+      def addAxiomsToBody(): PartialFunction[Node, Node] = {
+        case e: Exhale =>
+          if (!helper.checkIfPure(e)) {
+            val fields = helper.extractFieldAcc(e)
+            axiomGenerator.generateExhaleAxioms(e, fields)
+          } else {
+            e.withMeta(e.pos, MakeInfoPair(e.info, fHeapInfo(axiomGenerator.getCurrentfHeap)), e.errT)
+          }
+        case i: Inhale =>
+          if (!helper.checkIfPure(i)) {
+            val fields = helper.extractFieldAcc(i)
+            axiomGenerator.generateInhaleAxioms(i, fields)
+          } else {
+            i.withMeta(i.pos, MakeInfoPair(i.info, fHeapInfo(axiomGenerator.getCurrentfHeap)), i.errT)
+          }
+        case fa: FieldAssign =>
+          axiomGenerator.generateHeapWriteAxioms(fa)
+        case l@Label(name, _) =>
+          axiomGenerator.mapUserLabelToCurrentAFHeap(name)
+          l
+        case a: Assert =>
+          a.withMeta(a.pos, MakeInfoPair(a.info, fHeapInfo(axiomGenerator.getCurrentfHeap)), a.errT)
+        case a: Assume =>
+          a.withMeta(a.pos, MakeInfoPair(a.info, fHeapInfo(axiomGenerator.getCurrentfHeap)), a.errT)
+        case i: If =>
+          val fHeapOrig = axiomGenerator.getCurrentfHeap
+          i.copy(
+            thn = i.thn.transform(addAxiomsToBody()),
+            els = i.els.transform(addAxiomsToBody())
+          )(i.pos, MakeInfoPair(i.info, fHeapInfo(fHeapOrig)), i.errT)
+        case w: While =>
+          val fHeapOrig = axiomGenerator.getCurrentfHeap
+          w.copy(
+            body = w.body.transform(addAxiomsToBody())
+          )(w.pos, MakeInfoPair(w.info, fHeapInfo(fHeapOrig)), w.errT)
+      }
       outM = outM.body match {
         case Some(mBody) =>
-          val bodyWithAxioms = mBody.transformNodeAndContext[AFHeap]({
-              case (e: Exhale, fh) =>
-                if (!helper.checkIfPure(e)) {
-                  val fields = helper.extractFieldAcc(e)
-                  (axiomGenerator.generateExhaleAxioms(e, fields), axiomGenerator.getCurrentfHeap)
-                } else {
-                  (e.withMeta(e.pos, MakeInfoPair(e.info, fHeapInfo(axiomGenerator.getCurrentfHeap)), e.errT),
-                    axiomGenerator.getCurrentfHeap)
-                }
-              case (i: Inhale, fh) =>
-                if (!helper.checkIfPure(i)) {
-                  val fields = helper.extractFieldAcc(i)
-                  (axiomGenerator.generateInhaleAxioms(i, fields), axiomGenerator.getCurrentfHeap)
-                } else {
-                  (i.withMeta(i.pos, MakeInfoPair(i.info, fHeapInfo(axiomGenerator.getCurrentfHeap)), i.errT),
-                    axiomGenerator.getCurrentfHeap)
-                }
-              case (fa: FieldAssign, _) =>
-                (axiomGenerator.generateHeapWriteAxioms(fa), axiomGenerator.getCurrentfHeap)
-              case (l@Label(name, _), fh) =>
-                axiomGenerator.mapUserLabelToCurrentAFHeap(name)
-                (l, fh)
-            },
-            initialContext = axiomGenerator.getOldfHeap)
-          outM.copy(body = Some(bodyWithAxioms))(outM.pos, outM.info, outM.errT)
+          outM.copy(body =
+            Some(mBody.transform(addAxiomsToBody()))
+          )(outM.pos, outM.info, outM.errT)
         case None => return m
       }
 
@@ -427,8 +440,7 @@ object ComprehensionPlugin {
                  case ca: ACompApply =>
                    ca.fHeap = Some(fh)
                    ca.toViper(p)
-               },
-               recurse = Traverse.Innermost)
+               })
             }))
           )(outM.pos, outM.info, outM.errT)
         case None => return m
