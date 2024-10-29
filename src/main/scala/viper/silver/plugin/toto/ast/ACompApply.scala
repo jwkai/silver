@@ -15,17 +15,23 @@ case class ACompApply(comp: AComprehension3Tuple, filter: Exp, fieldName: String
     ACompDecl(receiverType, fieldName)
   }
 
-  var fHeap: Exp = null
+  var fHeap: Option[AFHeap] = None
 
   def toViper(input: Program): Exp = {
     val compEvalFunc = input.findDomainFunction(DomainsGenerator.compApplyKey)
     val compConstructed = comp.toViper(input)
 
-    DomainFuncApp(
-      compEvalFunc,
-      Seq(fHeap, compConstructed, filter),
-      compConstructed.typVarMap
-    )(this.pos, this.info, this.errT + NodeTrafo(this))
+    fHeap match {
+      case Some(fh) =>
+        DomainFuncApp(
+          compEvalFunc,
+          Seq(fh.toExp, compConstructed, filter),
+          compConstructed.typVarMap
+        )(this.pos, this.info, this.errT + NodeTrafo(this))
+      case None =>
+        throw new Exception("Comp to Viper undefined with fHeap = None")
+    }
+
   }
 
   def includeMapping(inside: Cont, mapping: Exp): Cont = {

@@ -10,7 +10,7 @@ import viper.silver.parser.FastParser
 import viper.silver.parser._
 import viper.silver.plugin.toto.ComprehensionPlugin.{addInlinedAxioms, defaultMappingIden}
 import viper.silver.plugin.toto.DomainsGenerator._
-import viper.silver.plugin.toto.ast.{ACompApply, ACompDecl}
+import viper.silver.plugin.toto.ast.{ACompApply, AFHeap, fHeapInfo}
 import viper.silver.plugin.toto.parser.PComprehension.PComprehensionKeywordType
 import viper.silver.plugin.toto.parser._
 import viper.silver.plugin.toto.util.AxiomHelper
@@ -355,87 +355,104 @@ object ComprehensionPlugin {
         case None => return m
       }
 
-      // Add axioms for exhales, inhales and heap writes
+      // Add axioms for exhales, inhales and heap writes, tracking fHeap insertions
+      // TODO: use slim transform here, and apply info to all statement types
+      outM = outM.body match {
+        case Some(mBody) =>
+          val bodyWithAxioms = mBody.transformNodeAndContext[AFHeap]({
+              case (e: Exhale, fh) =>
+                if (!helper.checkIfPure(e)) {
+                  val fields = helper.extractFieldAcc(e)
+                  (axiomGenerator.generateExhaleAxioms(e, fields), axiomGenerator.getCurrentfHeap)
+                } else {
+                  (e.withMeta(e.pos, MakeInfoPair(e.info, fHeapInfo(axiomGenerator.getCurrentfHeap)), e.errT),
+                    axiomGenerator.getCurrentfHeap)
+                }
+              case (i: Inhale, fh) =>
+                if (!helper.checkIfPure(i)) {
+                  val fields = helper.extractFieldAcc(i)
+                  (axiomGenerator.generateInhaleAxioms(i, fields), axiomGenerator.getCurrentfHeap)
+                } else {
+                  (i.withMeta(i.pos, MakeInfoPair(i.info, fHeapInfo(axiomGenerator.getCurrentfHeap)), i.errT),
+                    axiomGenerator.getCurrentfHeap)
+                }
+              case (fa: FieldAssign, _) =>
+                (axiomGenerator.generateHeapWriteAxioms(fa), axiomGenerator.getCurrentfHeap)
+              case (l@Label(name, _), fh) =>
+                axiomGenerator.mapUserLabelToCurrentAFHeap(name)
+                (l, fh)
+            },
+            initialContext = axiomGenerator.getOldfHeap)
+          outM.copy(body = Some(bodyWithAxioms))(outM.pos, outM.info, outM.errT)
+        case None => return m
+      }
+
       outM = outM.body match {
         case Some(mBody) =>
           outM.copy(body =
             Some(mBody.transform({
-              case e : Exhale if !helper.checkIfPure(e) =>
-                val fields = helper.extractFieldAcc(e)
-                axiomGenerator.generateExhaleAxioms(e, fields)
-              case i: Inhale if !helper.checkIfPure(i) =>
-                val fields = helper.extractFieldAcc(i)
-                axiomGenerator.generateInhaleAxioms(i, fields)
-              case fa: FieldAssign =>
-                axiomGenerator.generateHeapWriteAxioms(fa)
-              case l@Label(name, _) =>
-                axiomGenerator.mapUserLabelToCurrentAFHeap(name)
-                l
-              case lo@LabelledOld(exp, labelName) =>
-                exp match {
-                  case ca: ACompApply =>
-                    val cap = ca.copy()(lo.pos, lo.info, lo.errT)
-                    cap.fHeap = axiomGenerator.getAFHeapFromUserLabel(labelName)
-                    cap
-                  case _ =>
-                    LabelledOld(
-                      exp.transform({
-                        case ca: ACompApply =>
-                          ca.fHeap = axiomGenerator.getAFHeapFromUserLabel(labelName)
-                          ca
-                      }),
-                      labelName
-                    )(lo.pos, lo.info, lo.errT)
-                }
-              case o@Old(exp) =>
-                exp match {
-                  case ca: ACompApply =>
-                    val cap = ca.copy()(o.pos, o.info, o.errT)
-                    cap.fHeap = axiomGenerator.getOldfHeap
-                    cap
-                  case _ =>
-                    Old(
-                      exp.transform({
-                        case ca: ACompApply =>
-                          ca.fHeap = axiomGenerator.getOldfHeap
-                          ca
-                      })
-                    )(o.pos, o.info, o.errT)
-                }
-              case ca: ACompApply =>
-                ca.fHeap = axiomGenerator.getCurrentfHeap
-                ca
-            },
-            recurse = Traverse.Innermost))
+              case n@NodeWithFHeapInfo(fHeapInfo(fh)) =>
+                n.transform({
+                 case lo@LabelledOld(exp, labelName) =>
+                   exp match {
+                     case ca: ACompApply =>
+                       val cap = ca.copy()(lo.pos, lo.info, lo.errT)
+                       cap.fHeap = Some(axiomGenerator.getAFHeapFromUserLabel(labelName))
+                       cap.toViper(p)
+                     case _ =>
+                       LabelledOld(
+                         exp.transform({
+                           case ca: ACompApply =>
+                             ca.fHeap = Some(axiomGenerator.getAFHeapFromUserLabel(labelName))
+                             ca.toViper(p)
+                         }),
+                         labelName
+                       )(lo.pos, lo.info, lo.errT)
+                   }
+                 case o@Old(exp) =>
+                   exp match {
+                     case ca: ACompApply =>
+                       val cap = ca.copy()(o.pos, o.info, o.errT)
+                       cap.fHeap = Some(axiomGenerator.getOldfHeap)
+                       cap.toViper(p)
+                     case _ =>
+                       Old(
+                         exp.transform({
+                           case ca: ACompApply =>
+                             ca.fHeap = Some(axiomGenerator.getOldfHeap)
+                             ca.toViper(p)
+                         })
+                       )(o.pos, o.info, o.errT)
+                   }
+                 case ca: ACompApply =>
+                   ca.fHeap = Some(fh)
+                   ca.toViper(p)
+               },
+               recurse = Traverse.Innermost)
+            }))
           )(outM.pos, outM.info, outM.errT)
         case None => return m
       }
-
-//      // Add axioms for heap reads, using bottom-up traversal
-//      outM = outM.transform(
-//        { case s: Stmt  => axiomGenerator.generateHeapReadAxioms(s) },
-//        recurse = Traverse.BottomUp
-//      )
 
       val setFHeapApply: PartialFunction[Node, Node] = {
         case lo@Old(exp) =>
           exp match {
             case ca: ACompApply =>
               val c = ca.copy()(lo.pos, lo.info, lo.errT)
-              c.fHeap = axiomGenerator.getOldfHeap
-              c
+              c.fHeap = Some(axiomGenerator.getOldfHeap)
+              c.toViper(p)
             case _ =>
               Old(
                 exp.transform({
                   case ca: ACompApply =>
-                    ca.fHeap = axiomGenerator.getOldfHeap
-                    ca
+                    ca.fHeap = Some(axiomGenerator.getOldfHeap)
+                    ca.toViper(p)
                 })
               )(lo.pos, lo.info, lo.errT)
           }
         case ca: ACompApply =>
-          ca.fHeap = axiomGenerator.getCurrentfHeap
-          ca
+          ca.fHeap = Some(axiomGenerator.getCurrentfHeap)
+          ca.toViper(p)
       }
 
       // Add heap-dependent function to pre-/post-conditions and loop invariants
@@ -457,11 +474,7 @@ object ComprehensionPlugin {
           }
       )(outM.pos, outM.info, outM.errT)
 
-      val out = outM.transform({
-        case c: ACompApply => c.toViper(p)
-      })
-
-      out
+      outM
     }
 
     // Modify all methods
@@ -469,5 +482,12 @@ object ComprehensionPlugin {
 
     // Modify the program
     p.copy(methods = outMethods)(p.pos, p.info, p.errT)
+  }
+}
+
+object NodeWithFHeapInfo {
+  def unapply(node : Node) : Option[fHeapInfo] = node match {
+    case i: Infoed => i.info.getUniqueInfo[fHeapInfo]
+    case _ => None
   }
 }
