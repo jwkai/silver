@@ -310,7 +310,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
         Seq(trigger1),
         helper.foldedConjImplies(
           Seq(frGoodOrInj, fAccess),
-          Seq(frGood, triggerDeleteKeyNew, triggerDeleteKeyOld, framingEq),
+          Seq(frGood, triggerDeleteKeyOld, triggerDeleteKeyNew, framingEq),
         )
       )()
     )()
