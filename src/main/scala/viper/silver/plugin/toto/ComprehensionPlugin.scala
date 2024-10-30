@@ -208,7 +208,7 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
     newInput = newInput.transform({
       case e@Assume(a) => Inhale(a)(e.pos, e.info, e.errT)
     })
-    print(pretty(newInput) + "\n\n")
+//    print(pretty(newInput) + "\n\n")
     newInput
   }
 
