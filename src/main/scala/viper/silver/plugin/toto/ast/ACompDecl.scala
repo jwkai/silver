@@ -38,6 +38,18 @@ case class ACompDecl private(compType: (Type, Type, Type), fieldName: String)(va
     DomainType.apply(compDomain, typeVarMap)
   }
 
+  def compDRecvType(input: Program): DomainType = {
+    val recvDomain = input.findDomain(DomainsGenerator.recDKey)
+    val typeVars = recvDomain.typVars
+    if (typeVars.length != 1) {
+      throw new Exception("Receiver domain must have 1 type variable")
+    }
+    val typeVarMap = Map(
+      typeVars.head -> compType._1,
+    )
+    DomainType.apply(recvDomain, typeVarMap)
+  }
+
   def findFieldInProgram(p: Program): Field = {
     p.findField(fieldName)
   }
