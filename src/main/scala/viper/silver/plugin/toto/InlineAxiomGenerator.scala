@@ -243,7 +243,6 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val field = program.findField(compADecl.fieldName)
     // Extract the comp Domain type
     val compDType = compADecl.compDType(program)
-    val recvDType = compADecl.compDRecvType(program)
     val compIdxType = compADecl.compType._1
 
     // fHeap declarations
@@ -264,7 +263,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val receiverApp = helper.applyDomainFunc(
       DomainsGenerator.compGetRecvKey,
       Seq(compVar),
-      recvDType.typVarsMap
+      compDType.typVarsMap
     )
 
     val trigger1 = Trigger(Seq(helper.compApply(fhOld.toExp, compVar, forallVarFS.localVar)))()
@@ -469,7 +468,6 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
 
     // Extract the comp Domain type
     val compDType = compADecl.compDType(program)
-    val recvDType = compADecl.compDRecvType(program)
     val compIdxType = compADecl.compType._1
 
     // fHeap declarations
@@ -546,7 +544,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val receiverApp = helper.applyDomainFunc(
       DomainsGenerator.compGetRecvKey,
       Seq(compVar),
-      recvDType.typVarsMap
+      compDType.typVarsMap
     )
 
     // Index var declaration
@@ -677,7 +675,6 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
 
     // Extract the comp Domain type
     val compDType = compADecl.compDType(program)
-    val recvDType = compADecl.compDRecvType(program)
     val compIdxType = compADecl.compType._1
 
     // fHeap declarations
@@ -767,7 +764,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val receiverApp = helper.applyDomainFunc(
       DomainsGenerator.compGetRecvKey,
       Seq(compVar),
-      recvDType.typVarsMap
+      compDType.typVarsMap
     )
 
     val subsetNotInRefsGained = helper.applyDomainFunc(
