@@ -8,9 +8,9 @@ import viper.silver.verifier.reasons
 
 class AxiomHelper(program: Program) {
 
-//  def getStartLabel: Label = {
-//    Label(s"${labelPrefix}l0", Seq())()
-//  }
+  //  def getStartLabel: Label = {
+  //    Label(s"${labelPrefix}l0", Seq())()
+  //  }
 
   def labelPrefix: String = {
     "_compLabel"
@@ -93,6 +93,7 @@ class AxiomHelper(program: Program) {
 
   def injectiveFullCheck(filter: Exp, compExp: Exp): QuantifiedExp = {
     val compType = compExp.typ.asInstanceOf[DomainType]
+    val recvType = DomainType.apply(program.findDomain(DomainsGenerator.recDKey), compType.typVarsMap)
     val getreceiver = program.findDomainFunction(DomainsGenerator.compGetRecvKey)
 
     // getreceiver($c)
@@ -114,10 +115,10 @@ class AxiomHelper(program: Program) {
     val idxsNeq = NeCmp(forallVarInd1.localVar, forallVarInd2.localVar)()
     val recApplyInd1 = applyDomainFunc(DomainsGenerator.recApplyKey,
       Seq(getreceiverApplied, forallVarInd1.localVar),
-      compType.typVarsMap)
+      recvType.typVarsMap)
     val recApplyInd2 = applyDomainFunc(DomainsGenerator.recApplyKey,
       Seq(getreceiverApplied, forallVarInd2.localVar),
-      compType.typVarsMap)
+      recvType.typVarsMap)
     val recApplyNeq = NeCmp(recApplyInd1, recApplyInd2)()
     val injectiveFullCheck = Forall(
       Seq(forallVarInd1, forallVarInd2),
@@ -132,6 +133,7 @@ class AxiomHelper(program: Program) {
 
   def filterReceiverGood(filter: Exp, compExp: Exp): DomainFuncApp = {
     val compType = compExp.typ.asInstanceOf[DomainType]
+    val recvType = DomainType.apply(program.findDomain(DomainsGenerator.recDKey), compType.typVarsMap)
     val filterReceiverGoodFunc = program.findDomainFunction(DomainsGenerator.filterRecvGoodKey)
     val getreceiver = program.findDomainFunction(DomainsGenerator.compGetRecvKey)
 
@@ -144,7 +146,7 @@ class AxiomHelper(program: Program) {
     DomainFuncApp(
       filterReceiverGoodFunc,
       Seq(filter, getreceiverApplied),
-      compType.typVarsMap
+      recvType.typVarsMap
     )()
   }
 
@@ -158,6 +160,7 @@ class AxiomHelper(program: Program) {
 
   def subsetNotInRefs(fs: Exp, compExp: Exp, refs: LocalVar): DomainFuncApp = {
     val compType = compExp.typ.asInstanceOf[DomainType]
+    val recvType = DomainType.apply(program.findDomain(DomainsGenerator.recDKey), compType.typVarsMap)
     val filterNotLostFunc = program.findDomainFunction(DomainsGenerator.subsetNotInRefsKey)
     val getreceiver = program.findDomainFunction(DomainsGenerator.compGetRecvKey)
 
@@ -167,7 +170,7 @@ class AxiomHelper(program: Program) {
 
     DomainFuncApp(filterNotLostFunc,
       Seq(fs, getreceiverApplied, refs),
-      compType.typVarsMap
+      recvType.typVarsMap
     )()
   }
 
@@ -183,6 +186,7 @@ class AxiomHelper(program: Program) {
 
   def mapApplyTo(compExp: Exp, arg: Exp): DomainFuncApp = {
     val compType = compExp.typ.asInstanceOf[DomainType]
+    val mapType = DomainType.apply(program.findDomain(DomainsGenerator.mapDKey), compType.typVarsMap)
     val getmapping = program.findDomainFunction(DomainsGenerator.compGetMappingKey)
     val mapApply = program.findDomainFunction(DomainsGenerator.mapApplyKey)
     // getmapping($c)
@@ -194,12 +198,13 @@ class AxiomHelper(program: Program) {
     DomainFuncApp(
       mapApply,
       Seq(getmappingApplied, arg),
-      compType.typVarsMap
+      mapType.typVarsMap
     )()
   }
 
   def permNonZeroCmp(forallVarInd: Exp, compExp: Exp, fieldName: String): GtCmp = {
     val compType = compExp.typ.asInstanceOf[DomainType]
+    val recvType = DomainType.apply(program.findDomain(DomainsGenerator.recDKey), compType.typVarsMap)
     val getreceiver = program.findDomainFunction(DomainsGenerator.compGetRecvKey)
     val recApply = program.findDomainFunction(DomainsGenerator.recApplyKey)
     val field = program.findField(fieldName)
@@ -213,7 +218,7 @@ class AxiomHelper(program: Program) {
     val recApplied = DomainFuncApp(
       recApply,
       Seq(getreceiverApplied, forallVarInd),
-      compType.typVarsMap
+      recvType.typVarsMap
     )()
     val permFieldAccessed = CurrentPerm(FieldAccess(recApplied, field)())()
     GtCmp(permFieldAccessed, NoPerm()())()
@@ -242,7 +247,7 @@ class AxiomHelper(program: Program) {
   // generate a forall in the format:
   // (forall $ind: Int :: {$ind in $f}  $ind in $f ==> perm(recApply(getreceiver($c), $ind).val) == write)
   def forallFilterHaveAccImpure(filter: Exp, compExp: Exp,
-                                  fieldName: String, acc: PermExp): Forall = {
+                                fieldName: String, acc: PermExp): Forall = {
     val fElemType = filter.typ match {
       case setType: SetType => setType.elementType
       case _ => throw new Exception("Filter must be a set")
@@ -251,6 +256,7 @@ class AxiomHelper(program: Program) {
     val setContains = AnySetContains(forallVarInd.localVar, filter)()
     val forallTrigger = Trigger(Seq(setContains))()
     val compType = compExp.typ.asInstanceOf[DomainType]
+    val recvType = DomainType.apply(program.findDomain(DomainsGenerator.recDKey), compType.typVarsMap)
     val getreceiver = program.findDomainFunction(DomainsGenerator.compGetRecvKey)
     val recApply = program.findDomainFunction(DomainsGenerator.recApplyKey)
     val field = program.findField(fieldName)
@@ -264,7 +270,7 @@ class AxiomHelper(program: Program) {
     val recApplied = DomainFuncApp(
       recApply,
       Seq(getreceiverApplied, forallVarInd.localVar),
-      compType.typVarsMap
+      recvType.typVarsMap
     )()
 
     val fieldAcc = FieldAccess(recApplied, field)(
@@ -287,6 +293,8 @@ class AxiomHelper(program: Program) {
     val forallVarInd = LocalVarDecl("__ind", fElemType)()
     val setContains = AnySetContains(forallVarInd.localVar, filter)()
     val compType = compExp.typ.asInstanceOf[DomainType]
+    val recvType = DomainType.apply(program.findDomain(DomainsGenerator.recDKey), compType.typVarsMap)
+    val mapType = DomainType.apply(program.findDomain(DomainsGenerator.mapDKey), compType.typVarsMap)
     val getreceiver = program.findDomainFunction(DomainsGenerator.compGetRecvKey)
     val recApply = program.findDomainFunction(DomainsGenerator.recApplyKey)
     val field = program.findField(fieldName)
@@ -300,7 +308,7 @@ class AxiomHelper(program: Program) {
     val recApplied = DomainFuncApp(
       recApply,
       Seq(getreceiverApplied, forallVarInd.localVar),
-      compType.typVarsMap
+      recvType.typVarsMap
     )()
     val recAppliedVal = FieldAccess(recApplied, field)()
 
@@ -314,7 +322,7 @@ class AxiomHelper(program: Program) {
     val mappingApplied = DomainFuncApp(
       mapApply,
       Seq(getmappingApplied, recAppliedVal),
-      compType.typVarsMap
+      mapType.typVarsMap
     )()
     val mapAccessEq = EqCmp(MapLookup(mapResult, forallVarInd.localVar)(), mappingApplied)()
     val forallTrigger = Trigger(Seq(MapLookup(mapResult, forallVarInd.localVar)()))()

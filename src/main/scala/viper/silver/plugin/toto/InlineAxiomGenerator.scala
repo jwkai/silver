@@ -87,11 +87,11 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
   }
 
   def convertMethodToInhaleExhale(methodCall: MethodCall): Seqn = {
-//    val methodCall = mc.copy()(mc.pos, mc.info, mc.errT)
+    //    val methodCall = mc.copy()(mc.pos, mc.info, mc.errT)
     // Get method declaration
     val oldLabel = getUniqueLabelMethod
     val methodDecl = program.findMethod(methodCall.methodName)
-//    val methodDecl = md.copy()(mc.pos, mc.info, mc.errT)
+    //    val methodDecl = md.copy()(mc.pos, mc.info, mc.errT)
 
     // LocalVarsDecls for temporary return values
     val returnDecls = methodDecl.formalReturns.map(r =>
@@ -264,7 +264,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val receiverApp = helper.applyDomainFunc(
       DomainsGenerator.compGetRecvKey,
       Seq(compVar),
-      recvDType.typVarsMap
+      compDType.typVarsMap
     )
 
     val trigger1 = Trigger(Seq(helper.compApply(fhOld.toExp, compVar, forallVarFS.localVar)))()
@@ -272,7 +272,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val invRecvApp = helper.applyDomainFunc(
       DomainsGenerator.recInvKey,
       Seq(receiverApp, writeTo),
-      compDType.typVarsMap
+      recvDType.typVarsMap
     )
 
     val triggerDeleteKeyNew = helper.applyDomainFunc(
@@ -289,7 +289,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val setDeleteFSInv = helper.applyDomainFunc(
       DomainsGenerator.setDeleteKey,
       Seq(forallVarFS.localVar, ExplicitSet(Seq(invRecvApp))()),
-      compDType.typVarsMap
+      recvDType.typVarsMap
     )
 
     val framingEq = EqCmp(
@@ -322,7 +322,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val receiverAppIdx = helper.applyDomainFunc(
       DomainsGenerator.recApplyKey,
       Seq(receiverApp, idxVar),
-      compDType.typVarsMap
+      recvDType.typVarsMap
     )
 
     val lookupUnmodified = Assume(
@@ -381,6 +381,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
   //
   //    // Extract the comp Domain type
   //    val compDType = compADecl.compDType(program)
+  //    val recvDType = compADecl.compDRecvType(program)
   //    val compIdxType = compADecl.compType._1
   //
   //    // Comp var declaration
@@ -406,7 +407,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
   //    val invRecvApp = helper.applyDomainFunc(
   //      DomainsGenerator.recInvKey,
   //      Seq(receiverApp, readFrom),
-  //      compDType.typVarsMap
+  //      recvDType.typVarsMap
   //    )
   //
   //    val triggerDeleteKey = helper.applyDomainFunc(
@@ -546,7 +547,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val receiverApp = helper.applyDomainFunc(
       DomainsGenerator.compGetRecvKey,
       Seq(compVar),
-      recvDType.typVarsMap
+      compDType.typVarsMap
     )
 
     // Index var declaration
@@ -555,19 +556,19 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val receiverAppIdx = helper.applyDomainFunc(
       DomainsGenerator.recApplyKey,
       Seq(receiverApp, idxVar),
-      compDType.typVarsMap
+      recvDType.typVarsMap
     )
 
     val invRecvIndApp = helper.applyDomainFunc(
       DomainsGenerator.recInvKey,
       Seq(receiverApp, receiverAppIdx),
-      compDType.typVarsMap
+      recvDType.typVarsMap
     )
 
     val idxNotInRefs = helper.applyDomainFunc(
       DomainsGenerator.idxNotInRefsKey,
       Seq(idxVar, receiverApp, lostPVal),
-      compDType.typVarsMap
+      recvDType.typVarsMap
     )
 
     val lookupInOldState = Assume(
@@ -744,7 +745,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val setDelExFSFS = helper.applyDomainFunc(
       DomainsGenerator.setDeleteKey,
       Seq(forallVarExFS.localVar, forallVarFS.localVar),
-      compDType.typVarsMap
+      recvDType.typVarsMap
     )
 
     val triggerExtOldExFS = helper.applyDomainFunc(
@@ -767,13 +768,13 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val receiverApp = helper.applyDomainFunc(
       DomainsGenerator.compGetRecvKey,
       Seq(compVar),
-      recvDType.typVarsMap
+      compDType.typVarsMap
     )
 
     val subsetNotInRefsGained = helper.applyDomainFunc(
       DomainsGenerator.subsetNotInRefsKey,
       Seq(forallVarFS.localVar, receiverApp, gainedPVal),
-      compDType.typVarsMap
+      recvDType.typVarsMap
     )
 
     val triggerDeleteBlockNotGained = helper.applyDomainFunc(
@@ -817,11 +818,11 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
       compDType.typVarsMap
     )
 
-//    val succfHeap = helper.applyDomainFunc(
-//      DomainsGenerator.fHeapSTKey,
-//      Seq(forallVarfH.localVar, fhOld.toExp),
-//      compDType.typVarsMap
-//    )
+    //    val succfHeap = helper.applyDomainFunc(
+    //      DomainsGenerator.fHeapSTKey,
+    //      Seq(forallVarfH.localVar, fhOld.toExp),
+    //      compDType.typVarsMap
+    //    )
 
     val blockDecompOverPrevExhales = Assume(
       Forall(
@@ -876,13 +877,13 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val receiverAppIdx = helper.applyDomainFunc(
       DomainsGenerator.recApplyKey,
       Seq(receiverApp, idxVar),
-      compDType.typVarsMap
+      recvDType.typVarsMap
     )
 
     val invRecvIndApp = helper.applyDomainFunc(
       DomainsGenerator.recInvKey,
       Seq(receiverApp, receiverAppIdx),
-      compDType.typVarsMap
+      recvDType.typVarsMap
     )
 
     val lookupInOldState = Assume(
