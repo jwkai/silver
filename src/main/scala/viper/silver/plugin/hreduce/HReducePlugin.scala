@@ -360,8 +360,26 @@ object HReducePlugin {
           )(i.pos, MakeInfoPair(i.info, rHeapInfo(rHeapOrig)), i.errT)
         case w: While =>
           val rHeapOrig = axiomGenerator.getCurrentRHeap
-          w.copy(
-            body = w.body.transform(addAxiomsToBody())
+          val (invsWithReduce, invsWithoutReduce) = w.invs.partition(_.contains[AReduceApply])
+          val invAsserts = invsWithReduce.foldLeft(Seq())((ss, inv) =>
+            ss :+ Assert(inv)(w.pos, MakeInfoPair(w.info, rHeapInfo(rHeapOrig)), w.errT))
+          val invAssumes = invsWithReduce.foldLeft(Seq())((ss, inv) =>
+            ss :+ Assume(inv)(w.pos, MakeInfoPair(w.info, rHeapInfo(rHeapOrig)), w.errT))
+          val wBodyRec = w.body.transform(addAxiomsToBody())
+          Seqn(
+            invAsserts ++
+            Seq(
+              w.copy(
+                body = Seqn(
+                  invAssumes ++ wBodyRec.ss ++ invAsserts,
+                  wBodyRec.scopedSeqnDeclarations
+                )(wBodyRec.pos, wBodyRec.info, wBodyRec.errT),
+                invs = invsWithoutReduce
+              )(w.pos, MakeInfoPair(w.info, rHeapInfo(rHeapOrig)), w.errT)
+            ) ++
+            invsWithReduce.foldLeft(Seq())((ss, inv) =>
+                ss :+ Assume(inv)(w.pos, MakeInfoPair(w.info, rHeapInfo(axiomGenerator.getCurrentRHeap)), w.errT)),
+            Seq()
           )(w.pos, MakeInfoPair(w.info, rHeapInfo(rHeapOrig)), w.errT)
       }
       outM = outM.body match {
