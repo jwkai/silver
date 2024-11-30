@@ -1,18 +1,18 @@
-package viper.silver.plugin.toto.ast
+package viper.silver.plugin.hreduce.ast
 
 import viper.silver.ast._
 import viper.silver.ast.pretty.FastPrettyPrinter.{ContOps, text, toParenDoc}
 import viper.silver.ast.pretty.PrettyPrintPrimitives
-import viper.silver.plugin.toto.DomainsGenerator
+import viper.silver.plugin.hreduce.DomainsGenerator
 import viper.silver.verifier.VerificationResult
 
 
-case class AComprehension3Tuple(receiver: Exp, mapping: Exp, op: Exp)
-                               (val pos: Position = NoPosition, val info: Info = NoInfo,
+case class AReduction3Tuple(receiver: Exp, mapping: Exp, op: Exp)
+                           (val pos: Position = NoPosition, val info: Info = NoInfo,
                                                      val errT: ErrorTrafo = NoTrafos) extends ExtensionExp {
 
   override lazy val prettyPrint: PrettyPrintPrimitives#Cont =
-    text("comp") <+>  toParenDoc(op) <+> toParenDoc(receiver)
+    text("hreduce") <+>  toParenDoc(op) <+> toParenDoc(receiver)
 
   override val extensionSubnodes: Seq[Node] = Seq(receiver, mapping, op).flatten
 
@@ -51,26 +51,26 @@ case class AComprehension3Tuple(receiver: Exp, mapping: Exp, op: Exp)
 
 
   def toViper(input: Program) : DomainFuncApp = {
-    val typeVars = input.findDomain(DomainsGenerator.compDKey).typVars
+    val typeVars = input.findDomain(DomainsGenerator.reduceDKey).typVars
     if (typeVars.length != 3) {
-      throw new Exception("Comp domain must have 3 type variables")
+      throw new Exception("Reduce domain must have 3 type variables")
     }
     val typeVarMap = Map(
       typeVars(0) -> tripleType._1,
       typeVars(1) -> tripleType._2,
       typeVars(2) -> tripleType._3
     )
-//    val typViper = DomainType.apply(compDomain, typeVarMap)
-    val compFunc = input.findDomainFunction(DomainsGenerator.compConstructKey)
-    DomainFuncApp.apply(compFunc, Seq(receiver, mapping, op), typeVarMap)(pos, info, errT)
-//    DomainFuncApp("comp", Seq(receiver, mapping.orNull, op, unit),typeVarMap)(
-//      pos, info, typViper , "Comp", errT
+//    val typViper = DomainType.apply(Domain, typeVarMap)
+    val reduceFunc = input.findDomainFunction(DomainsGenerator.reduceConstructKey)
+    DomainFuncApp.apply(reduceFunc, Seq(receiver, mapping, op), typeVarMap)(pos, info, errT)
+//    DomainFuncApp("reduce", Seq(receiver, mapping.orNull, op, unit),typeVarMap)(
+//      pos, info, typViper , "Reduce", errT
   }
 
 
   // Does not get used, transform to ordinary Viper before verification
   override def verifyExtExp(): VerificationResult = {
-      throw new Exception("Not implemented");
+      throw new Exception("Not implemented")
   }
 
 //  def translateToViper : Exp = {

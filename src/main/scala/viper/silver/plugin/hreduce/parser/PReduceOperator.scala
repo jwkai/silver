@@ -1,16 +1,16 @@
-package viper.silver.plugin.toto.parser
+package viper.silver.plugin.hreduce.parser
 
 import viper.silver.ast._
 import viper.silver.parser._
-import viper.silver.plugin.toto.util.AxiomHelper
-import viper.silver.plugin.toto.{ComprehensionPlugin, DomainsGenerator, FoldErrors, FoldReasons}
+import viper.silver.plugin.hreduce.util.AxiomHelper
+import viper.silver.plugin.hreduce.{HReducePlugin, DomainsGenerator, ReduceErrors, ReduceReasons}
 import viper.silver.verifier.errors.AssertFailed
 
-case object PCompOperatorKeyword extends PKw("identityOp") with PKeywordLang
+case object PReduceOperatorKeyword extends PKw("opWithId") with PKeywordLang
 
-case class PCompOperator(keyword: PReserved[PCompOperatorKeyword.type], idndef: PIdnDef, override val formalArgs: Seq[PFormalArgDecl], opUnit: PExp, body: Some[PFunInline])
-                        (val pos: (Position, Position))
-  extends PExtender with PSingleMember with PCompComponentDecl {
+case class PReduceOperator(keyword: PReserved[PReduceOperatorKeyword.type], idndef: PIdnDef, override val formalArgs: Seq[PFormalArgDecl], opUnit: PExp, body: Some[PFunInline])
+                          (val pos: (Position, Position))
+  extends PExtender with PSingleMember with PReduceComponentDecl {
 
   override val componentName: String = "Operator"
   var sourcePos : Position = null
@@ -21,7 +21,7 @@ case class PCompOperator(keyword: PReserved[PCompOperatorKeyword.type], idndef: 
       t.checkTopTyped(opUnit, None)
       body.get.typecheckOp(t, n, opUnit.typ) match {
         case out @ Some(_) => return out
-        case None => typToInfer = ComprehensionPlugin.makeDomainType(DomainsGenerator.opDKey, Seq(opUnit.typ))
+        case None => typToInfer = HReducePlugin.makeDomainType(DomainsGenerator.opDKey, Seq(opUnit.typ))
       }
     }
     None
@@ -82,8 +82,8 @@ case class PCompOperator(keyword: PReserved[PCompOperatorKeyword.type], idndef: 
 
     val errComm = ErrTrafo({
       case AssertFailed(offendingNode, _, cached) =>
-        val reason = FoldReasons.NotCommutative(offendingNode, this)
-        FoldErrors.OpWellDefinednessError(offendingNode, this, reason, cached)
+        val reason = ReduceReasons.NotCommutative(offendingNode, this)
+        ReduceErrors.OpWellDefinednessError(offendingNode, this, reason, cached)
     })
 
     val assert1 = Assert(forallComm)(errT = errComm)
@@ -105,8 +105,8 @@ case class PCompOperator(keyword: PReserved[PCompOperatorKeyword.type], idndef: 
 
     val errAssoc = ErrTrafo({
       case AssertFailed(offendingNode, _, cached) =>
-        val reason = FoldReasons.NotAssociative(offendingNode, this)
-        FoldErrors.OpWellDefinednessError(offendingNode, this, reason, cached)
+        val reason = ReduceReasons.NotAssociative(offendingNode, this)
+        ReduceErrors.OpWellDefinednessError(offendingNode, this, reason, cached)
     })
     val assert2 = Assert(forallAssoc)(errT = errAssoc)
 
@@ -124,8 +124,8 @@ case class PCompOperator(keyword: PReserved[PCompOperatorKeyword.type], idndef: 
 
     val errIden = ErrTrafo({
       case AssertFailed(offendingNode, _, cached) =>
-        val reason = FoldReasons.IncorrectIdentity(offendingNode, this)
-        FoldErrors.OpWellDefinednessError(offendingNode, this, reason, cached)
+        val reason = ReduceReasons.IncorrectIdentity(offendingNode, this)
+        ReduceErrors.OpWellDefinednessError(offendingNode, this, reason, cached)
       //      case ExhaleFailed(offendingNode, _, cached) => {
 //        val reason = FoldReasons.IncorrectIdentity(offendingNode, this)
 //        FoldErrors.OpWellDefinednessError(offendingNode, this, reason, cached)

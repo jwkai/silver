@@ -1,4 +1,4 @@
-package viper.silver.plugin.toto.parser
+package viper.silver.plugin.hreduce.parser
 
 import viper.silver.ast._
 import viper.silver.parser.PDelimited.Comma
@@ -7,7 +7,7 @@ import viper.silver.parser.{PAnyFunction, PGlobalCallableNamedArgs, Translator, 
 
 // Defines a component declaration. This is a PExtender node (extended as a plugin) and acts as a Function declaration,
 // hence the PAnyFunction.
-trait PCompComponentDecl extends PExtender with PAnyFunction with PSingleMember with PGlobalCallableNamedArgs with PPrettySubnodes {
+trait PReduceComponentDecl extends PExtender with PAnyFunction with PSingleMember with PGlobalCallableNamedArgs with PPrettySubnodes {
 
   var typToInfer: PType = null
   override def resultType: PType = typToInfer

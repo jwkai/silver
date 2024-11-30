@@ -1,15 +1,15 @@
-package viper.silver.plugin.toto.parser
+package viper.silver.plugin.hreduce.parser
 
 import viper.silver.ast.{Member, Position}
 import viper.silver.parser.PSym.Colon
 import viper.silver.parser._
-import viper.silver.plugin.toto.{ComprehensionPlugin, DomainsGenerator}
+import viper.silver.plugin.hreduce.{HReducePlugin, DomainsGenerator}
 
 case object PMappingKeyword extends PKw("mapping") with PKeywordLang
 
 case class PMapping(keyword: PReserved[PMappingKeyword.type], idndef: PIdnDef, override val formalArgs: Seq[PFormalArgDecl], body: Some[PFunInline])
                   (val pos: (Position, Position))
-  extends PExtender with PSingleMember with PCompComponentDecl  {
+  extends PExtender with PSingleMember with PReduceComponentDecl  {
 
   override val componentName: String = "Mapping"
 
@@ -18,7 +18,7 @@ case class PMapping(keyword: PReserved[PMappingKeyword.type], idndef: PIdnDef, o
       formalArgs.foreach(a => t.check(a.typ))
       body.get.typecheckMapping(t, n) match {
         case out @ Some(_) => return out
-        case None => typToInfer = ComprehensionPlugin.makeDomainType(DomainsGenerator.mapDKey,
+        case None => typToInfer = HReducePlugin.makeDomainType(DomainsGenerator.mapDKey,
           Seq(body.get.getArgs.head.typ, body.get.body.typ))
       }
     }

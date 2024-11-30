@@ -1,4 +1,4 @@
-package viper.silver.plugin.toto
+package viper.silver.plugin.hreduce
 
 import fastparse.{NoCut, P}
 import viper.silver.FastMessaging
@@ -8,39 +8,39 @@ import viper.silver.ast.pretty.FastPrettyPrinter.pretty
 import viper.silver.parser.FastParserCompanion
 import viper.silver.parser.FastParser
 import viper.silver.parser._
-import viper.silver.plugin.toto.ComprehensionPlugin.{addInlinedAxioms, defaultMappingIden}
-import viper.silver.plugin.toto.DomainsGenerator._
-import viper.silver.plugin.toto.ast.{ACompApply, AFHeap, fHeapInfo}
-import viper.silver.plugin.toto.parser.PComprehension.PComprehensionKeywordType
-import viper.silver.plugin.toto.parser._
-import viper.silver.plugin.toto.util.AxiomHelper
+import viper.silver.plugin.hreduce.HReducePlugin.{addInlinedAxioms, defaultMappingIden}
+import viper.silver.plugin.hreduce.DomainsGenerator._
+import viper.silver.plugin.hreduce.ast.{AReduceApply, ARHeap, rHeapInfo}
+import viper.silver.plugin.hreduce.parser.PReduce.PReduceKeywordType
+import viper.silver.plugin.hreduce.parser._
+import viper.silver.plugin.hreduce.util.AxiomHelper
 import viper.silver.plugin.{ParserPluginTemplate, SilverPlugin}
 import viper.silver.verifier.{AbstractError, VerificationResult}
 
 import scala.annotation.unused
 
-class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
-                          @unused logger: ch.qos.logback.classic.Logger,
-                          @unused config: viper.silver.frontend.SilFrontendConfig,
-                          fp: FastParser) extends SilverPlugin with ParserPluginTemplate {
+class HReducePlugin(@unused reporter: viper.silver.reporter.Reporter,
+                    @unused logger: ch.qos.logback.classic.Logger,
+                    @unused config: viper.silver.frontend.SilFrontendConfig,
+                    fp: FastParser) extends SilverPlugin with ParserPluginTemplate {
 
   import fp.{ParserExtension, funcApp, exp, argList, commaSeparated, formalArg, fieldAccess, foldPExp, idndef, idnref, lineCol, _file}
   import FastParserCompanion.{ExtendedParsing, PositionParsing, reservedKw, whitespace}
 
-  private var setOperators: Set[PCompOperator] = Set()
+  private var setOperators: Set[PReduceOperator] = Set()
 
-  /** Parser for comprehension statements. */
-  def compOp[$: P]: P[(PComprehensionKeywordType, PCall)] =
-    P(P(PComprehensionKeyword) ~/ "[" ~ funcApp ~ "]")
+  /** Parser for reduce statements. */
+  def reduceOp[$: P]: P[(PReduceKeywordType, PCall)] =
+    P(P(PReduceKeyword) ~/ "[" ~ funcApp ~ "]")
 
-  def compDef[$: P]: P[(PMappingFieldReceiver, PExp)] =
+  def reduceDef[$: P]: P[(PMappingFieldReceiver, PExp)] =
     P(P("(") ~/ mapRecBoth ~ "|" ~ exp ~ ")")
 
-  def comp[$: P]: P[PComprehension] =
+  def reduce[$: P]: P[PReduce] =
     P(
-      (compOp ~/ compDef) map {
+      (reduceOp ~/ reduceDef) map {
         case (kw, op, (mRf, f)) => (kw, op, mRf, f)
-      } map (PComprehension.apply _).tupled
+      } map (PReduce.apply _).tupled
     ).pos
 
   def funDef[$:P]: P[PFunInline] =
@@ -60,12 +60,12 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
       }
     )
 
-  def opUnitDef[$:P]: P[PAnnotationsPosition => PCompOperator] =
+  def opUnitDef[$:P]: P[PAnnotationsPosition => PReduceOperator] =
     P(
-      (P(PCompOperatorKeyword) ~ idndef ~ argList(formalArg) ~/ "(" ~ exp ~ "," ~ funDef ~ ")") map {
+      (P(PReduceOperatorKeyword) ~ idndef ~ argList(formalArg) ~/ "(" ~ exp ~ "," ~ funDef ~ ")") map {
         case (kw, name, args, unitdef, fundef) =>
           ap: PAnnotationsPosition => {
-            PCompOperator(
+            PReduceOperator(
               kw, name, args.inner.toSeq, unitdef, Some(fundef)
             )(ap.pos)
           }
@@ -137,7 +137,7 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
     * @return Modified source code
     */
   override def beforeParse(input: String, isImported: Boolean) : String = {
-    ParserExtension.addNewExpAtStart(comp(_))
+    ParserExtension.addNewExpAtStart(reduce(_))
     ParserExtension.addNewDeclAtStart(recDef(_))
     ParserExtension.addNewDeclAtStart(mappingDef(_))
     ParserExtension.addNewDeclAtStart(filterDef(_))
@@ -153,13 +153,13 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
   override def beforeResolve(input: PProgram) : PProgram = {
 
     if (input.filterMembers {
-      case _: PComprehension | _: PReceiver | _: PMapping | _: PFilter | _: PCompOperator => true
+      case _: PReduce | _: PReceiver | _: PMapping | _: PFilter | _: PReduceOperator => true
       case _ => false
     }.members.isEmpty) {
       input
     } else {
       val domainsToAdd = Seq(
-        compDomainString(),
+        reduceDomainString(),
         receiverDomainString(),
         opDomainString(),
         mappingDomainString(),
@@ -180,7 +180,7 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
     */
   override def beforeTranslate(input: PProgram): PProgram = {
     setOperators = input.deepCollect({
-      case op: PCompOperator =>
+      case op: PReduceOperator =>
         op
     }).toSet
     input
@@ -248,7 +248,7 @@ class ComprehensionPlugin(@unused reporter: viper.silver.reporter.Reporter,
   }
 }
 
-object ComprehensionPlugin {
+object HReducePlugin {
 
   def defaultMappingIden(tuple: (Position, Position)): PCall = {
     PCall(PIdnRef(mapIdenKey)(tuple), PDelimited.impliedParenComma(Seq()), None)(tuple)
@@ -306,8 +306,8 @@ object ComprehensionPlugin {
     def modifyMethod(m: Method) : Method = {
       val axiomGenerator = new InlineAxiomGenerator(p, m.name)
 
-      // If no comprehension is used in a method, keep the method the same
-      if (axiomGenerator.compDeclsUsed.isEmpty) { return m }
+      // If no reduction is used in a method, keep the method the same
+      if (axiomGenerator.reduceDeclsUsed.isEmpty) { return m }
 
       val helper = new AxiomHelper(p)
 
@@ -327,42 +327,42 @@ object ComprehensionPlugin {
         case None => return m
       }
 
-      // Add axioms for exhales, inhales and heap writes, tracking fHeap insertions
+      // Add axioms for exhales, inhales and heap writes, tracking rHeap insertions
       def addAxiomsToBody(): PartialFunction[Node, Node] = {
         case e: Exhale =>
           if (!helper.checkIfPure(e)) {
             val fields = helper.extractFieldAcc(e)
             axiomGenerator.generateExhaleAxioms(e, fields)
           } else {
-            e.withMeta(e.pos, MakeInfoPair(e.info, fHeapInfo(axiomGenerator.getCurrentfHeap)), e.errT)
+            e.withMeta(e.pos, MakeInfoPair(e.info, rHeapInfo(axiomGenerator.getCurrentRHeap)), e.errT)
           }
         case i: Inhale =>
           if (!helper.checkIfPure(i)) {
             val fields = helper.extractFieldAcc(i)
             axiomGenerator.generateInhaleAxioms(i, fields)
           } else {
-            i.withMeta(i.pos, MakeInfoPair(i.info, fHeapInfo(axiomGenerator.getCurrentfHeap)), i.errT)
+            i.withMeta(i.pos, MakeInfoPair(i.info, rHeapInfo(axiomGenerator.getCurrentRHeap)), i.errT)
           }
         case fa: FieldAssign =>
           axiomGenerator.generateHeapWriteAxioms(fa)
         case l@Label(name, _) =>
-          axiomGenerator.mapUserLabelToCurrentAFHeap(name)
+          axiomGenerator.mapUserLabelToCurrentARHeap(name)
           l
         case a: Assert =>
-          a.withMeta(a.pos, MakeInfoPair(a.info, fHeapInfo(axiomGenerator.getCurrentfHeap)), a.errT)
+          a.withMeta(a.pos, MakeInfoPair(a.info, rHeapInfo(axiomGenerator.getCurrentRHeap)), a.errT)
         case a: Assume =>
-          a.withMeta(a.pos, MakeInfoPair(a.info, fHeapInfo(axiomGenerator.getCurrentfHeap)), a.errT)
+          a.withMeta(a.pos, MakeInfoPair(a.info, rHeapInfo(axiomGenerator.getCurrentRHeap)), a.errT)
         case i: If =>
-          val fHeapOrig = axiomGenerator.getCurrentfHeap
+          val rHeapOrig = axiomGenerator.getCurrentRHeap
           i.copy(
             thn = i.thn.transform(addAxiomsToBody()),
             els = i.els.transform(addAxiomsToBody())
-          )(i.pos, MakeInfoPair(i.info, fHeapInfo(fHeapOrig)), i.errT)
+          )(i.pos, MakeInfoPair(i.info, rHeapInfo(rHeapOrig)), i.errT)
         case w: While =>
-          val fHeapOrig = axiomGenerator.getCurrentfHeap
+          val rHeapOrig = axiomGenerator.getCurrentRHeap
           w.copy(
             body = w.body.transform(addAxiomsToBody())
-          )(w.pos, MakeInfoPair(w.info, fHeapInfo(fHeapOrig)), w.errT)
+          )(w.pos, MakeInfoPair(w.info, rHeapInfo(rHeapOrig)), w.errT)
       }
       outM = outM.body match {
         case Some(mBody) =>
@@ -372,111 +372,111 @@ object ComprehensionPlugin {
         case None => return m
       }
 
-      // Now, transform ACompApply nodes in context of fHeap annotations
+      // Now, transform AReduceApply nodes in context of rHeap annotations
       outM = outM.body match {
         case Some(mBody) =>
           outM.copy(body =
-            Some(mBody.transformWithContext[AFHeap]({
-              case (n@NodeWithFHeapInfo(fHeapInfo(fh)), _) =>
-                (n, fh)
-              case (lo@LabelledOld(exp, labelName), fh) =>
+            Some(mBody.transformWithContext[ARHeap]({
+              case (n@NodeWithRHeapInfo(rHeapInfo(rh)), _) =>
+                (n, rh)
+              case (lo@LabelledOld(exp, labelName), rh) =>
                 exp match {
-                  case ca: ACompApply =>
-                    val cap = ca.copy()(lo.pos, lo.info, lo.errT)
-                    cap.fHeap = Some(axiomGenerator.getAFHeapFromUserLabel(labelName))
-                    (cap.toViper(p), fh)
+                  case ra: AReduceApply =>
+                    val rap = ra.copy()(lo.pos, lo.info, lo.errT)
+                    rap.rHeap = Some(axiomGenerator.getARHeapFromUserLabel(labelName))
+                    (rap.toViper(p), rh)
                   case _ =>
                     val newLO = LabelledOld(
                       exp.transform({
-                        case ca: ACompApply =>
-                          ca.fHeap = Some(axiomGenerator.getAFHeapFromUserLabel(labelName))
-                          ca.toViper(p)
+                        case ra: AReduceApply =>
+                          ra.rHeap = Some(axiomGenerator.getARHeapFromUserLabel(labelName))
+                          ra.toViper(p)
                       }),
                       labelName
                     )(lo.pos, lo.info, lo.errT)
-                    (newLO, fh)
+                    (newLO, rh)
                 }
-              case (o@Old(exp), fh) =>
+              case (o@Old(exp), rh) =>
                 exp match {
-                  case ca: ACompApply =>
-                    val cap = ca.copy()(o.pos, o.info, o.errT)
-                    cap.fHeap = Some(axiomGenerator.getOldfHeap)
-                    (cap.toViper(p), fh)
+                  case ra: AReduceApply =>
+                    val rap = ra.copy()(o.pos, o.info, o.errT)
+                    rap.rHeap = Some(axiomGenerator.getOldRHeap)
+                    (rap.toViper(p), rh)
                   case _ =>
                     val newO = Old(
                       exp.transform({
-                        case ca: ACompApply =>
-                          ca.fHeap = Some(axiomGenerator.getOldfHeap)
-                          ca.toViper(p)
+                        case ra: AReduceApply =>
+                          ra.rHeap = Some(axiomGenerator.getOldRHeap)
+                          ra.toViper(p)
                       })
                     )(o.pos, o.info, o.errT)
-                    (newO, fh)
+                    (newO, rh)
                 }
-              case (ca: ACompApply, fh) =>
-                ca.fHeap = Some(fh)
-                (ca.toViper(p), fh)
-            }, initialContext = axiomGenerator.getOldfHeap))
+              case (ra: AReduceApply, rh) =>
+                ra.rHeap = Some(rh)
+                (ra.toViper(p), rh)
+            }, initialContext = axiomGenerator.getOldRHeap))
           )(outM.pos, outM.info, outM.errT)
         case None => return m
       }
 
       // TODO: figure out why this doesn't work...
-//      def stripfHeapInfo(n: Node) = {
-//        val nMeta = n.meta.copy(_2 = n.meta._2.removeUniqueInfo[fHeapInfo])
+//      def stripRHeapInfo(n: Node) = {
+//        val nMeta = n.meta.copy(_2 = n.meta._2.removeUniqueInfo[rHeapInfo])
 //        n.withMeta(nMeta)
 //      }
 //      outM = outM.body match {
 //        case Some(mBody) =>
 //          outM.copy(body =
 //            Some(mBody.transform({
-//              case n@NodeWithFHeapInfo(fHeapInfo(_)) =>
-//                stripfHeapInfo(n)
+//              case n@NodeWithRHeapInfo(rHeapInfo(_)) =>
+//                stripRHeapInfo(n)
 //            }))
 //          )(outM.pos, outM.info, outM.errT)
 //        case None => return m
 //      }
 
-      val setFHeapApply: PartialFunction[Node, Node] = {
+      val setRHeapApply: PartialFunction[Node, Node] = {
         case lo@Old(exp) =>
           exp match {
-            case ca: ACompApply =>
-              val c = ca.copy()(lo.pos, lo.info, lo.errT)
-              c.fHeap = Some(axiomGenerator.getOldfHeap)
+            case ra: AReduceApply =>
+              val c = ra.copy()(lo.pos, lo.info, lo.errT)
+              c.rHeap = Some(axiomGenerator.getOldRHeap)
               c.toViper(p)
             case _ =>
               Old(
                 exp.transform({
-                  case ca: ACompApply =>
-                    ca.fHeap = Some(axiomGenerator.getOldfHeap)
-                    ca.toViper(p)
+                  case ra: AReduceApply =>
+                    ra.rHeap = Some(axiomGenerator.getOldRHeap)
+                    ra.toViper(p)
                 })
               )(lo.pos, lo.info, lo.errT)
           }
-        case ca: ACompApply =>
-          ca.fHeap = Some(axiomGenerator.getCurrentfHeap)
-          ca.toViper(p)
+        case ra: AReduceApply =>
+          ra.rHeap = Some(axiomGenerator.getCurrentRHeap)
+          ra.toViper(p)
       }
 
       // Add heap-dependent function to pre-/post-conditions and loop invariants
       outM = outM.copy(
         pres =
-          outM.pres.map(pre => pre.transform(setFHeapApply, recurse = Traverse.Innermost)),
+          outM.pres.map(pre => pre.transform(setRHeapApply, recurse = Traverse.Innermost)),
         posts =
-          outM.posts.map(post => post.transform(setFHeapApply, recurse = Traverse.Innermost)),
+          outM.posts.map(post => post.transform(setRHeapApply, recurse = Traverse.Innermost)),
         body =
           outM.body match {
             case Some(bodyD) =>
               Some(bodyD.transform({
                 // TODO: deal with tricky invariant situations -
-                //  symbolic state (fHeap) is not well-defined at entry.
+                //  symbolic state (rHeap) is not well-defined at entry.
                 //  It's possible to manually convert these invariants:
-                //  - Add assert (in old fHeap) prior to the while statement,
-                //    and (in current fHeap) the end of the while body.
-                //  - Add assumes (in current fHeap) at start of while body
+                //  - Add assert (in old rHeap) prior to the while statement,
+                //    and (in current rHeap) the end of the while body.
+                //  - Add assumes (in current rHeap) at start of while body
                 //    and immediately after the while statement.
                 case w@While(cond, invs, body) =>
                   While(cond,
-                    invs.map(inv => inv.transform(setFHeapApply)),
+                    invs.map(inv => inv.transform(setRHeapApply)),
                     body)(w.pos, w.info, w.errT)},
                 recurse = Traverse.BottomUp))
             case None => None
@@ -494,9 +494,9 @@ object ComprehensionPlugin {
   }
 }
 
-object NodeWithFHeapInfo {
-  def unapply(node : Node) : Option[fHeapInfo] = node match {
-    case i: Infoed => i.info.getUniqueInfo[fHeapInfo]
+object NodeWithRHeapInfo {
+  def unapply(node : Node) : Option[rHeapInfo] = node match {
+    case i: Infoed => i.info.getUniqueInfo[rHeapInfo]
     case _ => None
   }
 }

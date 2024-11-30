@@ -19,7 +19,7 @@ domain Array {
 
 receiver arrayRec(a: Array) (fun i: Int :: loc(a,i))
 filter allInt(start: Int, end: Int) (fun i: Int :: i >= start && i < end )
-identityOp add() (0 ,fun a: Int, b: Int :: a + b )
+opWithId add() (0 ,fun a: Int, b: Int :: a + b )
 
 define access_array(a, i1, i2)
     (forall j: Int :: {loc(a,j)} i1 <= j && j < i2 ==> acc(loc(a,j).val))
@@ -40,8 +40,8 @@ method test1(i0: Int, a:Array)
 
     // r.val := r.val + 1
 
-    assert hfold[add()](arrayRec(a).val | allInt(0,5)) == old(hfold[add()](arrayRec(a).val | allInt(0,5))) + 2
+    assert hreduce[add()](arrayRec(a).val | allInt(0,5)) == old(hreduce[add()](arrayRec(a).val | allInt(0,5))) + 2
 
-    assert hfold[add()](arrayRec(a).val | allInt(0,10)) == old(hfold[add()](arrayRec(a).val | allInt(0,10))) + 2
+    assert hreduce[add()](arrayRec(a).val | allInt(0,10)) == old(hreduce[add()](arrayRec(a).val | allInt(0,10))) + 2
 
 }

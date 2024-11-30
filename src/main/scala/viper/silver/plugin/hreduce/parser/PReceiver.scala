@@ -1,14 +1,14 @@
-package viper.silver.plugin.toto.parser
+package viper.silver.plugin.hreduce.parser
 
 import viper.silver.ast.{Member, Position}
 import viper.silver.parser.PSym.Colon
 import viper.silver.parser._
-import viper.silver.plugin.toto.{ComprehensionPlugin, DomainsGenerator}
+import viper.silver.plugin.hreduce.{HReducePlugin, DomainsGenerator}
 
 case object PReceiverKeyword extends PKw("receiver") with PKeywordLang
 
 case class PReceiver(keyword: PReserved[PReceiverKeyword.type], idndef: PIdnDef, override val formalArgs: Seq[PFormalArgDecl], body : Some[PFunInline])(val pos: (Position, Position))
-  extends PExtender with PSingleMember with PCompComponentDecl {
+  extends PExtender with PSingleMember with PReduceComponentDecl {
 
   override def c: Colon = super.c
   override val componentName: String = "Receiver"
@@ -24,7 +24,7 @@ case class PReceiver(keyword: PReserved[PReceiverKeyword.type], idndef: PIdnDef,
       formalArgs.foreach( a => t.check(a.typ))
       myBody.typecheckReceiver(t, n) match {
         case out @ Some(_) => return out
-        case None => typToInfer = ComprehensionPlugin.makeDomainType(DomainsGenerator.recDKey,
+        case None => typToInfer = HReducePlugin.makeDomainType(DomainsGenerator.recDKey,
           Seq(myBody.getArgs.head.typ))
       }
     }

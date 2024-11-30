@@ -4,7 +4,6 @@
 //
 // Copyright (c) 2011-2021 ETH Zurich.
 
-
 import org.scalatest.funsuite.AnyFunSuite
 import viper.silver.ast.Program
 import viper.silver.frontend.{SilFrontend, SilFrontendConfig}
@@ -15,15 +14,14 @@ import viper.silver.verifier._
 
 import java.nio.file.Paths
 
-
-class PluginCompTests extends AnyFunSuite {
-  val inputfile = "toto/arrayTestExhaleInhale.vpr"
-//  val inputfile = "toto/arrayTestExhaleExhale.vpr"
-//  val inputfile = "toto/arrayBubbleSort.vpr"
-//  val inputfile = "toto/arrayTestChain.vpr"
+class HReduceTests extends AnyFunSuite {
+  val inputfile = "hreduce/arrayTestExhaleInhale.vpr"
+//  val inputfile = "hreduce/arrayTestExhaleExhale.vpr"
+//  val inputfile = "hreduce/arrayBubbleSort.vpr"
+//  val inputfile = "hreduce/arrayTestChain.vpr"
   val plugins: Seq[String] = Seq(
 //    "TestPluginAllCalled",
-    "viper.silver.plugin.toto.ComprehensionPlugin"
+    "viper.silver.plugin.hreduce.HReducePlugin"
   )
 
   var result: VerificationResult = Success

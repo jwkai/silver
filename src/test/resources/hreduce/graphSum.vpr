@@ -13,14 +13,14 @@ define INV(nodes)
 				n in nodes && n.right != null ==> n.right in nodes)
 
 receiver idenRec() (fun r: Ref :: r)
-identityOp add() (0 ,fun a: Int, b: Int :: a + b )
+opWithId add() (0, fun a: Int, b: Int :: a + b )
 
 method sumNodes(nodes : Set[Ref], node: Ref)
     requires node in nodes
     requires INV(nodes)
     ensures  INV(nodes)
-    ensures hfold[add()](idenRec().val | nodes) ==
-               old(hfold[add()](idenRec().val | nodes)) +2
+    ensures hreduce[add()](idenRec().val | nodes) ==
+               old(hreduce[add()](idenRec().val | nodes)) +2
 {
     node.val := node.val + 1
 

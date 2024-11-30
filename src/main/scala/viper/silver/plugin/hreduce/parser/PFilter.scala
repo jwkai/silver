@@ -1,9 +1,9 @@
-package viper.silver.plugin.toto.parser
+package viper.silver.plugin.hreduce.parser
 
 import viper.silver.ast.{Member, Position}
 import viper.silver.parser.PSym.Colon
 import viper.silver.parser._
-import viper.silver.plugin.toto.ComprehensionPlugin
+import viper.silver.plugin.hreduce.HReducePlugin
 
 /**
  * Keywords used to define ADT's
@@ -12,7 +12,7 @@ case object PFilterKeyword extends PKw("filter") with PKeywordLang
 
 case class PFilter(keyword: PReserved[PFilterKeyword.type], idndef: PIdnDef, override val formalArgs: Seq[PFormalArgDecl], body: Some[PFunInline])
                   (val pos: (Position, Position))
-  extends PExtender with PCompComponentDecl {
+  extends PExtender with PReduceComponentDecl {
 
   override val componentName: String = "Filter"
 
@@ -21,7 +21,7 @@ case class PFilter(keyword: PReserved[PFilterKeyword.type], idndef: PIdnDef, ove
       formalArgs.foreach(a => t.check(a.typ))
       body.get.typecheckFilter(t, n) match {
         case out @ Some(_) => return out
-        case None => typToInfer = ComprehensionPlugin.makeSetType(body.get.getArgs.head.typ)
+        case None => typToInfer = HReducePlugin.makeSetType(body.get.getArgs.head.typ)
       }
     }
     None
