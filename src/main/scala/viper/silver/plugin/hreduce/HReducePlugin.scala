@@ -328,64 +328,10 @@ object HReducePlugin {
       }
 
       // Add axioms for exhales, inhales and heap writes, tracking rHeap insertions
-      def addAxiomsToBody(): PartialFunction[Node, Node] = {
-        case e: Exhale =>
-          if (!helper.checkIfPure(e)) {
-            val fields = helper.extractFieldAcc(e)
-            axiomGenerator.generateExhaleAxioms(e, fields)
-          } else {
-            e.withMeta(e.pos, MakeInfoPair(e.info, rHeapInfo(axiomGenerator.getCurrentRHeap)), e.errT)
-          }
-        case i: Inhale =>
-          if (!helper.checkIfPure(i)) {
-            val fields = helper.extractFieldAcc(i)
-            axiomGenerator.generateInhaleAxioms(i, fields)
-          } else {
-            i.withMeta(i.pos, MakeInfoPair(i.info, rHeapInfo(axiomGenerator.getCurrentRHeap)), i.errT)
-          }
-        case fa: FieldAssign =>
-          axiomGenerator.generateHeapWriteAxioms(fa)
-        case l@Label(name, _) =>
-          axiomGenerator.mapUserLabelToCurrentARHeap(name)
-          l
-        case a: Assert =>
-          a.withMeta(a.pos, MakeInfoPair(a.info, rHeapInfo(axiomGenerator.getCurrentRHeap)), a.errT)
-        case a: Assume =>
-          a.withMeta(a.pos, MakeInfoPair(a.info, rHeapInfo(axiomGenerator.getCurrentRHeap)), a.errT)
-        case i: If =>
-          val rHeapOrig = axiomGenerator.getCurrentRHeap
-          i.copy(
-            thn = i.thn.transform(addAxiomsToBody()),
-            els = i.els.transform(addAxiomsToBody())
-          )(i.pos, MakeInfoPair(i.info, rHeapInfo(rHeapOrig)), i.errT)
-        case w: While =>
-          val rHeapOrig = axiomGenerator.getCurrentRHeap
-          val (invsWithReduce, invsWithoutReduce) = w.invs.partition(_.contains[AReduceApply])
-          val invAsserts = invsWithReduce.foldLeft(Seq())((ss, inv) =>
-            ss :+ Assert(inv)(w.pos, MakeInfoPair(w.info, rHeapInfo(rHeapOrig)), w.errT))
-          val invAssumes = invsWithReduce.foldLeft(Seq())((ss, inv) =>
-            ss :+ Assume(inv)(w.pos, MakeInfoPair(w.info, rHeapInfo(rHeapOrig)), w.errT))
-          val wBodyRec = w.body.transform(addAxiomsToBody())
-          Seqn(
-            invAsserts ++
-            Seq(
-              w.copy(
-                body = Seqn(
-                  invAssumes ++ wBodyRec.ss ++ invAsserts,
-                  wBodyRec.scopedSeqnDeclarations
-                )(wBodyRec.pos, wBodyRec.info, wBodyRec.errT),
-                invs = invsWithoutReduce
-              )(w.pos, MakeInfoPair(w.info, rHeapInfo(rHeapOrig)), w.errT)
-            ) ++
-            invsWithReduce.foldLeft(Seq())((ss, inv) =>
-                ss :+ Assume(inv)(w.pos, MakeInfoPair(w.info, rHeapInfo(axiomGenerator.getCurrentRHeap)), w.errT)),
-            Seq()
-          )(w.pos, MakeInfoPair(w.info, rHeapInfo(rHeapOrig)), w.errT)
-      }
       outM = outM.body match {
         case Some(mBody) =>
           outM.copy(body =
-            Some(mBody.transform(addAxiomsToBody()))
+            Some(mBody.transform(axiomGenerator.addAxiomsToBody()))
           )(outM.pos, outM.info, outM.errT)
         case None => return m
       }

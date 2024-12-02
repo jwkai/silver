@@ -58,6 +58,7 @@ method bubbleSort(a: Array)
             invariant access_array(a, 0, len(a))
             invariant mUnionfold(a, allInt(0,len(a))) == old(mUnionfold(a, allInt(0,len(a))))
         {
+            assert i in allInt(0,len(a)) && i-1 in allInt(0, len(a))
             if (loc(a,i - 1).val > loc(a,i).val) {
                 swap(a, i-1, i)
                 swapped := true

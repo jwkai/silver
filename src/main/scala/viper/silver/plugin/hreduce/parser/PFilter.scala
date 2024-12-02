@@ -1,7 +1,6 @@
 package viper.silver.plugin.hreduce.parser
 
 import viper.silver.ast.{Member, Position}
-import viper.silver.parser.PSym.Colon
 import viper.silver.parser._
 import viper.silver.plugin.hreduce.HReducePlugin
 

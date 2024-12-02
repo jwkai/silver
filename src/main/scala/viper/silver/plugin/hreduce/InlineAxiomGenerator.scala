@@ -86,6 +86,75 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     ARHeap(currentLabelNum-1)
   }
 
+  // Add axioms for exhales, inhales and heap writes, tracking rHeap insertions
+  def addAxiomsToBody(): PartialFunction[Node, Node] = {
+    case e: Exhale =>
+      if (!helper.checkIfPure(e)) {
+        val fields = helper.extractFieldAcc(e)
+        generateExhaleAxioms(e, fields)
+      } else {
+        e.withMeta(e.pos, MakeInfoPair(e.info, rHeapInfo(getCurrentRHeap)), e.errT)
+      }
+    case i: Inhale =>
+      if (!helper.checkIfPure(i)) {
+        val fields = helper.extractFieldAcc(i)
+        generateInhaleAxioms(i, fields)
+      } else {
+        i.withMeta(i.pos, MakeInfoPair(i.info, rHeapInfo(getCurrentRHeap)), i.errT)
+      }
+    case fa: FieldAssign =>
+      generateHeapWriteAxioms(fa)
+    case l@Label(name, _) =>
+      mapUserLabelToCurrentARHeap(name)
+      l
+    case a: Assert =>
+      a.withMeta(a.pos, MakeInfoPair(a.info, rHeapInfo(getCurrentRHeap)), a.errT)
+    case a: Assume =>
+      a.withMeta(a.pos, MakeInfoPair(a.info, rHeapInfo(getCurrentRHeap)), a.errT)
+    // TODO: make if-statement "phi" rHeapInfo, add triggers and "skip forward" for both branches
+    case i: If =>
+      val rHeapOrig = getCurrentRHeap
+      i.copy(
+        thn = i.thn.transform(addAxiomsToBody()),
+        els = i.els.transform(addAxiomsToBody())
+      )(i.pos, MakeInfoPair(i.info, rHeapInfo(rHeapOrig)), i.errT)
+    case w: While =>
+      whileInlineReduceInvariants(w)
+  }
+
+  private def whileInlineReduceInvariants(w: While): Seqn = {
+    val (invsWithReduce, invsWithoutReduce) = w.invs.partition(_.contains[AReduceApply])
+
+    def foldInvsAssert(rh: ARHeap) = invsWithReduce.foldLeft[Seq[Stmt]](Seq())((ss, inv) =>
+      ss :+ Assert(inv)(w.pos, MakeInfoPair(w.info, rHeapInfo(rh)), w.errT))
+    def foldInvsAssume(rh: ARHeap) = invsWithReduce.foldLeft[Seq[Stmt]](Seq())((ss, inv) =>
+      ss :+ Assume(inv)(w.pos, MakeInfoPair(w.info, rHeapInfo(rh)), w.errT))
+
+    val rHeapOrig = getCurrentRHeap
+//    val labelOrig = getCurrentLabel
+    labelIncrement()
+    val rHeapOnEntry = getCurrentRHeap
+    val labelOnEntry = getCurrentLabel
+    val wBodyRec: Seqn = w.body.transform(addAxiomsToBody())
+    Seqn(
+      foldInvsAssert(rHeapOrig) ++
+        Seq(
+          w.copy(
+            body = Seqn(
+              Seq(labelOnEntry) ++
+              foldInvsAssume(rHeapOnEntry) ++
+              wBodyRec.ss ++
+              foldInvsAssert(getCurrentRHeap),
+              wBodyRec.scopedSeqnDeclarations
+            )(wBodyRec.pos, wBodyRec.info, wBodyRec.errT),
+            invs = invsWithoutReduce
+          )(w.pos, MakeInfoPair(w.info, rHeapInfo(rHeapOrig)), w.errT)
+        ) ++
+        foldInvsAssume(getCurrentRHeap),
+      Seq()
+    )(w.pos, MakeInfoPair(w.info, rHeapInfo(rHeapOrig)), w.errT)
+  }
+
   def convertMethodToInhaleExhale(methodCall: MethodCall): Seqn = {
     //    val methodCall = mc.copy()(mc.pos, mc.info, mc.errT)
     // Get method declaration
