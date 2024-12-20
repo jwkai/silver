@@ -111,18 +111,92 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
       a.withMeta(a.pos, MakeInfoPair(a.info, rHeapInfo(getCurrentRHeap)), a.errT)
     case a: Assume =>
       a.withMeta(a.pos, MakeInfoPair(a.info, rHeapInfo(getCurrentRHeap)), a.errT)
-    // TODO: make if-statement "phi" rHeapInfo, add triggers and "skip forward" for both branches
     case i: If =>
-      val rHeapOrig = getCurrentRHeap
-      i.copy(
-        thn = i.thn.transform(addAxiomsToBody()),
-        els = i.els.transform(addAxiomsToBody())
-      )(i.pos, MakeInfoPair(i.info, rHeapInfo(rHeapOrig)), i.errT)
+      ifRHeapJoin(i)
     case w: While =>
-      whileInlineReduceInvariants(w)
+      whileRHeapFlattenInvariants(w)
   }
 
-  private def whileInlineReduceInvariants(w: While): Seqn = {
+  // Add axioms to each branch, "join" branches with next rHeap and triggers
+  private def ifRHeapJoin(i: If): Seqn = {
+    val rHeapOrig = getCurrentRHeap
+    val thnAxs = i.thn.transform(addAxiomsToBody())
+    val rHeapThn = getCurrentRHeap
+    val elsAxs = i.els.transform(addAxiomsToBody())
+    val rHeapEls = getCurrentRHeap
+    val ifJoinAx = makeIfJoinAxiom(rHeapThn, rHeapEls)
+    Seqn(
+      i.copy(
+        thn = thnAxs,
+        els = elsAxs
+      )(i.pos, MakeInfoPair(i.info, rHeapInfo(rHeapOrig)), i.errT)
+      +:
+      ifJoinAx,
+      Seq()
+    )(i.pos, MakeInfoPair(i.info, rHeapInfo(rHeapOrig)), i.errT)
+  }
+
+  private def makeIfJoinAxiom(rh1: ARHeap, rh2: ARHeap): Seq[Stmt] = {
+    labelIncrement()
+    val rhJoin = getCurrentRHeap
+    val reduceDom = program.findDomain(DomainsGenerator.reduceDKey)
+    // Extract the reduce Domain type
+    val reduceDType = DomainType(reduceDom, (reduceDom.typVars zip reduceDom.typVars).toMap)
+    val reduceIdxType = reduceDom.typVars.head
+
+    // Reduce var declaration
+    val forallVarR = LocalVarDecl("__r", reduceDType)()
+    val reduceVar = forallVarR.localVar
+
+    // Filter Var declaration
+    val forallVarFS = LocalVarDecl("__fs", SetType(reduceIdxType))()
+
+    // Use primed version so that any "yielded" terms are automatically advanced
+    val currReduceTerm1 = helper.reduceApplyPrime(rh1.toExp, reduceVar, forallVarFS.localVar)
+    val currReduceTerm2 = helper.reduceApplyPrime(rh2.toExp, reduceVar, forallVarFS.localVar)
+    val nextReduceTerm = helper.reduceApply(rhJoin.toExp, reduceVar, forallVarFS.localVar)
+    val triggerR1 = Trigger(Seq(currReduceTerm1))()
+    val triggerR2 = Trigger(Seq(currReduceTerm2))()
+
+    val eqReduce = Assume(
+      Forall(
+        Seq(forallVarR, forallVarFS),
+        Seq(triggerR1, triggerR2),
+        And(
+          EqCmp(currReduceTerm1, nextReduceTerm)(),
+          EqCmp(currReduceTerm2, nextReduceTerm)(),
+        )()
+      )()
+    )()
+
+    // Use primed version so that any "yielded" terms are automatically advanced
+    val currRHeapElemTerm1 = helper.rHeapElemApplyTo(rh1.toExp, reduceVar, forallVarFS.localVar)
+    val currRHeapElemTerm2 = helper.rHeapElemApplyTo(rh2.toExp, reduceVar, forallVarFS.localVar)
+    val nextRHeapElemTerm = helper.rHeapElemApplyTo(rhJoin.toExp, reduceVar, forallVarFS.localVar)
+    val triggerRH1 = Trigger(Seq(currReduceTerm1))()
+    val triggerRH2 = Trigger(Seq(currReduceTerm2))()
+
+    val eqRHeapElem = Assume(
+      Forall(
+        Seq(forallVarR, forallVarFS),
+        Seq(triggerRH1, triggerRH2),
+        And(
+          EqCmp(currRHeapElemTerm1, nextRHeapElemTerm)(),
+          EqCmp(currRHeapElemTerm2, nextRHeapElemTerm)(),
+        )()
+      )()
+    )()
+
+    Seq(eqReduce, eqRHeapElem)
+  }
+
+  // Symbolic state (rHeap) is not well-defined at entry.
+  // We manually convert any invariants containing hreduce terms:
+  //   - Add Assert (in old rHeap) prior to the while statement,
+  //     and (in current rHeap) the end of the while body.
+  //   - Add Assume (in current rHeap) at start of while body
+  //     and immediately after the while statement.
+  private def whileRHeapFlattenInvariants(w: While): Seqn = {
     val (invsWithReduce, invsWithoutReduce) = w.invs.partition(_.contains[AReduceApply])
 
     def foldInvsAssert(rh: ARHeap) = invsWithReduce.foldLeft[Seq[Stmt]](Seq())((ss, inv) =>

@@ -431,13 +431,6 @@ object HReducePlugin {
           outM.body match {
             case Some(bodyD) =>
               Some(bodyD.transform({
-                // TODO: deal with tricky invariant situations -
-                //  symbolic state (rHeap) is not well-defined at entry.
-                //  It's possible to manually convert these invariants:
-                //  - Add assert (in old rHeap) prior to the while statement,
-                //    and (in current rHeap) the end of the while body.
-                //  - Add assumes (in current rHeap) at start of while body
-                //    and immediately after the while statement.
                 case w@While(cond, invs, body) =>
                   While(cond,
                     invs.map(inv => inv.transform(setRHeapApply)),

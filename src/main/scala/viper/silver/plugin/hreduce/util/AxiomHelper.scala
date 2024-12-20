@@ -78,6 +78,16 @@ class AxiomHelper(program: Program) {
     )()
   }
 
+  def reduceApplyPrime(rHeap: Exp, reduce: Exp, filter: Exp): DomainFuncApp = {
+    val reduceApplyPrime = program.findDomainFunction(DomainsGenerator.reduceApplyPrimeKey)
+
+    DomainFuncApp(
+      reduceApplyPrime,
+      Seq(rHeap, reduce, filter),
+      reduce.typ.asInstanceOf[DomainType].typVarsMap
+    )()
+  }
+
   def foldedConjImplies(lhsExps: Seq[Exp], rhsExps: Seq[Exp]): Exp = {
     def foldConj(exps: Seq[Exp]): Exp = {
       if (exps.length == 1) {
