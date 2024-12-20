@@ -2,7 +2,8 @@ package viper.silver.plugin.hreduce
 
 import viper.silver.ast._
 import viper.silver.ast.utility.Expressions
-import viper.silver.plugin.hreduce.ast.{AReduceApply, AReduceDecl, ARHeap, rHeapInfo}
+import viper.silver.ast.utility.Statements.EmptyStmt
+import viper.silver.plugin.hreduce.ast.{ARHeap, AReduceApply, AReduceDecl, rHeapInfo}
 import viper.silver.plugin.hreduce.util.AxiomHelper
 import viper.silver.verifier.errors
 import viper.silver.verifier.errors.{ExhaleFailed, InhaleFailed}
@@ -120,34 +121,40 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
   // Add axioms to each branch, "join" branches with next rHeap and triggers
   private def ifRHeapJoin(i: If): Seqn = {
     val rHeapOrig = getCurrentRHeap
+    val thnFields = helper.extractFieldAcc(i.thn)
     val thnAxs = i.thn.transform(addAxiomsToBody())
     val rHeapThn = getCurrentRHeap
+    val elsFields = helper.extractFieldAcc(i.els)
     val elsAxs = i.els.transform(addAxiomsToBody())
-    val rHeapEls = getCurrentRHeap
+    val rHeapEls = if (i.els == EmptyStmt) rHeapOrig else getCurrentRHeap
     labelIncrement()
+    val ifJoinAxsThn = thnAxs.copy(
+      ss = thnAxs.ss ++ makeIfJoinAxioms(rHeapThn, getCurrentRHeap, thnFields ++ elsFields)
+    )(thnAxs.pos, thnAxs.info, thnAxs.errT)
+    val ifJoinAxsEls = elsAxs.copy(
+      ss = elsAxs.ss ++ makeIfJoinAxioms(rHeapEls, getCurrentRHeap, thnFields ++ elsFields)
+    )(elsAxs.pos, elsAxs.info, elsAxs.errT)
     Seqn(
-      i.copy(
-        thn = thnAxs,
-        els = elsAxs
-      )(i.pos, MakeInfoPair(i.info, rHeapInfo(rHeapOrig)), i.errT)
-      +: makeIfJoinAxioms(rHeapThn, rHeapEls, getCurrentRHeap),
+      Seq(i.copy(
+        thn = ifJoinAxsThn,
+        els = ifJoinAxsEls
+      )(i.pos, MakeInfoPair(i.info, rHeapInfo(rHeapOrig)), i.errT)),
       Seq()
     )(i.pos, MakeInfoPair(i.info, rHeapInfo(rHeapOrig)), i.errT)
   }
 
-  private def makeIfJoinAxioms(rh1: ARHeap, rh2: ARHeap, rhNext: ARHeap): Seq[Stmt] = {
-    val reduceDom = program.findDomain(DomainsGenerator.reduceDKey)
-    // Extract the reduce Domain type
-    val reduceDType = DomainType(reduceDom, (reduceDom.typVars zip reduceDom.typVars).toMap)
-    val reduceIdxType = reduceDom.typVars.head
+  private def makeIfJoinAxioms(rhCurr: ARHeap, rhNext: ARHeap, relevantField: Set[Field]): Seq[Stmt] = {
+    def ffAxs(rh: ARHeap, reduceADecl: AReduceDecl): Seq[Stmt] = {
+      // Extract the reduce Domain type
+      val reduceDType = reduceADecl.reduceDType(program)
+      val reduceIdxType = reduceADecl.reduceType._1
 
-    val forallVarR = LocalVarDecl("__r", reduceDType)()
-    val forallVarFS = LocalVarDecl("__fs", SetType(reduceIdxType))()
-    val forallVarIdx = LocalVarDecl("__i", reduceIdxType)()
+      // Create domain-typed vars for quantification
+      val forallVarR = LocalVarDecl("__r", reduceDType)()
+      val forallVarFS = LocalVarDecl("__fs", SetType(reduceIdxType))()
+      val forallVarIdx = LocalVarDecl("__i", reduceIdxType)()
 
-    def ffAxs(rh: ARHeap): Seq[Stmt] = {
-      // Use primed version so that any "yielded" terms are automatically advanced
-      val currReduceTerm = helper.reduceApplyPrime(rh.toExp, forallVarR.localVar, forallVarFS.localVar)
+      val currReduceTerm = helper.reduceApply(rh.toExp, forallVarR.localVar, forallVarFS.localVar)
       val nextReduceTerm = helper.reduceApply(rhNext.toExp, forallVarR.localVar, forallVarFS.localVar)
       val eqReduce = Assume(
         Forall(
@@ -157,20 +164,34 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
         )()
       )()
 
+      // Add primed version so that any "yielded" terms are automatically advanced
+      val currReducePrimeTerm = helper.reduceApplyPrime(rh.toExp, forallVarR.localVar, forallVarFS.localVar)
+      val nextReducePrimeTerm = helper.reduceApplyPrime(rhNext.toExp, forallVarR.localVar, forallVarFS.localVar)
+      val eqReducePrime = Assume(
+        Forall(
+          Seq(forallVarR, forallVarFS),
+          Seq(Trigger(Seq(currReducePrimeTerm))()),
+          EqCmp(currReducePrimeTerm, nextReducePrimeTerm)()
+        )()
+      )()
+
       val currRHeapElemTerm = helper.rHeapElemApplyTo(rh.toExp, forallVarR.localVar, forallVarIdx.localVar)
       val nextRHeapElemTerm = helper.rHeapElemApplyTo(rhNext.toExp, forallVarR.localVar, forallVarIdx.localVar)
       val eqRHeapElem = Assume(
         Forall(
-          Seq(forallVarR, forallVarFS),
+          Seq(forallVarR, forallVarIdx),
           Seq(Trigger(Seq(currRHeapElemTerm))()),
           EqCmp(currRHeapElemTerm, nextRHeapElemTerm)()
         )()
       )()
 
-      Seq(eqReduce, eqRHeapElem)
+      Seq(eqReduce, eqReducePrime, eqRHeapElem)
     }
 
-    ffAxs(rh1) ++ ffAxs(rh2)
+    val relevantReduceDecls = reduceDeclsUsed.toSeq.filter(reduceDecl =>
+      relevantField.contains(reduceDecl.findFieldInProgram(program)))
+
+    relevantReduceDecls.flatMap(reduceDecl => ffAxs(rhCurr, reduceDecl))
   }
 
   // Symbolic state (rHeap) is not well-defined at entry.
