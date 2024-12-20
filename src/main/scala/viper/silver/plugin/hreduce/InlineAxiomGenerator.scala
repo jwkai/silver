@@ -124,70 +124,53 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val rHeapThn = getCurrentRHeap
     val elsAxs = i.els.transform(addAxiomsToBody())
     val rHeapEls = getCurrentRHeap
-    val ifJoinAx = makeIfJoinAxiom(rHeapThn, rHeapEls)
+    labelIncrement()
     Seqn(
       i.copy(
         thn = thnAxs,
         els = elsAxs
       )(i.pos, MakeInfoPair(i.info, rHeapInfo(rHeapOrig)), i.errT)
-      +:
-      ifJoinAx,
+      +: makeIfJoinAxioms(rHeapThn, rHeapEls, getCurrentRHeap),
       Seq()
     )(i.pos, MakeInfoPair(i.info, rHeapInfo(rHeapOrig)), i.errT)
   }
 
-  private def makeIfJoinAxiom(rh1: ARHeap, rh2: ARHeap): Seq[Stmt] = {
-    labelIncrement()
-    val rhJoin = getCurrentRHeap
+  private def makeIfJoinAxioms(rh1: ARHeap, rh2: ARHeap, rhNext: ARHeap): Seq[Stmt] = {
     val reduceDom = program.findDomain(DomainsGenerator.reduceDKey)
     // Extract the reduce Domain type
     val reduceDType = DomainType(reduceDom, (reduceDom.typVars zip reduceDom.typVars).toMap)
     val reduceIdxType = reduceDom.typVars.head
 
-    // Reduce var declaration
     val forallVarR = LocalVarDecl("__r", reduceDType)()
-    val reduceVar = forallVarR.localVar
-
-    // Filter Var declaration
     val forallVarFS = LocalVarDecl("__fs", SetType(reduceIdxType))()
+    val forallVarIdx = LocalVarDecl("__i", reduceIdxType)()
 
-    // Use primed version so that any "yielded" terms are automatically advanced
-    val currReduceTerm1 = helper.reduceApplyPrime(rh1.toExp, reduceVar, forallVarFS.localVar)
-    val currReduceTerm2 = helper.reduceApplyPrime(rh2.toExp, reduceVar, forallVarFS.localVar)
-    val nextReduceTerm = helper.reduceApply(rhJoin.toExp, reduceVar, forallVarFS.localVar)
-    val triggerR1 = Trigger(Seq(currReduceTerm1))()
-    val triggerR2 = Trigger(Seq(currReduceTerm2))()
-
-    val eqReduce = Assume(
-      Forall(
-        Seq(forallVarR, forallVarFS),
-        Seq(triggerR1, triggerR2),
-        And(
-          EqCmp(currReduceTerm1, nextReduceTerm)(),
-          EqCmp(currReduceTerm2, nextReduceTerm)(),
+    def ffAxs(rh: ARHeap): Seq[Stmt] = {
+      // Use primed version so that any "yielded" terms are automatically advanced
+      val currReduceTerm = helper.reduceApplyPrime(rh.toExp, forallVarR.localVar, forallVarFS.localVar)
+      val nextReduceTerm = helper.reduceApply(rhNext.toExp, forallVarR.localVar, forallVarFS.localVar)
+      val eqReduce = Assume(
+        Forall(
+          Seq(forallVarR, forallVarFS),
+          Seq(Trigger(Seq(currReduceTerm))()),
+          EqCmp(currReduceTerm, nextReduceTerm)()
         )()
       )()
-    )()
 
-    // Use primed version so that any "yielded" terms are automatically advanced
-    val currRHeapElemTerm1 = helper.rHeapElemApplyTo(rh1.toExp, reduceVar, forallVarFS.localVar)
-    val currRHeapElemTerm2 = helper.rHeapElemApplyTo(rh2.toExp, reduceVar, forallVarFS.localVar)
-    val nextRHeapElemTerm = helper.rHeapElemApplyTo(rhJoin.toExp, reduceVar, forallVarFS.localVar)
-    val triggerRH1 = Trigger(Seq(currReduceTerm1))()
-    val triggerRH2 = Trigger(Seq(currReduceTerm2))()
-
-    val eqRHeapElem = Assume(
-      Forall(
-        Seq(forallVarR, forallVarFS),
-        Seq(triggerRH1, triggerRH2),
-        And(
-          EqCmp(currRHeapElemTerm1, nextRHeapElemTerm)(),
-          EqCmp(currRHeapElemTerm2, nextRHeapElemTerm)(),
+      val currRHeapElemTerm = helper.rHeapElemApplyTo(rh.toExp, forallVarR.localVar, forallVarIdx.localVar)
+      val nextRHeapElemTerm = helper.rHeapElemApplyTo(rhNext.toExp, forallVarR.localVar, forallVarIdx.localVar)
+      val eqRHeapElem = Assume(
+        Forall(
+          Seq(forallVarR, forallVarFS),
+          Seq(Trigger(Seq(currRHeapElemTerm))()),
+          EqCmp(currRHeapElemTerm, nextRHeapElemTerm)()
         )()
       )()
-    )()
 
-    Seq(eqReduce, eqRHeapElem)
+      Seq(eqReduce, eqRHeapElem)
+    }
+
+    ffAxs(rh1) ++ ffAxs(rh2)
   }
 
   // Symbolic state (rHeap) is not well-defined at entry.
@@ -475,19 +458,19 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
         Forall(
           Seq(forallVarIdx),
           Seq(
-            Trigger(Seq(helper.rHeapElemApplyTo(reduceVar, rhOld.toExp, idxVar)))(),
-            Trigger(Seq(helper.rHeapElemApplyTo(reduceVar, rhNew.toExp, idxVar)))()
+            Trigger(Seq(helper.rHeapElemApplyTo(rhOld.toExp, reduceVar, idxVar)))(),
+            Trigger(Seq(helper.rHeapElemApplyTo(rhNew.toExp, reduceVar, idxVar)))()
           ),
           helper.foldedConjImplies(
             Seq(NeCmp(idxVar, invRecvApp)(), helper.permNonZeroCmp(idxVar, reduceVar, field.name)),
             Seq(
               NeCmp(idxVar, invRecvApp)(),
               EqCmp(
-                helper.rHeapElemApplyTo(reduceVar, rhOld.toExp, idxVar),
+                helper.rHeapElemApplyTo(rhOld.toExp, reduceVar, idxVar),
                 helper.mapApplyTo(reduceVar, FieldAccess(receiverAppIdx, field)())
               )(),
               EqCmp(
-                helper.rHeapElemApplyTo(reduceVar, rhNew.toExp, idxVar),
+                helper.rHeapElemApplyTo(rhNew.toExp, reduceVar, idxVar),
                 helper.mapApplyTo(reduceVar, FieldAccess(receiverAppIdx, field)())
               )()
             ),
@@ -504,11 +487,11 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
           Seq(helper.permNonZeroCmp(invRecvApp, reduceVar, field.name)),
           Seq(
             EqCmp(
-              helper.rHeapElemApplyTo(reduceVar, rhOld.toExp, invRecvApp),
+              helper.rHeapElemApplyTo(rhOld.toExp, reduceVar, invRecvApp),
               helper.mapApplyTo(reduceVar, FieldAccess(writeTo, field)())
             )(),
             EqCmp(
-              helper.rHeapElemApplyTo(reduceVar, rhNew.toExp, invRecvApp),
+              helper.rHeapElemApplyTo(rhNew.toExp, reduceVar, invRecvApp),
               helper.mapApplyTo(reduceVar, writeExp)
             )()
           )
@@ -721,18 +704,18 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
         Forall(
           Seq(forallVarIdx),
           Seq(
-            Trigger(Seq(helper.rHeapElemApplyTo(reduceVar, rhOld.toExp, idxVar)))()
+            Trigger(Seq(helper.rHeapElemApplyTo(rhOld.toExp, reduceVar, idxVar)))()
           ),
           helper.foldedConjImplies(
             Seq(
               LabelledOld(
-                helper.permNonZeroCmp(idxVar, reduceVar, field.name),
+                helper.permNonZeroCmp(reduceVar, idxVar, field.name),
                 getLastLabel.name
               )()
             ),
             Seq(
               EqCmp(
-                helper.rHeapElemApplyTo(reduceVar, rhOld.toExp, invRecvIndApp),
+                helper.rHeapElemApplyTo(rhOld.toExp, reduceVar, invRecvIndApp),
                 LabelledOld(
                   helper.mapApplyTo(reduceVar, FieldAccess(receiverAppIdx, field)()),
                   getLastLabel.name
@@ -751,19 +734,19 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
         Forall(
           Seq(forallVarIdx),
           Seq(
-            Trigger(Seq(helper.rHeapElemApplyTo(reduceVar, rhOld.toExp, idxVar)))(),
-            Trigger(Seq(helper.rHeapElemApplyTo(reduceVar, rhNew.toExp, idxVar)))()
+            Trigger(Seq(helper.rHeapElemApplyTo(rhOld.toExp, reduceVar, idxVar)))(),
+            Trigger(Seq(helper.rHeapElemApplyTo(rhNew.toExp, reduceVar, idxVar)))()
           ),
           helper.foldedConjImplies(
             Seq(idxNotInRefs, helper.permNonZeroCmp(idxVar, reduceVar, field.name)),
             Seq(
               idxNotInRefs,
               EqCmp(
-                helper.rHeapElemApplyTo(reduceVar, rhOld.toExp, invRecvIndApp),
+                helper.rHeapElemApplyTo(rhOld.toExp, reduceVar, invRecvIndApp),
                 helper.mapApplyTo(reduceVar, FieldAccess(receiverAppIdx, field)())
               )(),
               EqCmp(
-                helper.rHeapElemApplyTo(reduceVar, rhNew.toExp, invRecvIndApp),
+                helper.rHeapElemApplyTo(rhNew.toExp, reduceVar, invRecvIndApp),
                 helper.mapApplyTo(reduceVar, FieldAccess(receiverAppIdx, field)())
               )()
             ),
@@ -1030,7 +1013,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
         Forall(
           Seq(forallVarIdx),
           Seq(
-            Trigger(Seq(helper.rHeapElemApplyTo(reduceVar, rhOld.toExp, idxVar)))()
+            Trigger(Seq(helper.rHeapElemApplyTo(rhOld.toExp, reduceVar, idxVar)))()
           ),
           helper.foldedConjImplies(
             Seq(
@@ -1041,14 +1024,14 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
             ),
             Seq(
               EqCmp(
-                helper.rHeapElemApplyTo(reduceVar, rhOld.toExp, invRecvIndApp),
+                helper.rHeapElemApplyTo(rhOld.toExp, reduceVar, invRecvIndApp),
                 LabelledOld(
                   helper.mapApplyTo(reduceVar, FieldAccess(receiverAppIdx, field)()),
                   getLastLabel.name
                 )()
               )(),
               EqCmp(
-                helper.rHeapElemApplyTo(reduceVar, rhNew.toExp, invRecvIndApp),
+                helper.rHeapElemApplyTo(rhNew.toExp, reduceVar, invRecvIndApp),
                 LabelledOld(
                   helper.mapApplyTo(reduceVar, FieldAccess(receiverAppIdx, field)()),
                   getLastLabel.name
@@ -1067,13 +1050,13 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
         Forall(
           Seq(forallVarIdx),
           Seq(
-            Trigger(Seq(helper.rHeapElemApplyTo(reduceVar, rhNew.toExp, idxVar)))()
+            Trigger(Seq(helper.rHeapElemApplyTo(rhNew.toExp, reduceVar, idxVar)))()
           ),
           helper.foldedConjImplies(
             Seq(helper.permNonZeroCmp(idxVar, reduceVar, field.name)),
             Seq(
               EqCmp(
-                helper.rHeapElemApplyTo(reduceVar, rhNew.toExp, invRecvIndApp),
+                helper.rHeapElemApplyTo(rhNew.toExp, reduceVar, invRecvIndApp),
                 helper.mapApplyTo(reduceVar, FieldAccess(receiverAppIdx, field)())
               )()
             ),

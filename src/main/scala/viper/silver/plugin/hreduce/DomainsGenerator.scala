@@ -170,7 +170,7 @@ object DomainsGenerator {
          |
          |    function $reduceApplyDummyKey(a:$reduceDTV2): Bool
          |    function setEqDummy(b: Bool): Bool
-         |    function $rHeapElemKey(c: $reduceDKey[$reduceDTV0,$reduceDTV1,$reduceDTV2], h: $intKey, a: $reduceDTV0): $reduceDTV2
+         |    function $rHeapElemKey(h: $intKey, c: $reduceDKey[$reduceDTV0,$reduceDTV1,$reduceDTV2], a: $reduceDTV0): $reduceDTV2
          |
          |    function $trigDelBlockKey(applyC: $reduceDTV2, block: Set[$reduceDTV0]): Bool
          |    function $trigDelKey1Key(applyC: $reduceDTV2, key: $reduceDTV0): Bool
@@ -207,8 +207,8 @@ object DomainsGenerator {
          |               ${prefix}c: $reduceDKey[$reduceDTV0,$reduceDTV1,$reduceDTV2],
          |               ${prefix}elem: $reduceDTV0 ::
          |        { ($reduceApplyKey(${prefix}rh, ${prefix}c, Set(${prefix}elem)): $reduceDTV2),
-         |          ($rHeapElemKey(${prefix}c, ${prefix}rh, ${prefix}elem): $reduceDTV2) }
-         |        $reduceApplyKey(${prefix}rh, ${prefix}c, Set(${prefix}elem)) == $rHeapElemKey(${prefix}c, ${prefix}rh, ${prefix}elem)
+         |          ($rHeapElemKey(${prefix}rh, ${prefix}c, ${prefix}elem): $reduceDTV2) }
+         |        $reduceApplyKey(${prefix}rh, ${prefix}c, Set(${prefix}elem)) == $rHeapElemKey(${prefix}rh, ${prefix}c, ${prefix}elem)
          |    }
          |
          |    axiom _dropOne1 {
@@ -217,13 +217,13 @@ object DomainsGenerator {
          |               ${prefix}fs: Set[$reduceDTV0],
          |               ${prefix}key: $reduceDTV0 ::
          |        { ($trigDelKey1Key($reduceApplyKey(${prefix}rh, ${prefix}c, ${prefix}fs), ${prefix}key): Bool),
-         |          ($rHeapElemKey(${prefix}c, ${prefix}rh, ${prefix}key): $reduceDTV2) }
+         |          ($rHeapElemKey(${prefix}rh, ${prefix}c, ${prefix}key): $reduceDTV2) }
          |        (${prefix}key in ${prefix}fs) ==>
          |        (${prefix}key in ${prefix}fs) &&
          |        $reduceApplyKey(${prefix}rh, ${prefix}c, ${prefix}fs) ==
          |        $opApplyKey($reduceGetOperKey(${prefix}c),
          |          $reduceApplyPrimeKey(${prefix}rh, ${prefix}c, $setDeleteKey(${prefix}fs, Set(${prefix}key))),
-         |          $rHeapElemKey(${prefix}c, ${prefix}rh, ${prefix}key))
+         |          $rHeapElemKey(${prefix}rh, ${prefix}c, ${prefix}key))
          |    }
          |
          |    axiom _loseMany {
@@ -289,8 +289,8 @@ object DomainsGenerator {
          |                       ($reduceApplyPrimeKey(${prefix}rh_new, ${prefix}c, ${prefix}fs): $reduceDTV2)): Bool) }
          |        ($reduceApplyKey(${prefix}rh_old, ${prefix}c, ${prefix}fs) == $reduceApplyKey(${prefix}rh_new, ${prefix}c, ${prefix}fs)) ||
          |        ((_skExt(${prefix}c, $reduceApplyPrimeKey(${prefix}rh_old, ${prefix}c, ${prefix}fs), $reduceApplyPrimeKey(${prefix}rh_new, ${prefix}c, ${prefix}fs)) in ${prefix}fs ==>
-         |            (($rHeapElemKey(${prefix}c, ${prefix}rh_old, _skExt(${prefix}c, $reduceApplyPrimeKey(${prefix}rh_old, ${prefix}c, ${prefix}fs), $reduceApplyPrimeKey(${prefix}rh_new, ${prefix}c, ${prefix}fs))): $reduceDTV2)) ==
-         |            (($rHeapElemKey(${prefix}c, ${prefix}rh_new, _skExt(${prefix}c, $reduceApplyPrimeKey(${prefix}rh_old, ${prefix}c, ${prefix}fs), $reduceApplyPrimeKey(${prefix}rh_new, ${prefix}c, ${prefix}fs))): $reduceDTV2)))
+         |            (($rHeapElemKey(${prefix}rh_old, ${prefix}c, _skExt(${prefix}c, $reduceApplyPrimeKey(${prefix}rh_old, ${prefix}c, ${prefix}fs), $reduceApplyPrimeKey(${prefix}rh_new, ${prefix}c, ${prefix}fs))): $reduceDTV2)) ==
+         |            (($rHeapElemKey(${prefix}rh_new, ${prefix}c, _skExt(${prefix}c, $reduceApplyPrimeKey(${prefix}rh_old, ${prefix}c, ${prefix}fs), $reduceApplyPrimeKey(${prefix}rh_new, ${prefix}c, ${prefix}fs))): $reduceDTV2)))
          |        ==>
          |        ($reduceApplyPrimeKey(${prefix}rh_old, ${prefix}c, ${prefix}fs) == $reduceApplyPrimeKey(${prefix}rh_new, ${prefix}c, ${prefix}fs)))
          |    }

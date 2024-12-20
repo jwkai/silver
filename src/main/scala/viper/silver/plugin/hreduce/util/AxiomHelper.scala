@@ -184,12 +184,12 @@ class AxiomHelper(program: Program) {
     )()
   }
 
-  def rHeapElemApplyTo(reduceExp: Exp, rHeap: Exp, arg: Exp): DomainFuncApp = {
+  def rHeapElemApplyTo(rHeap: Exp, reduceExp: Exp, arg: Exp): DomainFuncApp = {
     val reduceType = reduceExp.typ.asInstanceOf[DomainType]
     val rHeapFunc: DomainFunc = program.findDomainFunction(DomainsGenerator.rHeapElemKey)
     DomainFuncApp(
       rHeapFunc,
-      Seq(reduceExp, rHeap, arg),
+      Seq(rHeap, reduceExp, arg),
       reduceType.typVarsMap
     )()
   }
