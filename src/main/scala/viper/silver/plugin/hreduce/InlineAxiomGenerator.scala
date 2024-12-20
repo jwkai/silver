@@ -709,7 +709,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
           helper.foldedConjImplies(
             Seq(
               LabelledOld(
-                helper.permNonZeroCmp(reduceVar, idxVar, field.name),
+                helper.permNonZeroCmp(idxVar, reduceVar, field.name),
                 getLastLabel.name
               )()
             ),
