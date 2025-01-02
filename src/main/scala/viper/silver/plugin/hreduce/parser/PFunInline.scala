@@ -21,12 +21,12 @@ case class PFunInline(keyword: PReserved[PFunInlineKeyword.type], args: Seq[PFor
     None
   }
 
-  def typecheckOp(t: TypeChecker, n: NameAnalyser, expected: PType): Option[Seq[String]] = {
+  def typecheckOp(t: TypeChecker, n: NameAnalyser, expected: Option[PType]): Option[Seq[String]] = {
     if (args.length != 2) {
       return Some(Seq("Operator body should have exactly two arguments."))
     }
     args.foreach(a => t.check(a.typ))
-    t.checkTopTyped(body, Some(expected))
+    t.checkTopTyped(body, expected)
     None
   }
 

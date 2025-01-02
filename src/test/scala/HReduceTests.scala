@@ -15,11 +15,12 @@ import viper.silver.verifier._
 import java.nio.file.Paths
 
 class HReduceTests extends AnyFunSuite {
-  val inputfile = "hreduce/arrayTestExhaleInhale.vpr"
+//  val inputfile = "hreduce/arrayTestExhaleInhale.vpr"
 //  val inputfile = "hreduce/arrayTestExhaleExhale.vpr"
-//  val inputfile = "hreduce/arrayBubbleSort.vpr"
+  val inputfile = "hreduce/arrayBubbleSort.vpr"
 //  val inputfile = "hreduce/arraySwapNested.vpr"
 //  val inputfile = "hreduce/arrayTestChain.vpr"
+//  val inputfile = "hreduce/graphSum.vpr"
   val plugins: Seq[String] = Seq(
 //    "TestPluginAllCalled",
     "viper.silver.plugin.hreduce.HReducePlugin"

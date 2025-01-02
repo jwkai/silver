@@ -18,7 +18,7 @@ case class AReduceApply(reduction: AReduction3Tuple, filter: Exp, fieldName: Str
   var rHeap: Option[ARHeap] = None
 
   def toViper(input: Program): Exp = {
-    val reduceEvalFunc = input.findDomainFunction(DomainsGenerator.reduceApplyKey)
+    val reduceEvalFunc = input.findDomainFunction(reduction.reduceEvalFuncName())
     val reduceConstructed = reduction.toViper(input)
 
     rHeap match {
@@ -44,7 +44,7 @@ case class AReduceApply(reduction: AReduction3Tuple, filter: Exp, fieldName: Str
   }
 
   override lazy val prettyPrint: PrettyPrintPrimitives#Cont =
-    text(DomainsGenerator.reduceConstructKey) <> brackets(show(reduction.op)) <>
+    text(reduction.reduceConstructKeyName()) <> brackets(show(reduction.op)) <>
       parens(includeMapping(show(reduction.receiver) <> char('.') <> text(fieldName), reduction.mapping) <+>
         char('|') <+> show(filter))
 

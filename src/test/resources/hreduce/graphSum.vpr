@@ -13,7 +13,7 @@ define INV(nodes)
 				n in nodes && n.right != null ==> n.right in nodes)
 
 receiver idenRec() (fun r: Ref :: r)
-opWithId add() (0, fun a: Int, b: Int :: a + b )
+operator add() (0, fun a: Int, b: Int :: a + b )
 
 method sumNodes(nodes : Set[Ref], node: Ref)
     requires node in nodes

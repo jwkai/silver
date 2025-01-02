@@ -6,45 +6,24 @@ import viper.silver.plugin.hreduce.util.AxiomHelper
 import viper.silver.plugin.hreduce.{HReducePlugin, DomainsGenerator, ReduceErrors, ReduceReasons}
 import viper.silver.verifier.errors.AssertFailed
 
-case object PReduceOperatorKeyword extends PKw("opWithId") with PKeywordLang
+case object PReduceOperatorKeyword extends PKw("operator") with PKeywordLang
 
-case class PReduceOperator(keyword: PReserved[PReduceOperatorKeyword.type], idndef: PIdnDef, override val formalArgs: Seq[PFormalArgDecl], opUnit: PExp, body: Some[PFunInline])
-                          (val pos: (Position, Position))
-  extends PExtender with PSingleMember with PReduceComponentDecl {
-
+sealed trait PReduceOperator extends PExtender with PSingleMember with PReduceComponentDecl {
   override val componentName: String = "Operator"
   var sourcePos : Position = null
+  var helper : AxiomHelper
 
-  override def typecheck(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] = {
-    t.checkMember(this){
-      formalArgs.foreach(a => t.check(a.typ))
-      t.checkTopTyped(opUnit, None)
-      body.get.typecheckOp(t, n, opUnit.typ) match {
-        case out @ Some(_) => return out
-        case None => typToInfer = HReducePlugin.makeDomainType(DomainsGenerator.opDKey, Seq(opUnit.typ))
-      }
-    }
-    None
-  }
+  def typecheck(t: TypeChecker, n: NameAnalyser): Option[Seq[String]]
 
-  override def translateMember(t: Translator): Member = {
-    translateMemberWithName(t, Some(DomainsGenerator.opApplyKey))
-    // Gets the dummy domain
-    val d = t.getMembers()(genDomainName).asInstanceOf[Domain]
-    // Gets the evalRec function
-    val axiom = getOperUnitAxiom(t)
-    val dd = d.copy(
-      functions = d.functions,
-      axioms = d.axioms :+ axiom
-    )(d.pos, d.info, d.errT)
-    sourcePos = t.liftPos(this)
-    t.getMembers()(genDomainName) = dd
-    dd
+  def translateMember(t: Translator): Member
 
-  }
+  def genOpUnitAssert(opExp: DomainFuncApp,
+                      opTypeVarMap: Map[TypeVar, Type],
+                      input: LocalVarDecl,
+                      outerArgs: Seq[LocalVarDecl]): Seq[Stmt]
 
   def generatedOpWelldefinednessCheck(program: Program): Method = {
-    val helper = new AxiomHelper(program)
+    helper = new AxiomHelper(program)
     // Find the domain function of the operator
     val domainFuncAST = program.findDomainFunction(idndef.name)
 
@@ -57,9 +36,9 @@ case class PReduceOperator(keyword: PReserved[PReduceOperatorKeyword.type], idnd
     // Outer args. So if add(i), we want i
     val opOuterArgs : Seq[LocalVarDecl] =
       domainFuncAST.formalArgs.flatMap{
-          case lv: LocalVarDecl => Seq(lv)
-          case _ => Seq()
-        }
+        case lv: LocalVarDecl => Seq(lv)
+        case _ => Seq()
+      }
     val input1 = LocalVarDecl("_i1", inputType)()
     val input2 = LocalVarDecl("_i2", inputType)()
 
@@ -110,13 +89,95 @@ case class PReduceOperator(keyword: PReserved[PReduceOperatorKeyword.type], idnd
     })
     val assert2 = Assert(forallAssoc)(errT = errAssoc)
 
+    val assert3 = genOpUnitAssert(opExp, opTypeVarMap, input1, opOuterArgs)
+
+    val asserts = Seq(assert1, assert2) ++ assert3
+
+    Method("operator_" + this.idndef.name + "_welldef_check", Seq(), Seq(),Seq(),Seq(),
+      Some(Seqn(asserts,Seq())()))()
+  }
+}
+
+case class PReduceOperatorWithoutId(keyword: PReserved[PReduceOperatorKeyword.type],
+                                    idndef: PIdnDef,
+                                    override val formalArgs: Seq[PFormalArgDecl],
+                                    body: Some[PFunInline])
+                              (val pos: (Position, Position)) extends PReduceOperator {
+
+  override var helper: AxiomHelper = null
+
+  override def typecheck(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] = {
+    t.checkMember(this){
+      formalArgs.foreach(a => t.check(a.typ))
+      body.get.typecheckOp(t, n, None) match {
+        case out@Some(_) => return out
+        case None => typToInfer = HReducePlugin.makeDomainType(DomainsGenerator.opDKey, Seq(body.get.body.typ))
+      }
+    }
+    None
+  }
+
+  override def genOpUnitAssert(opExp: DomainFuncApp,
+                               opTypeVarMap: Map[TypeVar, Type],
+                               input: LocalVarDecl,
+                               outerArgs: Seq[LocalVarDecl]): Seq[Stmt] = Seq()
+
+  override def translateMember(t: Translator): Member = {
+    translateMemberWithName(t, Some(DomainsGenerator.opApplyKey))
+    // Gets the dummy domain
+    val d = t.getMembers()(genDomainName).asInstanceOf[Domain]
+    sourcePos = t.liftPos(this)
+    t.getMembers()(genDomainName) = d
+    d
+  }
+}
+
+case class PReduceOperatorWithId(keyword: PReserved[PReduceOperatorKeyword.type],
+                                 idndef: PIdnDef,
+                                 override val formalArgs: Seq[PFormalArgDecl],
+                                 body: Some[PFunInline], opUnit: PExp)
+                          (val pos: (Position, Position)) extends PReduceOperator {
+
+  override var helper: AxiomHelper = null
+
+  override def typecheck(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] = {
+    t.checkMember(this){
+      formalArgs.foreach(a => t.check(a.typ))
+      t.checkTopTyped(opUnit, None)
+      body.get.typecheckOp(t, n, Some(opUnit.typ)) match {
+        case out@Some(_) => return out
+        case None => typToInfer = HReducePlugin.makeDomainType(DomainsGenerator.opDKey, Seq(body.get.body.typ))
+      }
+    }
+    None
+  }
+
+  override def translateMember(t: Translator): Member = {
+    translateMemberWithName(t, Some(DomainsGenerator.opApplyKey))
+    // Gets the dummy domain
+    val d = t.getMembers()(genDomainName).asInstanceOf[Domain]
+    // Gets the evalRec function
+    val axiom = getOperUnitAxiom(t)
+    val dd = d.copy(
+      functions = d.functions,
+      axioms = d.axioms :+ axiom
+    )(d.pos, d.info, d.errT)
+    sourcePos = t.liftPos(this)
+    t.getMembers()(genDomainName) = dd
+    dd
+  }
+
+  override def genOpUnitAssert(opExp: DomainFuncApp,
+                               opTypeVarMap: Map[TypeVar, Type],
+                               input1: LocalVarDecl,
+                               opOuterArgs: Seq[LocalVarDecl]): Seq[Stmt] = {
     // Identity check
-    val opUnit = helper.applyDomainFunc(
+    val opUnitExp = helper.applyDomainFunc(
       DomainsGenerator.opIdenKey, Seq(opExp), opTypeVarMap)
     val opAppliedUnit = helper.applyDomainFunc(
-      DomainsGenerator.opApplyKey, Seq(opExp, input1.localVar, opUnit), opTypeVarMap)
+      DomainsGenerator.opApplyKey, Seq(opExp, input1.localVar, opUnitExp), opTypeVarMap)
     val dummyTrigger2 = helper.applyDomainFunc(
-      "_noTrigOp",Seq(opAppliedUnit), opTypeVarMap)
+      "_noTrigOp", Seq(opAppliedUnit), opTypeVarMap)
     val forallIden = Forall(
       opOuterArgs ++ Seq(input1),
       Seq(Trigger(Seq(dummyTrigger2))()),
@@ -127,14 +188,11 @@ case class PReduceOperator(keyword: PReserved[PReduceOperatorKeyword.type], idnd
         val reason = ReduceReasons.IncorrectIdentity(offendingNode, this)
         ReduceErrors.OpWellDefinednessError(offendingNode, this, reason, cached)
       //      case ExhaleFailed(offendingNode, _, cached) => {
-//        val reason = FoldReasons.IncorrectIdentity(offendingNode, this)
-//        FoldErrors.OpWellDefinednessError(offendingNode, this, reason, cached)
-//      }
+      //        val reason = FoldReasons.IncorrectIdentity(offendingNode, this)
+      //        FoldErrors.OpWellDefinednessError(offendingNode, this, reason, cached)
+      //      }
     })
-    val assert3 = Assert(forallIden)(errT = errIden)
-
-    Method("operator_" + this.idndef.name + "_welldef_check", Seq(), Seq(),Seq(),Seq(),
-      Some(Seqn(Seq(assert1, assert2, assert3),Seq())()))()
+    Seq(Assert(forallIden)(errT = errIden))
   }
 
   def getOperUnitAxiom(t: Translator): AnonymousDomainAxiom = {

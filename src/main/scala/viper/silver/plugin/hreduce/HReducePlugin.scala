@@ -60,17 +60,33 @@ class HReducePlugin(@unused reporter: viper.silver.reporter.Reporter,
       }
     )
 
+  def opDef[$:P]: P[PAnnotationsPosition => PReduceOperator] =
+    P(
+      (P(PReduceOperatorKeyword) ~ idndef ~ argList(formalArg) ~/ "(" ~ funDef ~ ")") map {
+        case (kw, name, args, fundef) =>
+          ap: PAnnotationsPosition => {
+            PReduceOperatorWithoutId(
+              kw, name, args.inner.toSeq, Some(fundef)
+            )(ap.pos)
+          }
+      }
+    )
+
   def opUnitDef[$:P]: P[PAnnotationsPosition => PReduceOperator] =
     P(
       (P(PReduceOperatorKeyword) ~ idndef ~ argList(formalArg) ~/ "(" ~ exp ~ "," ~ funDef ~ ")") map {
         case (kw, name, args, unitdef, fundef) =>
           ap: PAnnotationsPosition => {
-            PReduceOperator(
-              kw, name, args.inner.toSeq, unitdef, Some(fundef)
+            PReduceOperatorWithId(
+              kw, name, args.inner.toSeq, Some(fundef), unitdef
             )(ap.pos)
           }
       }
     )
+
+  // Allow both with and without identity element
+  def opBoth[$: P]: P[PAnnotationsPosition => PReduceOperator] =
+    P(NoCut(opDef) | opUnitDef)
 
   def mappingDef[$:P]: P[PAnnotationsPosition => PMapping] =
     P(
@@ -141,7 +157,7 @@ class HReducePlugin(@unused reporter: viper.silver.reporter.Reporter,
     ParserExtension.addNewDeclAtStart(recDef(_))
     ParserExtension.addNewDeclAtStart(mappingDef(_))
     ParserExtension.addNewDeclAtStart(filterDef(_))
-    ParserExtension.addNewDeclAtStart(opUnitDef(_))
+    ParserExtension.addNewDeclAtStart(opBoth(_))
     input
   }
 
@@ -158,8 +174,27 @@ class HReducePlugin(@unused reporter: viper.silver.reporter.Reporter,
     }.members.isEmpty) {
       input
     } else {
+      val hasReduceDSWithId =
+        input.filterMembers {
+          case _: PReduceOperatorWithId => true
+          case _ => false
+        }.members.nonEmpty
+      val hasReduceDSWithoutId =
+        input.filterMembers {
+          case _: PReduceOperatorWithoutId => true
+          case _ => false
+        }.members.nonEmpty
+      val reduceDomains: String =
+        if (hasReduceDSWithId && !hasReduceDSWithoutId)
+          reduceDomainString()
+        else if (!hasReduceDSWithId && hasReduceDSWithoutId)
+          reduceDomainStringNoId()
+        else if (hasReduceDSWithId && hasReduceDSWithoutId)
+          reduceDomainString() + reduceDomainStringNoId()
+        else
+          reduceDomainString()
       val domainsToAdd = Seq(
-        reduceDomainString(),
+        reduceDomains,
         receiverDomainString(),
         opDomainString(),
         mappingDomainString(),
@@ -208,7 +243,7 @@ class HReducePlugin(@unused reporter: viper.silver.reporter.Reporter,
     newInput = newInput.transform({
       case e@Assume(a) => Inhale(a)(e.pos, e.info, e.errT)
     })
-//    print(pretty(newInput) + "\n\n")
+    print(pretty(newInput) + "\n\n")
     newInput
   }
 

@@ -19,7 +19,7 @@ domain Array {
 
 receiver arrayRec(a: Array) (fun i: Int :: loc(a,i))
 filter allInt(start: Int, end: Int) (fun i: Int :: i >= start && i < end )
-opWithId add() (0 ,fun a: Int, b: Int :: a + b )
+operator add() (0, fun a: Int, b: Int :: a + b )
 define access_array(a, i1, i2)
     (forall j: Int :: {loc(a,j)} i1 <= j && j < i2 ==> acc(loc(a,j).val))
 

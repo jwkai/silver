@@ -6,10 +6,10 @@ import viper.silver.ast.pretty.PrettyPrintPrimitives
 import viper.silver.plugin.hreduce.DomainsGenerator
 import viper.silver.verifier.VerificationResult
 
-
-case class AReduction3Tuple(receiver: Exp, mapping: Exp, op: Exp)
-                           (val pos: Position = NoPosition, val info: Info = NoInfo,
-                                                     val errT: ErrorTrafo = NoTrafos) extends ExtensionExp {
+sealed trait AReduction3Tuple extends ExtensionExp {
+  def receiver: Exp
+  def op: Exp
+  def mapping: Exp
 
   override lazy val prettyPrint: PrettyPrintPrimitives#Cont =
     text("hreduce") <+>  toParenDoc(op) <+> toParenDoc(receiver)
@@ -24,7 +24,6 @@ case class AReduction3Tuple(receiver: Exp, mapping: Exp, op: Exp)
     case _ => throw new Exception("Operator must be an operator. Resolving should have failed.")
   }
 
-
   val tripleType: (Type, Type, Type)   = {
     val recA = receiver.typ match {
       case d: DomainType if d.domainName == DomainsGenerator.recDKey =>
@@ -36,10 +35,10 @@ case class AReduction3Tuple(receiver: Exp, mapping: Exp, op: Exp)
     }
     val A = recA.head
     val VB = mapping.typ match {
-          case d: DomainType if d.domainName == DomainsGenerator.mapDKey =>
-            d.typVarsMap.values
-          case _ => throw new Exception(s"Mapping must be a ${DomainsGenerator.mapDKey} type. " +
-            s"Resolving should have failed.")
+      case d: DomainType if d.domainName == DomainsGenerator.mapDKey =>
+        d.typVarsMap.values
+      case _ => throw new Exception(s"Mapping must be a ${DomainsGenerator.mapDKey} type. " +
+        s"Resolving should have failed.")
     }
     if (VB.size != 2) {
       throw new Exception("Mapping must be a mapping from 2 variables")
@@ -49,9 +48,37 @@ case class AReduction3Tuple(receiver: Exp, mapping: Exp, op: Exp)
     (A, V, B)
   }
 
+  def reduceDKeyName(): String
+  def reduceConstructKeyName(): String
+  def reduceEvalFuncName(): String
 
-  def toViper(input: Program) : DomainFuncApp = {
-    val typeVars = input.findDomain(DomainsGenerator.reduceDKey).typVars
+  def toViper(input: Program) : DomainFuncApp
+
+  // Does not get used, transform to ordinary Viper before verification
+  override def verifyExtExp(): VerificationResult = {
+    throw new Exception("Not implemented")
+  }
+}
+
+object AReduction3Tuple {
+  def apply(receiver: Exp, mapping: Exp, op: Exp, hasID: Boolean)(pos: Position = NoPosition, info: Info = NoInfo, errT: ErrorTrafo = NoTrafos) = if (hasID) {
+    AReduction3TupleWithId(receiver, mapping, op)(pos, info, errT)
+  } else {
+    AReduction3TupleWithoutId(receiver, mapping, op)(pos, info, errT)
+  }
+
+  def unapply(a: AReduction3Tuple) = Some((a.receiver, a.mapping, a.op))
+}
+
+case class AReduction3TupleWithId(receiver: Exp, mapping: Exp, op: Exp)
+                           (val pos: Position = NoPosition, val info: Info = NoInfo,
+                                                     val errT: ErrorTrafo = NoTrafos) extends AReduction3Tuple {
+  override def reduceDKeyName(): String = DomainsGenerator.reduceDKeyM
+  override def reduceConstructKeyName(): String = DomainsGenerator.reduceConstructKeyM
+  override def reduceEvalFuncName(): String = DomainsGenerator.reduceApplyKeyM
+
+  override def toViper(input: Program) : DomainFuncApp = {
+    val typeVars = input.findDomain(DomainsGenerator.reduceDKeyM).typVars
     if (typeVars.length != 3) {
       throw new Exception("Reduce domain must have 3 type variables")
     }
@@ -60,22 +87,29 @@ case class AReduction3Tuple(receiver: Exp, mapping: Exp, op: Exp)
       typeVars(1) -> tripleType._2,
       typeVars(2) -> tripleType._3
     )
-//    val typViper = DomainType.apply(Domain, typeVarMap)
-    val reduceFunc = input.findDomainFunction(DomainsGenerator.reduceConstructKey)
+    val reduceFunc = input.findDomainFunction(DomainsGenerator.reduceConstructKeyM)
     DomainFuncApp.apply(reduceFunc, Seq(receiver, mapping, op), typeVarMap)(pos, info, errT)
-//    DomainFuncApp("reduce", Seq(receiver, mapping.orNull, op, unit),typeVarMap)(
-//      pos, info, typViper , "Reduce", errT
   }
+}
 
+case class AReduction3TupleWithoutId(receiver: Exp, mapping: Exp, op: Exp)
+                                 (val pos: Position = NoPosition, val info: Info = NoInfo,
+                                  val errT: ErrorTrafo = NoTrafos) extends AReduction3Tuple {
+  override def reduceDKeyName(): String = DomainsGenerator.reduceDKeyS
+  override def reduceConstructKeyName(): String = DomainsGenerator.reduceConstructKeyS
+  override def reduceEvalFuncName(): String = DomainsGenerator.reduceApplyKeyS
 
-  // Does not get used, transform to ordinary Viper before verification
-  override def verifyExtExp(): VerificationResult = {
-      throw new Exception("Not implemented")
+  override def toViper(input: Program) : DomainFuncApp = {
+    val typeVars = input.findDomain(DomainsGenerator.reduceDKeyS).typVars
+    if (typeVars.length != 3) {
+      throw new Exception("Reduce domain must have 3 type variables")
+    }
+    val typeVarMap = Map(
+      typeVars(0) -> tripleType._1,
+      typeVars(1) -> tripleType._2,
+      typeVars(2) -> tripleType._3
+    )
+    val reduceFunc = input.findDomainFunction(DomainsGenerator.reduceConstructKeyS)
+    DomainFuncApp.apply(reduceFunc, Seq(receiver, mapping, op), typeVarMap)(pos, info, errT)
   }
-
-//  def translateToViper : Exp = {
-//    DomainFuncApp
-//
-//  }
-
 }
