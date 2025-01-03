@@ -4,7 +4,7 @@ import viper.silver.ast.{ErrTrafo, Exp, NoPosition, Position}
 import viper.silver.parser._
 import viper.silver.plugin.hreduce.parser.PReduce.getNewTypeVariable
 import viper.silver.plugin.hreduce._
-import viper.silver.plugin.hreduce.ast.{AReduceApply, AReduction3Tuple}
+import viper.silver.plugin.hreduce.ast.{AReduceApply, AReduction3Tuple, AReduction3TupleWithId, AReduction3TupleWithoutId}
 import viper.silver.verifier.errors
 
 case object PReduceKeyword extends PKw("hreduce") with PKeywordLang
@@ -69,14 +69,31 @@ case class PReduce(keyword: PReserved[PReduceKeyword.type], opUnit: PCall, mappi
     val opTranslated = t.exp(opUnit)
     val (mappingOut, fieldString, receiverTranslated) = mappingFieldReceiver.translateTo(t)
     val filterTranslated = t.exp(filter)
-    val tuple = AReduction3Tuple(receiverTranslated, mappingOut, opTranslated)(t.liftPos(this))
+    val opMember = t.program.filterMembers {
+      case p: PReduceOperatorWithId if p.idndef.name == opUnit.idnref.name => true
+      case p: PReduceOperatorWithoutId if p.idndef.name == opUnit.idnref.name => true
+      case _ => false
+    }.members.headOption
+    val opHasID = opMember match {
+      case Some(opm) => opm match {
+        case _: PReduceOperatorWithId => true
+        case _: PReduceOperatorWithoutId => false
+        case _ => throw new Exception(s"User-declared operator ${opUnit.toString} has unexpected type.")
+      }
+      case None => throw new Exception(s"User-declared operator ${opUnit.toString} not found.")
+    }
+    val tuple = AReduction3Tuple(receiverTranslated, mappingOut, opTranslated, hasID = opHasID)(t.liftPos(this))
     val reduceApply = AReduceApply(tuple, filterTranslated, fieldString)(t.liftPos(this))
     val errTFoldApply = ErrTrafo({
       case errors.PreconditionInAppFalse(offendingNode, reason, cached) =>
         ReduceErrors.ReduceApplyError(offendingNode, reduceApply, reason, cached)
     })
+    val liftedTuple = tuple match {
+      case a : AReduction3TupleWithId => a.copy()(pos = t.liftPos(this), info = tuple.info, errT = errTFoldApply)
+      case a : AReduction3TupleWithoutId => a.copy()(pos = t.liftPos(this), info = tuple.info, errT = errTFoldApply)
+    }
     AReduceApply(
-      tuple.copy()(pos = t.liftPos(this), info = tuple.info, errT = errTFoldApply),
+      liftedTuple,
       filterTranslated.withMeta((t.liftPos(this), filterTranslated.info, errTFoldApply)),
       fieldString
     )(pos = t.liftPos(this), info = reduceApply.info, errT = errTFoldApply)

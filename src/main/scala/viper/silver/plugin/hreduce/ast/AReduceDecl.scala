@@ -7,10 +7,13 @@ import viper.silver.plugin.hreduce.DomainsGenerator
 import viper.silver.plugin.hreduce.util.AxiomHelper.tupleFieldToString
 
 // Constructor should not be called directly, use getOrMakeNewReduceDecl
-case class AReduceDecl private(reduceType: (Type, Type, Type), fieldName: String)(val pos : Position = NoPosition)
+case class AReduceDecl private(domainKey: String, reduceType: (Type, Type, Type), fieldName: String)(val pos : Position = NoPosition)
   extends ExtensionMember
 {
   def key: String = tupleFieldToString(reduceType, fieldName)
+  def hasID: Boolean = if (domainKey == DomainsGenerator.reduceDKeyM) true else
+                        if (domainKey == DomainsGenerator.reduceDKeyS) false else
+                          throw new Exception("Reduce domain has unknown key " + domainKey)
 
   override def name: String = key
   override def extensionSubnodes: Seq[Node] = ???
@@ -25,7 +28,7 @@ case class AReduceDecl private(reduceType: (Type, Type, Type), fieldName: String
   val outType: Type = reduceType._3
 
   def reduceDType(input: Program): DomainType = {
-    val reduceDomain = input.findDomain(DomainsGenerator.reduceDKey)
+    val reduceDomain = input.findDomain(domainKey)
     val typeVars = reduceDomain.typVars
     if (typeVars.length != 3) {
       throw new Exception("Reduce domain must have 3 type variables")
@@ -64,14 +67,14 @@ object AReduceDecl {
 
   private val fieldIDMap: scala.collection.mutable.Map[String, Int] = scala.collection.mutable.Map()
 
-  private def getOrMakeNewReduceDecl(reduceType: (Type, Type, Type), fieldID: String): AReduceDecl = {
+  private def getOrMakeNewReduceDecl(domainKey: String, reduceType: (Type, Type, Type), fieldID: String): AReduceDecl = {
     val key = tupleFieldToString(reduceType, fieldID)
     addFieldtoMap(fieldID)
-    reduceDecls.getOrElseUpdate(key, new AReduceDecl(reduceType, fieldID)(NoPosition))
+    reduceDecls.getOrElseUpdate(key, new AReduceDecl(domainKey, reduceType, fieldID)(NoPosition))
   }
 
-  def apply(reduceType: (Type, Type, Type), fieldID: String): AReduceDecl = {
-    getOrMakeNewReduceDecl(reduceType, fieldID)
+  def apply(domainKey: String, reduceType: (Type, Type, Type), fieldID: String): AReduceDecl = {
+    getOrMakeNewReduceDecl(domainKey, reduceType, fieldID)
   }
 
   def addFieldtoMap(fieldName: String): Unit = {

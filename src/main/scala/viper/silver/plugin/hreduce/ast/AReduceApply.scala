@@ -11,8 +11,9 @@ case class AReduceApply(reduction: AReduction3Tuple, filter: Exp, fieldName: Str
   extends ExtensionExp {
 
   var reduceFunctionDeclaration: AReduceDecl = {
+    val domainKey = reduction.reduceDKeyName()
     val receiverType = reduction.tripleType
-    AReduceDecl(receiverType, fieldName)
+    AReduceDecl(domainKey, receiverType, fieldName)
   }
 
   var rHeap: Option[ARHeap] = None

@@ -148,14 +148,15 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
       // Extract the reduce Domain type
       val reduceDType = reduceADecl.reduceDType(program)
       val reduceIdxType = reduceADecl.reduceType._1
+      val reduceHasID = reduceADecl.hasID
 
       // Create domain-typed vars for quantification
       val forallVarR = LocalVarDecl("__r", reduceDType)()
       val forallVarFS = LocalVarDecl("__fs", SetType(reduceIdxType))()
       val forallVarIdx = LocalVarDecl("__i", reduceIdxType)()
 
-      val currReduceTerm = helper.reduceApply(rh.toExp, forallVarR.localVar, forallVarFS.localVar)
-      val nextReduceTerm = helper.reduceApply(rhNext.toExp, forallVarR.localVar, forallVarFS.localVar)
+      val currReduceTerm = helper.reduceApply(rh.toExp, forallVarR.localVar, forallVarFS.localVar)(reduceHasID)
+      val nextReduceTerm = helper.reduceApply(rhNext.toExp, forallVarR.localVar, forallVarFS.localVar)(reduceHasID)
       val eqReduce = Assume(
         Forall(
           Seq(forallVarR, forallVarFS),
@@ -165,8 +166,8 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
       )()
 
       // Add primed version so that any "yielded" terms are automatically advanced
-      val currReducePrimeTerm = helper.reduceApplyPrime(rh.toExp, forallVarR.localVar, forallVarFS.localVar)
-      val nextReducePrimeTerm = helper.reduceApplyPrime(rhNext.toExp, forallVarR.localVar, forallVarFS.localVar)
+      val currReducePrimeTerm = helper.reducePrimeApply(rh.toExp, forallVarR.localVar, forallVarFS.localVar)(reduceHasID)
+      val nextReducePrimeTerm = helper.reducePrimeApply(rhNext.toExp, forallVarR.localVar, forallVarFS.localVar)(reduceHasID)
       val eqReducePrime = Assume(
         Forall(
           Seq(forallVarR, forallVarFS),
@@ -175,8 +176,16 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
         )()
       )()
 
-      val currRHeapElemTerm = helper.rHeapElemApplyTo(rh.toExp, forallVarR.localVar, forallVarIdx.localVar)
-      val nextRHeapElemTerm = helper.rHeapElemApplyTo(rhNext.toExp, forallVarR.localVar, forallVarIdx.localVar)
+      val currRHeapElemTerm = helper.rHeapElemApplyTo(
+        rh.toExp,
+        forallVarR.localVar,
+        forallVarIdx.localVar
+      )(reduceHasID)
+      val nextRHeapElemTerm = helper.rHeapElemApplyTo(
+        rhNext.toExp,
+        forallVarR.localVar,
+        forallVarIdx.localVar
+      )(reduceHasID)
       val eqRHeapElem = Assume(
         Forall(
           Seq(forallVarR, forallVarIdx),
@@ -392,6 +401,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val reduceDType = reduceADecl.reduceDType(program)
     val recvDType = reduceADecl.reduceDRecvType(program)
     val reduceIdxType = reduceADecl.reduceType._1
+    val reduceHasID = reduceADecl.hasID
 
     // rHeap declarations
     val rhOld = getLastRHeap
@@ -404,17 +414,13 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     // Filter Var declaration
     val forallVarFS = LocalVarDecl("__fs", SetType(reduceIdxType))()
 
-    val frGood = helper.filterReceiverGood(forallVarFS.localVar, reduceVar)
-    val frGoodOrInj = helper.filterRecvGoodOrInjCheck(forallVarFS.localVar, reduceVar)
-    val fAccess = helper.forallFilterHaveSomeAccess(forallVarFS.localVar, reduceVar, field.name, None)
+    val frGood = helper.filterReceiverGood(forallVarFS.localVar, reduceVar)(reduceHasID)
+    val frGoodOrInj = helper.filterRecvGoodOrInjCheck(forallVarFS.localVar, reduceVar)(reduceHasID)
+    val fAccess = helper.forallFilterHaveSomeAccess(forallVarFS.localVar, reduceVar, field.name, None)(reduceHasID)
 
-    val receiverApp = helper.applyDomainFunc(
-      DomainsGenerator.reduceGetRecvKey,
-      Seq(reduceVar),
-      reduceDType.typVarsMap
-    )
+    val receiverApp = helper.getReceiverApply(reduceVar)(reduceHasID)
 
-    val trigger1 = Trigger(Seq(helper.reduceApply(rhOld.toExp, reduceVar, forallVarFS.localVar)))()
+    val trigger1 = Trigger(Seq(helper.reduceApply(rhOld.toExp, reduceVar, forallVarFS.localVar)(reduceHasID)))()
 
     val invRecvApp = helper.applyDomainFunc(
       DomainsGenerator.recInvKey,
@@ -422,16 +428,8 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
       recvDType.typVarsMap
     )
 
-    val triggerDeleteKeyNew = helper.applyDomainFunc(
-      DomainsGenerator.trigDelKey1Key,
-      Seq(helper.reduceApply(rhNew.toExp, reduceVar, forallVarFS.localVar), invRecvApp),
-      reduceDType.typVarsMap
-    )
-    val triggerDeleteKeyOld = helper.applyDomainFunc(
-      DomainsGenerator.trigDelKey1Key,
-      Seq(helper.reduceApply(rhOld.toExp, reduceVar, forallVarFS.localVar), invRecvApp),
-      reduceDType.typVarsMap
-    )
+    val triggerDeleteKeyNew = helper.trigDelKeyApply(rhNew.toExp, reduceVar, forallVarFS.localVar, invRecvApp)(reduceHasID)
+    val triggerDeleteKeyOld = helper.trigDelKeyApply(rhOld.toExp, reduceVar, forallVarFS.localVar, invRecvApp)(reduceHasID)
 
     val setDeleteFSInv = helper.applyDomainFunc(
       DomainsGenerator.setDeleteKey,
@@ -440,16 +438,8 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     )
 
     val framingEq = EqCmp(
-      helper.applyDomainFunc(
-        DomainsGenerator.reduceApplyPrimeKey,
-        Seq(rhOld.toExp, reduceVar, setDeleteFSInv),
-        reduceDType.typVarsMap
-      ),
-      helper.applyDomainFunc(
-        DomainsGenerator.reduceApplyPrimeKey,
-        Seq(rhNew.toExp, reduceVar, setDeleteFSInv),
-        reduceDType.typVarsMap
-      )
+      helper.reducePrimeApply(rhOld.toExp, reduceVar, setDeleteFSInv)(reduceHasID),
+      helper.reducePrimeApply(rhNew.toExp, reduceVar, setDeleteFSInv)(reduceHasID)
     )()
 
     val reduceFraming = Assume(
@@ -479,20 +469,20 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
         Forall(
           Seq(forallVarIdx),
           Seq(
-            Trigger(Seq(helper.rHeapElemApplyTo(rhOld.toExp, reduceVar, idxVar)))(),
-            Trigger(Seq(helper.rHeapElemApplyTo(rhNew.toExp, reduceVar, idxVar)))()
+            Trigger(Seq(helper.rHeapElemApplyTo(rhOld.toExp, reduceVar, idxVar)(reduceHasID)))(),
+            Trigger(Seq(helper.rHeapElemApplyTo(rhNew.toExp, reduceVar, idxVar)(reduceHasID)))()
           ),
           helper.foldedConjImplies(
-            Seq(NeCmp(idxVar, invRecvApp)(), helper.permNonZeroCmp(idxVar, reduceVar, field.name)),
+            Seq(NeCmp(idxVar, invRecvApp)(), helper.permNonZeroCmp(idxVar, reduceVar, field.name)(reduceHasID)),
             Seq(
               NeCmp(idxVar, invRecvApp)(),
               EqCmp(
-                helper.rHeapElemApplyTo(rhOld.toExp, reduceVar, idxVar),
-                helper.mapApplyTo(reduceVar, FieldAccess(receiverAppIdx, field)())
+                helper.rHeapElemApplyTo(rhOld.toExp, reduceVar, idxVar)(reduceHasID),
+                helper.mapApplyTo(reduceVar, FieldAccess(receiverAppIdx, field)())(reduceHasID)
               )(),
               EqCmp(
-                helper.rHeapElemApplyTo(rhNew.toExp, reduceVar, idxVar),
-                helper.mapApplyTo(reduceVar, FieldAccess(receiverAppIdx, field)())
+                helper.rHeapElemApplyTo(rhNew.toExp, reduceVar, idxVar)(reduceHasID),
+                helper.mapApplyTo(reduceVar, FieldAccess(receiverAppIdx, field)())(reduceHasID)
               )()
             ),
           )
@@ -505,15 +495,15 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
         Seq(forallVarR),
         Seq(Trigger(Seq(receiverApp))()),
         helper.foldedConjImplies(
-          Seq(helper.permNonZeroCmp(invRecvApp, reduceVar, field.name)),
+          Seq(helper.permNonZeroCmp(invRecvApp, reduceVar, field.name)(reduceHasID)),
           Seq(
             EqCmp(
-              helper.rHeapElemApplyTo(rhOld.toExp, reduceVar, invRecvApp),
-              helper.mapApplyTo(reduceVar, FieldAccess(writeTo, field)())
+              helper.rHeapElemApplyTo(rhOld.toExp, reduceVar, invRecvApp)(reduceHasID),
+              helper.mapApplyTo(reduceVar, FieldAccess(writeTo, field)())(reduceHasID)
             )(),
             EqCmp(
-              helper.rHeapElemApplyTo(rhNew.toExp, reduceVar, invRecvApp),
-              helper.mapApplyTo(reduceVar, writeExp)
+              helper.rHeapElemApplyTo(rhNew.toExp, reduceVar, invRecvApp)(reduceHasID),
+              helper.mapApplyTo(reduceVar, writeExp)(reduceHasID)
             )()
           )
         )
@@ -619,6 +609,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val reduceDType = reduceADecl.reduceDType(program)
     val recvDType = reduceADecl.reduceDRecvType(program)
     val reduceIdxType = reduceADecl.reduceType._1
+    val reduceHasID = reduceADecl.hasID
 
     // rHeap declarations
     val rhOld = getLastRHeap
@@ -631,54 +622,42 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     // Filter Var declaration
     val forallVarFS = LocalVarDecl("__fs", SetType(reduceIdxType))()
 
-    val trigger = Trigger(Seq(helper.reduceApply(rhOld.toExp, reduceVar, forallVarFS.localVar)))()
+    val trigger = Trigger(Seq(helper.reduceApply(rhOld.toExp, reduceVar, forallVarFS.localVar)(reduceHasID)))()
 
     // ---------------Making the LHS---------------
     // FilterReceiverGood
-    val frGood = helper.filterReceiverGood(forallVarFS.localVar, reduceVar)
-    val frGoodOrInj = helper.filterRecvGoodOrInjCheck(forallVarFS.localVar, reduceVar)
+    val frGood = helper.filterReceiverGood(forallVarFS.localVar, reduceVar)(reduceHasID)
+    val frGoodOrInj = helper.filterRecvGoodOrInjCheck(forallVarFS.localVar, reduceVar)(reduceHasID)
     // Have access to the big filter in old
     val forallOldHasPerm = helper.forallFilterHaveSomeAccess(forallVarFS.localVar,
-      reduceVar, field.name, Some(getLastLabel.name))
+      reduceVar, field.name, Some(getLastLabel.name))(reduceHasID)
     // filterNotLost
-    val filterNotLostApplied = helper.subsetNotInRefs(forallVarFS.localVar, reduceVar, lostPVal)
+    val filterNotLostApplied = helper.subsetNotInRefs(forallVarFS.localVar, reduceVar, lostPVal)(reduceHasID)
     // Have access to the remaining filter in new state
     val forallNewStillHasPerm = helper.forallFilterHaveSomeAccess(filterNotLostApplied,
-      reduceVar, field.name, None)
+      reduceVar, field.name, None)(reduceHasID)
 
     // ---------------Making the RHS---------------
-    val triggerDeleteBlockOld = helper.applyDomainFunc(
-      DomainsGenerator.trigDelBlockKey,
-      Seq(helper.reduceApply(rhOld.toExp, reduceVar, forallVarFS.localVar), filterNotLostApplied),
-      reduceDType.typVarsMap
-    )
-    val dummyApplyNew = helper.applyDomainFunc(
-      DomainsGenerator.reduceApplyDummyKey,
-      Seq(helper.reduceApply(rhNew.toExp, reduceVar, filterNotLostApplied)),
-      reduceDType.typVarsMap
-    )
+    val triggerDeleteBlockOld = helper.trigDelBlockApply(
+      rhOld.toExp,
+      reduceVar,
+      forallVarFS.localVar,
+      filterNotLostApplied
+    )(reduceHasID)
+
+    val dummyApplyNew = helper.reduceDummyApply(rhNew.toExp, reduceVar, filterNotLostApplied)(reduceHasID)
+
     val framingEq = EqCmp(
-      helper.applyDomainFunc(
-        DomainsGenerator.reduceApplyPrimeKey,
-        Seq(rhOld.toExp, reduceVar, filterNotLostApplied),
-        reduceDType.typVarsMap
-      ),
-      helper.applyDomainFunc(
-        DomainsGenerator.reduceApplyPrimeKey,
-        Seq(rhNew.toExp, reduceVar, filterNotLostApplied),
-        reduceDType.typVarsMap
-      )
+      helper.reducePrimeApply(rhOld.toExp, reduceVar, filterNotLostApplied)(reduceHasID),
+      helper.reducePrimeApply(rhNew.toExp, reduceVar, filterNotLostApplied)(reduceHasID)
     )()
-    val exhaleCF = helper.applyDomainFunc(
-      DomainsGenerator.exhaleReduceSetKey,
-      Seq(
-        rhOld.toExp,
-        reduceVar,
-        forallVarFS.localVar,
-        IntLit(AReduceDecl.getFieldInt(field.name))()
-      ),
-      reduceDType.typVarsMap
-    )
+
+    val exhaleCF = helper.exhaleReduceSetApply(
+      rhOld.toExp,
+      reduceVar,
+      forallVarFS.localVar,
+      IntLit(AReduceDecl.getFieldInt(field.name))()
+    )(reduceHasID)
 
     val reduceFraming = Assume(
       Forall(
@@ -691,11 +670,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
       )()
     )()
 
-    val receiverApp = helper.applyDomainFunc(
-      DomainsGenerator.reduceGetRecvKey,
-      Seq(reduceVar),
-      reduceDType.typVarsMap
-    )
+    val receiverApp = helper.getReceiverApply(reduceVar)(reduceHasID)
 
     // Index var declaration
     val forallVarIdx = LocalVarDecl("__ind", reduceIdxType)()
@@ -725,20 +700,20 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
         Forall(
           Seq(forallVarIdx),
           Seq(
-            Trigger(Seq(helper.rHeapElemApplyTo(rhOld.toExp, reduceVar, idxVar)))()
+            Trigger(Seq(helper.rHeapElemApplyTo(rhOld.toExp, reduceVar, idxVar)(reduceHasID)))()
           ),
           helper.foldedConjImplies(
             Seq(
               LabelledOld(
-                helper.permNonZeroCmp(idxVar, reduceVar, field.name),
+                helper.permNonZeroCmp(idxVar, reduceVar, field.name)(reduceHasID),
                 getLastLabel.name
               )()
             ),
             Seq(
               EqCmp(
-                helper.rHeapElemApplyTo(rhOld.toExp, reduceVar, invRecvIndApp),
+                helper.rHeapElemApplyTo(rhOld.toExp, reduceVar, invRecvIndApp)(reduceHasID),
                 LabelledOld(
-                  helper.mapApplyTo(reduceVar, FieldAccess(receiverAppIdx, field)()),
+                  helper.mapApplyTo(reduceVar, FieldAccess(receiverAppIdx, field)())(reduceHasID),
                   getLastLabel.name
                 )()
               )()
@@ -755,20 +730,20 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
         Forall(
           Seq(forallVarIdx),
           Seq(
-            Trigger(Seq(helper.rHeapElemApplyTo(rhOld.toExp, reduceVar, idxVar)))(),
-            Trigger(Seq(helper.rHeapElemApplyTo(rhNew.toExp, reduceVar, idxVar)))()
+            Trigger(Seq(helper.rHeapElemApplyTo(rhOld.toExp, reduceVar, idxVar)(reduceHasID)))(),
+            Trigger(Seq(helper.rHeapElemApplyTo(rhNew.toExp, reduceVar, idxVar)(reduceHasID)))()
           ),
           helper.foldedConjImplies(
-            Seq(idxNotInRefs, helper.permNonZeroCmp(idxVar, reduceVar, field.name)),
+            Seq(idxNotInRefs, helper.permNonZeroCmp(idxVar, reduceVar, field.name)(reduceHasID)),
             Seq(
               idxNotInRefs,
               EqCmp(
-                helper.rHeapElemApplyTo(rhOld.toExp, reduceVar, invRecvIndApp),
-                helper.mapApplyTo(reduceVar, FieldAccess(receiverAppIdx, field)())
+                helper.rHeapElemApplyTo(rhOld.toExp, reduceVar, invRecvIndApp)(reduceHasID),
+                helper.mapApplyTo(reduceVar, FieldAccess(receiverAppIdx, field)())(reduceHasID)
               )(),
               EqCmp(
-                helper.rHeapElemApplyTo(rhNew.toExp, reduceVar, invRecvIndApp),
-                helper.mapApplyTo(reduceVar, FieldAccess(receiverAppIdx, field)())
+                helper.rHeapElemApplyTo(rhNew.toExp, reduceVar, invRecvIndApp)(reduceHasID),
+                helper.mapApplyTo(reduceVar, FieldAccess(receiverAppIdx, field)())(reduceHasID)
               )()
             ),
           )
@@ -827,6 +802,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val reduceDType = reduceADecl.reduceDType(program)
     val recvDType = reduceADecl.reduceDRecvType(program)
     val reduceIdxType = reduceADecl.reduceType._1
+    val reduceHasID = reduceADecl.hasID
 
     // rHeap declarations
     val rhOld = getLastRHeap
@@ -841,29 +817,21 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val forallVarFS = LocalVarDecl("__fs", SetType(reduceIdxType))()
     val forallVarExFS = LocalVarDecl("__exfs", SetType(reduceIdxType))()
 
-    val triggerOld = Trigger(Seq(helper.reduceApply(rhOld.toExp, reduceVar, forallVarFS.localVar)))()
-    val triggerNew = Trigger(Seq(helper.reduceApply(rhNew.toExp, reduceVar, forallVarFS.localVar)))()
+    val triggerOld = Trigger(Seq(helper.reduceApply(rhOld.toExp, reduceVar, forallVarFS.localVar)(reduceHasID)))()
+    val triggerNew = Trigger(Seq(helper.reduceApply(rhNew.toExp, reduceVar, forallVarFS.localVar)(reduceHasID)))()
 
     // ---------------Making the LHS---------------
     // FilterReceiverGood
-    val frGood = helper.filterReceiverGood(forallVarFS.localVar, reduceVar)
-    val frGoodOrInj = helper.filterRecvGoodOrInjCheck(forallVarFS.localVar, reduceVar)
+    val frGood = helper.filterReceiverGood(forallVarFS.localVar, reduceVar)(reduceHasID)
+    val frGoodOrInj = helper.filterRecvGoodOrInjCheck(forallVarFS.localVar, reduceVar)(reduceHasID)
     // Have access to the big filter in new
     val forallCurrHasPerm = helper.forallFilterHaveSomeAccess(forallVarFS.localVar,
-      reduceVar, field.name, None)
+      reduceVar, field.name, None)(reduceHasID)
 
     // ---------------Making the RHS---------------
     val framingEq = EqCmp(
-      helper.applyDomainFunc(
-        DomainsGenerator.reduceApplyPrimeKey,
-        Seq(rhOld.toExp, reduceVar, forallVarFS.localVar),
-        reduceDType.typVarsMap
-      ),
-      helper.applyDomainFunc(
-        DomainsGenerator.reduceApplyKey,
-        Seq(rhNew.toExp, reduceVar, forallVarFS.localVar),
-        reduceDType.typVarsMap
-      )
+      helper.reducePrimeApply(rhOld.toExp, reduceVar, forallVarFS.localVar)(reduceHasID),
+      helper.reducePrimeApply(rhNew.toExp, reduceVar, forallVarFS.localVar)(reduceHasID)
     )()
 
     val reduceFraming = Assume(
@@ -877,17 +845,19 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
       )()
     )()
 
-    val triggerDeleteBlockNew = helper.applyDomainFunc(
-      DomainsGenerator.trigDelBlockKey,
-      Seq(helper.reduceApply(rhNew.toExp, reduceVar, forallVarExFS.localVar), forallVarFS.localVar),
-      reduceDType.typVarsMap
-    )
+    val triggerDeleteBlockNew = helper.trigDelBlockApply(
+      rhNew.toExp,
+      reduceVar,
+      forallVarExFS.localVar,
+      forallVarFS.localVar
+    )(reduceHasID)
 
-    val triggerDeleteBlockExFS = helper.applyDomainFunc(
-      DomainsGenerator.trigDelBlockKey,
-      Seq(helper.reduceApply(forallVarRH.localVar, reduceVar, forallVarExFS.localVar), forallVarFS.localVar),
-      reduceDType.typVarsMap
-    )
+    val triggerDeleteBlockExFS = helper.trigDelBlockApply(
+      forallVarRH.localVar,
+      reduceVar,
+      forallVarExFS.localVar,
+      forallVarFS.localVar
+    )(reduceHasID)
 
     val setDelExFSFS = helper.applyDomainFunc(
       DomainsGenerator.setDeleteKey,
@@ -895,28 +865,9 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
       recvDType.typVarsMap
     )
 
-    val triggerExtOldExFS = helper.applyDomainFunc(
-      DomainsGenerator.trigExtKey,
-      Seq(
-        helper.applyDomainFunc(
-          DomainsGenerator.reduceApplyPrimeKey,
-          Seq(rhNew.toExp, reduceVar, setDelExFSFS),
-          reduceDType.typVarsMap
-        ),
-        helper.applyDomainFunc(
-          DomainsGenerator.reduceApplyPrimeKey,
-          Seq(forallVarRH.localVar, reduceVar, setDelExFSFS),
-          reduceDType.typVarsMap
-        )
-      ),
-      reduceDType.typVarsMap
-    )
+    val triggerExtOldExFS = helper.trigExtApply(rhNew.toExp, forallVarRH.localVar, reduceVar, setDelExFSFS)(reduceHasID)
 
-    val receiverApp = helper.applyDomainFunc(
-      DomainsGenerator.reduceGetRecvKey,
-      Seq(reduceVar),
-      reduceDType.typVarsMap
-    )
+    val receiverApp = helper.getReceiverApply(reduceVar)(reduceHasID)
 
     val subsetNotInRefsGained = helper.applyDomainFunc(
       DomainsGenerator.subsetNotInRefsKey,
@@ -924,24 +875,21 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
       recvDType.typVarsMap
     )
 
-    val triggerDeleteBlockNotGained = helper.applyDomainFunc(
-      DomainsGenerator.trigDelBlockKey,
-      Seq(helper.reduceApply(rhNew.toExp, reduceVar, forallVarFS.localVar), subsetNotInRefsGained),
-      reduceDType.typVarsMap
-    )
+    val triggerDeleteBlockNotGained = helper.trigDelBlockApply(
+      rhNew.toExp,
+      reduceVar,
+      forallVarFS.localVar,
+      subsetNotInRefsGained
+    )(reduceHasID)
 
-    val dummyApplyOldNotGained = helper.applyDomainFunc(
-      DomainsGenerator.reduceApplyDummyKey,
-      Seq(helper.reduceApply(rhOld.toExp, reduceVar, subsetNotInRefsGained)),
-      reduceDType.typVarsMap
-    )
+    val dummyApplyOldNotGained = helper.reduceDummyApply(rhOld.toExp, reduceVar, subsetNotInRefsGained)(reduceHasID)
 
     val forallVarIdxHasPerm = helper.forallFilterHaveSomeAccess(
       forallVarFS.localVar,
       reduceVar,
       field.name,
       None
-    )
+    )(reduceHasID)
 
     //    val forallVarFieldId = LocalVarDecl("__id", Int)()
 
@@ -954,23 +902,19 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     //      IntLit(AReduceDecl.getFieldInt(field.name))()
     //    )()
 
-    val exhaleCF = helper.applyDomainFunc(
-      DomainsGenerator.exhaleReduceSetKey,
-      Seq(
-        forallVarRH.localVar,
-        reduceVar,
-        forallVarExFS.localVar,
-        IntLit(AReduceDecl.getFieldInt(field.name))()
-      ),
-      reduceDType.typVarsMap
-    )
+    val exhaleCF = helper.exhaleReduceSetApply(
+      forallVarRH.localVar,
+      reduceVar,
+      forallVarExFS.localVar,
+      IntLit(AReduceDecl.getFieldInt(field.name))()
+    )(reduceHasID)
 
     val blockDecompOverPrevExhales = Assume(
       Forall(
         Seq(forallVarRH, forallVarR, forallVarFS, forallVarExFS),
         Seq(
           Trigger(Seq(
-            helper.reduceApply(rhOld.toExp, reduceVar, forallVarFS.localVar),
+            helper.reduceApply(rhOld.toExp, reduceVar, forallVarFS.localVar)(reduceHasID),
             exhaleCF
           ))()
         ),
@@ -1034,27 +978,27 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
         Forall(
           Seq(forallVarIdx),
           Seq(
-            Trigger(Seq(helper.rHeapElemApplyTo(rhOld.toExp, reduceVar, idxVar)))()
+            Trigger(Seq(helper.rHeapElemApplyTo(rhOld.toExp, reduceVar, idxVar)(reduceHasID)))()
           ),
           helper.foldedConjImplies(
             Seq(
               LabelledOld(
-                helper.permNonZeroCmp(idxVar, reduceVar, field.name),
+                helper.permNonZeroCmp(idxVar, reduceVar, field.name)(reduceHasID),
                 getLastLabel.name
               )()
             ),
             Seq(
               EqCmp(
-                helper.rHeapElemApplyTo(rhOld.toExp, reduceVar, invRecvIndApp),
+                helper.rHeapElemApplyTo(rhOld.toExp, reduceVar, invRecvIndApp)(reduceHasID),
                 LabelledOld(
-                  helper.mapApplyTo(reduceVar, FieldAccess(receiverAppIdx, field)()),
+                  helper.mapApplyTo(reduceVar, FieldAccess(receiverAppIdx, field)())(reduceHasID),
                   getLastLabel.name
                 )()
               )(),
               EqCmp(
-                helper.rHeapElemApplyTo(rhNew.toExp, reduceVar, invRecvIndApp),
+                helper.rHeapElemApplyTo(rhNew.toExp, reduceVar, invRecvIndApp)(reduceHasID),
                 LabelledOld(
-                  helper.mapApplyTo(reduceVar, FieldAccess(receiverAppIdx, field)()),
+                  helper.mapApplyTo(reduceVar, FieldAccess(receiverAppIdx, field)())(reduceHasID),
                   getLastLabel.name
                 )()
               )()
@@ -1071,14 +1015,14 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
         Forall(
           Seq(forallVarIdx),
           Seq(
-            Trigger(Seq(helper.rHeapElemApplyTo(rhNew.toExp, reduceVar, idxVar)))()
+            Trigger(Seq(helper.rHeapElemApplyTo(rhNew.toExp, reduceVar, idxVar)(reduceHasID)))()
           ),
           helper.foldedConjImplies(
-            Seq(helper.permNonZeroCmp(idxVar, reduceVar, field.name)),
+            Seq(helper.permNonZeroCmp(idxVar, reduceVar, field.name)(reduceHasID)),
             Seq(
               EqCmp(
-                helper.rHeapElemApplyTo(rhNew.toExp, reduceVar, invRecvIndApp),
-                helper.mapApplyTo(reduceVar, FieldAccess(receiverAppIdx, field)())
+                helper.rHeapElemApplyTo(rhNew.toExp, reduceVar, invRecvIndApp)(reduceHasID),
+                helper.mapApplyTo(reduceVar, FieldAccess(receiverAppIdx, field)())(reduceHasID)
               )()
             ),
           )

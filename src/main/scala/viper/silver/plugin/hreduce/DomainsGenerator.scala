@@ -297,9 +297,9 @@ object DomainsGenerator {
         { ($trigExtKeyS(($reduceApplyPrimeKeyS(${prefix}rh_old, ${prefix}c, ${prefix}fs): $reduceDTV2),
                        ($reduceApplyPrimeKeyS(${prefix}rh_new, ${prefix}c, ${prefix}fs): $reduceDTV2)): Bool) }
         ($reduceApplyKeyS(${prefix}rh_old, ${prefix}c, ${prefix}fs) == $reduceApplyKeyS(${prefix}rh_new, ${prefix}c, ${prefix}fs)) ||
-        (((${prefix}fs != Set()) && (_skExt(${prefix}c, $reduceApplyPrimeKeyS(${prefix}rh_old, ${prefix}c, ${prefix}fs), $reduceApplyPrimeKeyS(${prefix}rh_new, ${prefix}c, ${prefix}fs)) in ${prefix}fs ==>
-            (($rHeapElemKeyS(${prefix}rh_old, ${prefix}c, _skExt(${prefix}c, $reduceApplyPrimeKeyS(${prefix}rh_old, ${prefix}c, ${prefix}fs), $reduceApplyPrimeKeyS(${prefix}rh_new, ${prefix}c, ${prefix}fs))): $reduceDTV2)) ==
-            (($rHeapElemKeyS(${prefix}rh_new, ${prefix}c, _skExt(${prefix}c, $reduceApplyPrimeKeyS(${prefix}rh_old, ${prefix}c, ${prefix}fs), $reduceApplyPrimeKeyS(${prefix}rh_new, ${prefix}c, ${prefix}fs))): $reduceDTV2))))
+        (((${prefix}fs != Set()) && ($skExtKeyS(${prefix}c, $reduceApplyPrimeKeyS(${prefix}rh_old, ${prefix}c, ${prefix}fs), $reduceApplyPrimeKeyS(${prefix}rh_new, ${prefix}c, ${prefix}fs)) in ${prefix}fs ==>
+            (($rHeapElemKeyS(${prefix}rh_old, ${prefix}c, $skExtKeyS(${prefix}c, $reduceApplyPrimeKeyS(${prefix}rh_old, ${prefix}c, ${prefix}fs), $reduceApplyPrimeKeyS(${prefix}rh_new, ${prefix}c, ${prefix}fs))): $reduceDTV2)) ==
+            (($rHeapElemKeyS(${prefix}rh_new, ${prefix}c, $skExtKeyS(${prefix}c, $reduceApplyPrimeKeyS(${prefix}rh_old, ${prefix}c, ${prefix}fs), $reduceApplyPrimeKeyS(${prefix}rh_new, ${prefix}c, ${prefix}fs))): $reduceDTV2))))
         ==>
         ($reduceApplyPrimeKeyS(${prefix}rh_old, ${prefix}c, ${prefix}fs) == $reduceApplyPrimeKeyS(${prefix}rh_new, ${prefix}c, ${prefix}fs)))
     }"""
@@ -314,9 +314,9 @@ object DomainsGenerator {
         { ($trigExtKeyM(($reduceApplyPrimeKeyM(${prefix}rh_old, ${prefix}c, ${prefix}fs): $reduceDTV2),
                        ($reduceApplyPrimeKeyM(${prefix}rh_new, ${prefix}c, ${prefix}fs): $reduceDTV2)): Bool) }
         ($reduceApplyKeyM(${prefix}rh_old, ${prefix}c, ${prefix}fs) == $reduceApplyKeyM(${prefix}rh_new, ${prefix}c, ${prefix}fs)) ||
-        ((_skExt(${prefix}c, $reduceApplyPrimeKeyM(${prefix}rh_old, ${prefix}c, ${prefix}fs), $reduceApplyPrimeKeyM(${prefix}rh_new, ${prefix}c, ${prefix}fs)) in ${prefix}fs ==>
-            (($rHeapElemKeyM(${prefix}rh_old, ${prefix}c, _skExt(${prefix}c, $reduceApplyPrimeKeyM(${prefix}rh_old, ${prefix}c, ${prefix}fs), $reduceApplyPrimeKeyM(${prefix}rh_new, ${prefix}c, ${prefix}fs))): $reduceDTV2)) ==
-            (($rHeapElemKeyM(${prefix}rh_new, ${prefix}c, _skExt(${prefix}c, $reduceApplyPrimeKeyM(${prefix}rh_old, ${prefix}c, ${prefix}fs), $reduceApplyPrimeKeyM(${prefix}rh_new, ${prefix}c, ${prefix}fs))): $reduceDTV2)))
+        (($skExtKeyM(${prefix}c, $reduceApplyPrimeKeyM(${prefix}rh_old, ${prefix}c, ${prefix}fs), $reduceApplyPrimeKeyM(${prefix}rh_new, ${prefix}c, ${prefix}fs)) in ${prefix}fs ==>
+            (($rHeapElemKeyM(${prefix}rh_old, ${prefix}c, $skExtKeyM(${prefix}c, $reduceApplyPrimeKeyM(${prefix}rh_old, ${prefix}c, ${prefix}fs), $reduceApplyPrimeKeyM(${prefix}rh_new, ${prefix}c, ${prefix}fs))): $reduceDTV2)) ==
+            (($rHeapElemKeyM(${prefix}rh_new, ${prefix}c, $skExtKeyM(${prefix}c, $reduceApplyPrimeKeyM(${prefix}rh_old, ${prefix}c, ${prefix}fs), $reduceApplyPrimeKeyM(${prefix}rh_new, ${prefix}c, ${prefix}fs))): $reduceDTV2)))
         ==>
         ($reduceApplyPrimeKeyM(${prefix}rh_old, ${prefix}c, ${prefix}fs) == $reduceApplyPrimeKeyM(${prefix}rh_new, ${prefix}c, ${prefix}fs)))
     }"""
@@ -404,7 +404,7 @@ object DomainsGenerator {
          |               ${prefix}fs2: Set[$reduceDTV0] ::
          |        { ($reduceApplyPrimeKey(${prefix}rh, ${prefix}c, ${prefix}fs1): $reduceDTV2),
          |          ($reduceApplyPrimeKey(${prefix}rh, ${prefix}c, ${prefix}fs2): $reduceDTV2) }
-         |        setEqDummy(${prefix}fs1 == ${prefix}fs2)
+         |        $setEqDummyKey(${prefix}fs1 == ${prefix}fs2)
          |    }
          |
          |    $disjAxiom
