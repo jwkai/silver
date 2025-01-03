@@ -243,7 +243,7 @@ class HReducePlugin(@unused reporter: viper.silver.reporter.Reporter,
     newInput = newInput.transform({
       case e@Assume(a) => Inhale(a)(e.pos, e.info, e.errT)
     })
-    print(pretty(newInput) + "\n\n")
+//    print(pretty(newInput) + "\n\n")
     newInput
   }
 
@@ -344,7 +344,7 @@ object HReducePlugin {
       // If no reduction is used in a method, keep the method the same
       if (axiomGenerator.reduceDeclsUsed.isEmpty) { return m }
 
-      val helper = new AxiomHelper(p)
+//      val helper = new AxiomHelper(p)
 
       // Convert all method calls to inhales and exhales
       var outM: Method = m.transform({
