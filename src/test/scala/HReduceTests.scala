@@ -17,7 +17,8 @@ import java.nio.file.Paths
 class HReduceTests extends AnyFunSuite {
 //  val inputfile = "hreduce/arrayTestExhaleInhale.vpr"
 //  val inputfile = "hreduce/arrayTestExhaleExhale.vpr"
-  val inputfile = "hreduce/arrayBubbleSort.vpr"
+//  val inputfile = "hreduce/arrayBubbleSort.vpr"
+  val inputfile = "hreduce/array-sum.vpr"
 //  val inputfile = "hreduce/arraySwapNested.vpr"
 //  val inputfile = "hreduce/arrayTestChain.vpr"
 //  val inputfile = "hreduce/graphSum.vpr"

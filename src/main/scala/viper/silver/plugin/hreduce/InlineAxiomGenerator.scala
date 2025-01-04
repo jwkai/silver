@@ -345,55 +345,55 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     Seqn(out :+ writeStmt :+ getCurrentLabel, Seq())(writeStmt.pos, infoPair, writeStmt.errT)
   }
 
-//    def generateHeapReadAxioms(readStmt: Stmt): Stmt = {
-//      var accLHS = Set[FieldAccess]()
-//      val relevantPart: Node = readStmt match {
-//        case w : While =>
-//          w.copy(body = Seqn(Seq(), Seq())())(w.pos, w.info, w.errT)
-//        case i : If =>
-//          i.copy(thn = Seqn(Seq(), Seq())(), els = Seqn(Seq(), Seq())())(i.pos, i.info, i.errT)
-//        case out@ Seqn(_, _) =>
-//          return out
-//        // Do this to ignore LHS in case of a heap write tgt with heap read. Could cause redundancy.
-//        case a: FieldAssign =>
-//          accLHS = accLHS + a.lhs
-//          a.rhs
-//        case generated: Assume =>
-//          return generated
-//        case _ => readStmt
-//      }
-//
-//      // These reads cannot contained quantified vars
-//      val allQuantifiedVars = relevantPart.deepCollect({
-//        case qe: QuantifiedExp => qe.variables
-//      }).flatten
-//
-//      // TODO: remove stuff in accessibility predicate TOO!!
-//      val ignoreAcc = relevantPart.deepCollect({
-//        case acc: FieldAccessPredicate => acc.loc
-//      })
-//
-//      val allReads = relevantPart.deepCollect({
-//        case fieldAccess: FieldAccess => fieldAccess
-//      })
-//
-//      // Filters things in ignoreAcc, using reference equality, then convert to Set
-//      var reads = allReads.filterNot(r => ignoreAcc.exists(p => p eq r)).toSet
-//      reads = reads.filterNot(r => allQuantifiedVars.exists(p =>  r.contains(p.localVar)))
-//      reads = reads -- accLHS // remove all reads with quantified var
-//
-//      if (reads.isEmpty) {
-//        return readStmt
-//      }
-//
-//      val reduceAndFields = reads.flatMap(r =>
-//        reduceDeclsUsed.filter(rd => rd.findFieldInProgram(program) == r.field).zipAll(Seq(), null, r)
-//      ).toSeq
-//      val out = reduceAndFields.flatMap(reduceAndField =>
-//        generateHeapReadAxiomPerReduce(reduceAndField._1, reduceAndField._2.rcv)
-//      )
-//      Seqn(out :+ readStmt, Seq())(readStmt.pos, readStmt.info, readStmt.errT)
-//    }
+  def generateHeapReadAxioms(readStmt: Stmt): Stmt = {
+    var accLHS = Set[FieldAccess]()
+    val relevantPart: Node = readStmt match {
+      case w : While =>
+        w.copy(body = Seqn(Seq(), Seq())())(w.pos, w.info, w.errT)
+      case i : If =>
+        i.copy(thn = Seqn(Seq(), Seq())(), els = Seqn(Seq(), Seq())())(i.pos, i.info, i.errT)
+      case out@ Seqn(_, _) =>
+        return out
+      // Do this to ignore LHS in case of a heap write tgt with heap read. Could cause redundancy.
+      case a: FieldAssign =>
+        accLHS = accLHS + a.lhs
+        a.rhs
+      case generated: Assume =>
+        return generated
+      case _ => readStmt
+    }
+
+    // These reads cannot contained quantified vars
+    val allQuantifiedVars = relevantPart.deepCollect({
+      case qe: QuantifiedExp => qe.variables
+    }).flatten
+
+    // TODO: remove stuff in accessibility predicate TOO!!
+    val ignoreAcc = relevantPart.deepCollect({
+      case acc: FieldAccessPredicate => acc.loc
+    })
+
+    val allReads = relevantPart.deepCollect({
+      case fieldAccess: FieldAccess => fieldAccess
+    })
+
+    // Filters things in ignoreAcc, using reference equality, then convert to Set
+    var reads = allReads.filterNot(r => ignoreAcc.exists(p => p eq r)).toSet
+    reads = reads.filterNot(r => allQuantifiedVars.exists(p =>  r.contains(p.localVar)))
+    reads = reads -- accLHS // remove all reads with quantified var
+
+    if (reads.isEmpty) {
+      return readStmt
+    }
+
+    val reduceAndFields = reads.flatMap(r =>
+      reduceDeclsUsed.filter(rd => rd.findFieldInProgram(program) == r.field).zipAll(Seq(), null, r)
+    ).toSeq
+    val out = reduceAndFields.flatMap(reduceAndField =>
+      generateHeapReadAxiomPerReduce(reduceAndField._1, reduceAndField._2.rcv)
+    )
+    Seqn(readStmt +: out, Seq())(readStmt.pos, readStmt.info, readStmt.errT)
+  }
 
   private def generateHeapWriteAxiomPerReduce(reduceADecl: AReduceDecl, writeTo: Exp, writeExp: Exp): Seq[Stmt] = {
     val field = program.findField(reduceADecl.fieldName)
@@ -513,53 +513,65 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     Seq(reduceFraming, lookupUnmodified, lookupModified)
   }
 
-//    private def generateHeapReadAxiomPerReduce(reduceADecl: AReduceDecl, readFrom: Exp) : Seq[Stmt] = {
-//      val field = program.findField(reduceADecl.fieldName)
-//
-//      // Extract the reduce Domain type
-//      val reduceDType = reduceADecl.reduceDType(program)
-//      val recvDType = reduceADecl.reduceDRecvType(program)
-//      val reduceIdxType = reduceADecl.reduceType._1
-//
-//      // Reduce var declaration
-//      val forallVarR = LocalVarDecl("__r", reduceDType)()
-//      val reduceVar = forallVarR.localVar
-//
-//      // rHeap declaration
-//      val rh = getCurrentRHeap
-//
-//      // Filter Var declaration
-//      val forallVarFS = LocalVarDecl("__fs", SetType(reduceIdxType))()
-//      val fRGood = helper.filterReceiverGood(forallVarFS.localVar, reduceVar)
-//      val fAccess = helper.forallFilterHaveSomeAccess(forallVarFS.localVar, reduceVar, field.name, None)
-//
-//      val receiverApp = helper.applyDomainFunc(
-//        DomainsGenerator.reduceGetRecvKey,
-//        Seq(reduceVar),
-//        reduceDType.typVarsMap
-//      )
-//
-//      val trigger = Trigger(Seq(helper.reduceApply(rh, reduceVar, forallVarFS.localVar)))()
-//
-//      val invRecvApp = helper.applyDomainFunc(
-//        DomainsGenerator.recInvKey,
-//        Seq(receiverApp, readFrom),
-//        recvDType.typVarsMap
-//      )
-//
-//      val triggerDeleteKey = helper.applyDomainFunc(
-//        DomainsGenerator.trigDelKey1Key,
-//        Seq(helper.reduceApply(rh, reduceVar, forallVarFS.localVar), invRecvApp),
-//        reduceDType.typVarsMap)
-//
-//      val outForall = Forall(
-//        Seq(forallVarR, forallVarFS),
-//        Seq(trigger),
-//        helper.foldedConjImplies(Seq(fRGood, fAccess), Seq(fRGood, triggerDeleteKey))
-//      )()
-//
-//      Seq(Assume(outForall)())
-//    }
+  private def generateHeapReadAxiomPerReduce(reduceADecl: AReduceDecl, readFrom: Exp) : Seq[Stmt] = {
+    val field = program.findField(reduceADecl.fieldName)
+
+    // Extract the reduce Domain type
+    val reduceDType = reduceADecl.reduceDType(program)
+    val recvDType = reduceADecl.reduceDRecvType(program)
+    val reduceIdxType = reduceADecl.reduceType._1
+    val reduceHasID = reduceADecl.hasID
+
+    // Reduce var declaration
+    val forallVarR = LocalVarDecl("__r", reduceDType)()
+    val reduceVar = forallVarR.localVar
+
+    // rHeap declaration
+    val rh = getCurrentRHeap
+
+    // Filter Var declaration
+    val forallVarFS = LocalVarDecl("__fs", SetType(reduceIdxType))()
+    val fRGood = helper.filterReceiverGood(forallVarFS.localVar, reduceVar)(reduceHasID)
+    val frGoodOrInj = helper.filterRecvGoodOrInjCheck(forallVarFS.localVar, reduceVar)(reduceHasID)
+    val fAccess = helper.forallFilterHaveSomeAccess(forallVarFS.localVar, reduceVar, field.name, None)(reduceHasID)
+
+    val receiverApp = helper.getReceiverApply(reduceVar)(reduceHasID)
+    val trigger = Trigger(Seq(helper.reduceApply(rh.toExp, reduceVar, forallVarFS.localVar)(reduceHasID)))()
+
+    val invRecvApp = helper.applyDomainFunc(
+      DomainsGenerator.recInvKey,
+      Seq(receiverApp, readFrom),
+      recvDType.typVarsMap
+    )
+
+    val triggerDeleteKey = helper.trigDelKeyApply(rh.toExp, reduceVar, forallVarFS.localVar, invRecvApp)(reduceHasID)
+
+    val reduceDelKey = Assume(
+        Forall(
+        Seq(forallVarR, forallVarFS),
+        Seq(trigger),
+        helper.foldedConjImplies(Seq(frGoodOrInj, fAccess), Seq(fRGood, triggerDeleteKey))
+      )()
+    )()
+
+    val lookup = Assume(
+      Forall(
+        Seq(forallVarR),
+        Seq(Trigger(Seq(receiverApp))()),
+        helper.foldedConjImplies(
+          Seq(helper.permNonZeroCmp(invRecvApp, reduceVar, field.name)(reduceHasID)),
+          Seq(
+            EqCmp(
+              helper.rHeapElemApplyTo(rh.toExp, reduceVar, invRecvApp)(reduceHasID),
+              helper.mapApplyTo(reduceVar, FieldAccess(readFrom, field)())(reduceHasID)
+            )()
+          )
+        )
+      )()
+    )()
+
+    Seq(reduceDelKey, lookup)
+  }
 
   private def generateExhaleAxiomsPerReduce(reduceADecl: AReduceDecl, declaredLosts: mutable.Set[LocalVarDecl]): Seqn = {
     val field = program.findField(reduceADecl.fieldName)

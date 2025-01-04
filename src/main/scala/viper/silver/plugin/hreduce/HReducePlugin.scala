@@ -371,6 +371,13 @@ object HReducePlugin {
         case None => return m
       }
 
+      // add axioms for heap reads, using bottom up traversal
+      // TODO: ensure that the correct rHeap annotations are observed by these axioms
+      outM = outM.transform({
+        case s: Stmt  =>
+          axiomGenerator.generateHeapReadAxioms(s)
+      }, recurse = Traverse.BottomUp)
+
       // Now, transform AReduceApply nodes in context of rHeap annotations
       outM = outM.body match {
         case Some(mBody) =>
