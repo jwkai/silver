@@ -1,0 +1,27 @@
+// The three methods feature updates to one, two, and three (non-aliasing) nodes, resp.
+
+field val: Int
+
+function min(a: Int, b: Int): Int
+  ensures (a == b ==> result == a && result == b) &&
+    (a < b ==> result == a) && 
+    (a > b ==> result == b)
+
+receiver idRec() (fun r: Ref :: r)
+operator minOp() (fun a: Int, b: Int :: min(a,b))
+
+method flipThree(nodes: Set[Ref], x: Ref, y: Ref, z: Ref, m: Int)
+    requires (forall n: Ref :: {n in nodes} n in nodes ==> acc(n.val))
+    requires x in nodes && y in nodes && z in nodes && x != y && y != z && z != x
+    requires 0 <= m && m == hreduce[minOp()](idRec().val | nodes)
+{
+    x.val := -1 * m
+    y.val := -1 * m
+    z.val := -1 * m
+    assert hreduce[minOp()](idRec().val | nodes) == -1 * m
+}
+
+// The last benchmark in the series is a smoke test, 
+// i.e. we add assert false as the very last statement of the body 
+// of each of the three methods and measure the time it takes 
+// the verifier to report failure.

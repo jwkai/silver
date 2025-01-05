@@ -442,7 +442,7 @@ object HReducePlugin {
 //        case None => return m
 //      }
 
-      val setRHeapApply: PartialFunction[Node, Node] = {
+      val setRHeapApply: ARHeap => PartialFunction[Node, Node] = (rh: ARHeap) => {
         case lo@Old(exp) =>
           exp match {
             case ra: AReduceApply =>
@@ -459,23 +459,23 @@ object HReducePlugin {
               )(lo.pos, lo.info, lo.errT)
           }
         case ra: AReduceApply =>
-          ra.rHeap = Some(axiomGenerator.getCurrentRHeap)
+          ra.rHeap = Some(rh)
           ra.toViper(p)
       }
 
       // Add heap-dependent function to pre-/post-conditions and loop invariants
       outM = outM.copy(
         pres =
-          outM.pres.map(pre => pre.transform(setRHeapApply, recurse = Traverse.Innermost)),
+          outM.pres.map(pre => pre.transform(setRHeapApply(axiomGenerator.getOldRHeap), recurse = Traverse.Innermost)),
         posts =
-          outM.posts.map(post => post.transform(setRHeapApply, recurse = Traverse.Innermost)),
+          outM.posts.map(post => post.transform(setRHeapApply(axiomGenerator.getCurrentRHeap), recurse = Traverse.Innermost)),
         body =
           outM.body match {
             case Some(bodyD) =>
               Some(bodyD.transform({
                 case w@While(cond, invs, body) =>
                   While(cond,
-                    invs.map(inv => inv.transform(setRHeapApply)),
+                    invs.map(inv => inv.transform(setRHeapApply(axiomGenerator.getCurrentRHeap))),
                     body)(w.pos, w.info, w.errT)},
                 recurse = Traverse.BottomUp))
             case None => None

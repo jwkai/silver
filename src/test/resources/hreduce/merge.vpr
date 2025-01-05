@@ -1,0 +1,63 @@
+// The benchmark demonstrates reasoning about comprehensions in presence of
+// complex heap transformations, 
+// i.e. those over subgraphs (cf. the recursive call in the then- branch) 
+// and over individual nodes (cf. the field update in the else-branch). 
+// 
+// We omitted the reachability part of the specification of MERGE; 
+// this program is also the running example of our technique of Chap. 3 
+// in which we focus precisely on the problem of modularly verifying 
+// reachability properties, in particular, acyclicity. 
+//
+// The decompositions needed are filt(𝔤) = filt(𝔤 \ 𝔥) ⊎ filt(𝔥), 
+// where 𝔥 ⊂ 𝔤 is the callee footprint in the then-branch, 
+// and filt(𝔤) = filt(𝔤 \ {l}) ⊎ filt({l}),
+// where l is the node modified in the else-branch.
+
+field right: Ref
+
+receiver idRec() (fun r: Ref :: r)
+mapping nullTestToInt() (fun n: Ref :: n == null ? 1 : 0)
+operator add() (0, fun a: Int, b: Int :: a + b )
+
+define DAG(nodes)
+    !(null in nodes)
+	&& (forall n: Ref :: n in nodes ==> acc(n.right))
+	&& (forall n: Ref :: {n.right in nodes}{n in nodes, n.right}
+				n in nodes && n.right != null ==> n.right in nodes)
+
+define closed(g, h)
+    forall n: Ref :: {n in h} 
+        n in h ==> (n.right != null && n.right in g) ==> (n.right in h)
+
+predicate isPathIn(g: Set[Ref], from: Ref, to: Ref)
+
+define ds(st, s, t)
+    st == s union t && s intersection t == Set[Ref]()
+
+function subIn(g: Set[Ref], h: Set[Ref], root: Ref): Set[Ref]
+    requires root in h && h subset g
+    ensures result subset h && root in result // && closed(h, res) // && 
+        // (forall n: Ref :: {n in res} 
+        //     n in res <==> (n in h && isPathIn(g, root, n)))
+
+method merge(nodes: Set[Ref], l: Ref, r: Ref, ldag: Set[Ref], rdag: Set[Ref]) returns (link: Ref)
+    requires DAG(nodes) && l in ldag && r in rdag &&
+             ds(nodes, ldag, rdag) && closed(nodes, ldag)
+    ensures  DAG(nodes) && link in ldag // &&
+             // old(l.right) == null ==> l == link && l.right == r 
+    ensures  hreduce[add()](nullTestToInt(idRec().right) | nodes) == 
+                old(hreduce[add()](nullTestToInt(idRec().right) | nodes)) - 1
+{
+    if (l.right != null) {
+        var nldag: Set[Ref] := subIn(nodes, ldag, l.right) 
+        var g1: Set[Ref] := nldag union rdag
+        link := merge(g1, l.right, r, nldag, rdag)
+    } else { 
+        l.right := r 
+        link := l
+    }
+}
+
+// Failing scenarios: we planted two bugs into MERGE. 
+// Fail 1: we replaced -1 with +1 in the postcondition.
+// Fail 2: we inverted the branch condition.

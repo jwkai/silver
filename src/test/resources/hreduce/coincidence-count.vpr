@@ -1,0 +1,133 @@
+// This method is the optimal implementation for computing the number of coinciding
+// values in two sorted sets (i.e. disjoint, sorted arrays of unique elements).
+//
+// The method maintains a comprehensive invariant that requires multiple independent 
+// iterated variables. Instead of using nested comprehensions, our technique encodes 
+// independent iterated variables as tuples.
+
+field val: Int
+
+domain IntPair {
+  function first(p: IntPair): Int
+  function second(p: IntPair): Int
+  function pair(x: Int, y: Int): IntPair
+
+  axiom {
+    (forall x: Int, y: Int :: {pair(x, y)} 
+        first(pair(x, y)) == x)
+  }
+
+  axiom {
+    (forall x: Int, y: Int :: {pair(x, y)} 
+        second(pair(x, y)) == y)
+  }
+}
+
+field val2: IntPair
+
+domain Array {
+  function loc(a: Array, i: Int): Ref
+  function len(a: Array): Int
+  function inv1(r: Ref): Array
+  function inv2(r: Ref): Int
+
+  function loc2(a: Array, b: Array, is: IntPair): Ref
+  function inv21(r: Ref): Array
+  function inv22(r: Ref): Array
+  function inv23(r: Ref): IntPair
+
+  axiom all_diff {
+    forall a: Array, i: Int :: {loc(a,i)}
+      inv1(loc(a,i)) == a && inv2(loc(a,i)) == i
+  }
+
+  axiom all_diff_2 {
+    forall a: Array, b: Array, is: IntPair :: {loc2(a,b,is)}
+      inv21(loc2(a,b,is)) == a && inv22(loc2(a,b,is)) == b && inv23(loc2(a,b,is)) == is
+  }
+
+  axiom inv_lproj_2 {
+    forall a: Array, b: Array, i: Int, is: IntPair :: {loc2(a,b,is), loc(a,i)} {loc2(a,b,is), loc(b,i)}
+      first(is) == i ==> inv21(loc2(a,b,is)) == inv1(loc(a, i)) &&
+      second(is) == i ==> inv22(loc2(a,b,is)) == inv1(loc(b, i))
+  }
+
+  axiom inv_rproj_2 {
+    forall a: Array, b: Array, i: Int, j: Int, is: IntPair :: {loc2(a,b,is), loc(a,i), loc(b, j)}
+      (inv21(loc2(a,b,is)) == inv1(loc(a, i)) && inv22(loc2(a,b,is)) == inv1(loc(b, j))) ==>
+        (first(is) == i && second(is) == j)
+  }
+
+  axiom len_nonneg {
+    forall a: Array :: { len(a) }
+      len(a) >= 0
+  }
+}
+
+function inRange(i: Int, start: Int, end: Int): Bool {
+    i >= start && i < end
+}
+
+receiver arrayRec(a: Array, b: Array) (fun is: IntPair :: loc2(a,b,is))
+filter allInt2(start1: Int, end1: Int, start2: Int, end2: Int) 
+    (fun p: IntPair :: inRange(first(p), start1, end1) && 
+                        inRange(second(p), start2, end2))
+mapping compPairToInt() (fun p: IntPair :: first(p) == second(p) ? 1 : 0)
+operator add() (0, fun a: Int, b: Int :: a + b )
+
+define access_array(a, start, end)
+    (forall i: Int :: {inRange(i, start, end)} 
+        inRange(i, start, end) ==> acc(loc(a, i).val))
+
+define access_array_2(a, start1, end1, b, start2, end2)
+    (forall i: Int, j: Int :: {inRange(i, start1, end1), inRange(j, start2, end2)} 
+        inRange(i, start1, end1) && inRange(j, start2, end2) ==> acc(loc2(a, b, pair(i,j)).val2))
+
+define sorted(a, start, end)
+    (forall i: Int, j: Int :: {inRange(i, start, end), inRange(j, start, end)}
+        inRange(i, start, end) && inRange(j, start, end) ==> 
+            i < j ==> loc(a, i).val < loc(a, j).val)
+
+define disjoint(a, b)
+    (forall i: Int, j: Int :: {loc(a, i), loc(b, j)}
+        loc(a, i) != loc(b, j))
+
+method coincidenceCount(a: Array, b: Array) returns (res: Int)
+    requires access_array(a, 0, len(a)) && access_array(b, 0, len(b)) && 
+        access_array_2(a, 0, len(a), b, 0, len(b)) &&
+        (forall i: Int, j: Int :: {loc(a, i), loc(b, j)} {loc2(a, b, pair(i,j))}
+            inRange(i, 0, len(a)) && inRange(j, 0, len(b)) ==> 
+            (loc(a, i).val == first(loc2(a, b, pair(i,j)).val2) && 
+            loc(b, j).val == second(loc2(a, b, pair(i,j)).val2)))
+    requires disjoint(a, b)
+    requires sorted(a, 0, len(a)) && sorted(b, 0, len(b))
+    ensures  access_array(a, 0, len(a)) && access_array(b, 0, len(b))
+    ensures  res == hreduce[add()](compPairToInt(arrayRec(a,b).val2) | allInt2(0, len(a), 0, len(b)))
+{
+    var m: Int := 0
+    var n: Int := 0
+    res := 0
+    while (m < len(a) && n < len(b))
+        invariant access_array(a, 0, len(a)) && access_array(b, 0, len(b))
+        invariant sorted(a, 0, len(a)) && sorted(b, 0, len(b))
+        invariant 0 <= m <= len(a) && 0 <= n <= len(b)
+        invariant m != len(a) && inRange(n, 0, len(b)) ==> 
+            (forall i: Int :: {inRange(i, 0, m)} 
+                inRange(i, 0, m) ==> loc(a, i).val < loc(b, n).val)
+        invariant n != len(b) && inRange(m, 0, len(a)) ==> 
+            (forall j: Int :: {inRange(j, 0, n)} 
+                inRange(j, 0, n) ==> loc(b, j).val < loc(a, m).val)
+        invariant res == hreduce[add()](compPairToInt(arrayRec(a,b).val2) | allInt2(0, m, 0, n))
+    {
+        if (loc(a, m).val < loc(b, n).val) { m := m + 1 } 
+        else {
+            if (loc(a, m).val > loc(b, n).val) { n := n + 1 }
+            else { res := res+1; m := m+1; n := n+1 } 
+        }
+    }
+}
+
+// Failing scenarios: we planted two bugs into COINCIDENCE-COUNT. 
+// Fail 1: we decreased by one the upper bounds for both iterated variables 
+//         of the 𝖘𝖚𝖒-comprehension.
+// Fail 2: we dropped n:=n+1 in the last branch.

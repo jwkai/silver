@@ -1,0 +1,69 @@
+field val: Int
+
+domain Array {
+  function loc(a: Array, i: Int): Ref
+  function len(a: Array): Int
+  function first(r: Ref): Array
+  function second(r: Ref): Int
+
+  axiom all_diff {
+    forall a: Array, i: Int :: {loc(a,i)}
+      first(loc(a,i)) == a && second(loc(a,i)) == i
+  }
+
+  axiom len_nonneg {
+    forall a: Array :: { len(a) }
+      len(a) >= 0
+  }
+}
+
+predicate ACCESS_ARRAY(A: Array) {
+    forall i: Int :: 
+        0 <= i && i <= len(A) ==> acc(loc(A,i).val)
+}
+
+predicate INCREASING(A: Array, lo: Int, hi: Int) {
+    lo >= 0 && hi <= len(A) && lo <= hi ==>
+        forall i: Int, j: Int :: {loc(A,i), loc(A,j)}
+            lo <= i && i <= hi && 
+            lo <= j && j <= hi &&
+            i < j ==> loc(A,i).val <= loc(A,j).val
+}
+
+predicate MAX_IN_RANGE(A: Array, p: Int, lo: Int, hi: Int) {
+    lo >= 0 && hi <= len(A) && lo <= hi && lo <= p && p <= hi ==>
+        (forall i: Int :: {loc(A,i)}
+            loc(A,i).val <= loc(A,p).val)
+}
+
+predicate MIN_IN_RANGE(A: Array, p: Int, lo: Int, hi: Int) {
+    lo >= 0 && hi <= len(A) && lo <= hi && lo <= p && p <= hi ==>
+        (forall i: Int :: {loc(A,i)}
+            loc(A,i).val >= loc(A,p).val)
+}
+
+receiver arrayRec(a: Array) (fun i: Int :: loc(a,i))
+filter allInt(start: Int, end: Int) (fun i: Int :: i >= start && i < end )
+mapping singleM() (fun i: Int :: Multiset[Int](i))
+operator mUnion() (Multiset[Int](), fun a: Multiset[Int], b: Multiset[Int] :: a union b )
+
+define asMultiset(a) (hreduce[mUnion()](singleM(arrayRec(a).val) | allInt(0, len(a))))
+
+method Quicksort(A: Array, lo: Int, hi: Int)
+	requires ACCESS_ARRAY(A)
+    ensures  ACCESS_ARRAY(A) && INCREASING(A, lo, hi) &&
+		     asMultiset(A) == old(asMultiset(A))
+{
+    if (0 <= lo && lo < hi && hi < len(A)) {
+		var p: Int := Partition(A, lo, hi)
+		Quicksort(A, lo, p)
+		Quicksort(A, p+1, hi)
+	}
+}
+
+method Partition(A: Array, lo: Int, hi: Int) returns (p: Int)
+	requires 0 <= lo < hi < len(A) && ACCESS_ARRAY(A, lo, hi)
+    ensures  lo <= p <= hi && ACCESS_ARRAY(A, lo, hi) && 
+		    MAX_IN_RANGE(A, p, lo, p) && MIN_IN_RANGE(A, p, p, hi) &&
+		    asMultiset(A) == old(asMultiset(A))
+

@@ -554,7 +554,38 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
       )()
     )()
 
-    val lookup = Assume(
+    // Index var declaration
+    val forallVarIdx = LocalVarDecl("__ind", reduceIdxType)()
+    val idxVar = forallVarIdx.localVar
+    val receiverAppIdx = helper.applyDomainFunc(
+      DomainsGenerator.recApplyKey,
+      Seq(receiverApp, idxVar),
+      recvDType.typVarsMap
+    )
+
+    val lookupUnread = Assume(
+      Forall(
+        Seq(forallVarR),
+        Seq(Trigger(Seq(receiverApp))()),
+        Forall(
+          Seq(forallVarIdx),
+          Seq(
+            Trigger(Seq(helper.rHeapElemApplyTo(rh.toExp, reduceVar, idxVar)(reduceHasID)))()
+          ),
+          helper.foldedConjImplies(
+            Seq(helper.permNonZeroCmp(idxVar, reduceVar, field.name)(reduceHasID)),
+            Seq(
+              EqCmp(
+                helper.rHeapElemApplyTo(rh.toExp, reduceVar, idxVar)(reduceHasID),
+                helper.mapApplyTo(reduceVar, FieldAccess(receiverAppIdx, field)())(reduceHasID)
+              )()
+            ),
+          )
+        )()
+      )()
+    )()
+
+    val lookupRead = Assume(
       Forall(
         Seq(forallVarR),
         Seq(Trigger(Seq(receiverApp))()),
@@ -570,7 +601,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
       )()
     )()
 
-    Seq(reduceDelKey, lookup)
+    Seq(reduceDelKey, lookupUnread, lookupRead)
   }
 
   private def generateExhaleAxiomsPerReduce(reduceADecl: AReduceDecl, declaredLosts: mutable.Set[LocalVarDecl]): Seqn = {
