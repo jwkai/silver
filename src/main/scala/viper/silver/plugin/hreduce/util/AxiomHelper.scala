@@ -22,6 +22,13 @@ class AxiomHelper(program: Program) {
     "_methodLabel"
   }
 
+  def extractFieldAcc(e: Exp): Set[Field] = {
+    e.deepCollect({
+      case fieldAccess: FieldAccess =>
+        fieldAccess.field
+    }).toSet
+  }
+
   def extractFieldAcc(s: Stmt): Set[Field] = {
     s.deepCollect({
       case fieldAccessPredicate: FieldAccessPredicate =>

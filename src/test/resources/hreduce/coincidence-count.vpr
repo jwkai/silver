@@ -11,15 +11,23 @@ domain IntPair {
   function first(p: IntPair): Int
   function second(p: IntPair): Int
   function pair(x: Int, y: Int): IntPair
+  function sgnCmp(p: IntPair): Int
 
   axiom {
-    (forall x: Int, y: Int :: {pair(x, y)} 
+    (forall x: Int, y: Int :: {pair(x, y)}
         first(pair(x, y)) == x)
   }
 
   axiom {
-    (forall x: Int, y: Int :: {pair(x, y)} 
+    (forall x: Int, y: Int :: {pair(x, y)}
         second(pair(x, y)) == y)
+  }
+
+  axiom {
+    (forall p: IntPair :: {sgnCmp(p)}
+      first(p) <  second(p) ==> sgnCmp(p) == -1 &&
+      first(p) == second(p) ==> sgnCmp(p) ==  0 &&
+      first(p) >  second(p) ==> sgnCmp(p) ==  1)
   }
 }
 
@@ -69,61 +77,68 @@ function inRange(i: Int, start: Int, end: Int): Bool {
 }
 
 receiver arrayRec(a: Array, b: Array) (fun is: IntPair :: loc2(a,b,is))
-filter allInt2(start1: Int, end1: Int, start2: Int, end2: Int) 
-    (fun p: IntPair :: inRange(first(p), start1, end1) && 
+filter allInt2(start1: Int, end1: Int, start2: Int, end2: Int)
+    (fun p: IntPair :: inRange(first(p), start1, end1) &&
                         inRange(second(p), start2, end2))
 mapping compPairToInt() (fun p: IntPair :: first(p) == second(p) ? 1 : 0)
 operator add() (0, fun a: Int, b: Int :: a + b )
 
 define access_array(a, start, end)
-    (forall i: Int :: {inRange(i, start, end)} 
+    (forall i: Int :: {inRange(i, start, end)}
         inRange(i, start, end) ==> acc(loc(a, i).val))
 
 define access_array_2(a, start1, end1, b, start2, end2)
-    (forall i: Int, j: Int :: {inRange(i, start1, end1), inRange(j, start2, end2)} 
+    (forall i: Int, j: Int :: {inRange(i, start1, end1), inRange(j, start2, end2)}
         inRange(i, start1, end1) && inRange(j, start2, end2) ==> acc(loc2(a, b, pair(i,j)).val2))
 
 define sorted(a, start, end)
     (forall i: Int, j: Int :: {inRange(i, start, end), inRange(j, start, end)}
-        inRange(i, start, end) && inRange(j, start, end) ==> 
+        inRange(i, start, end) && inRange(j, start, end) ==>
             i < j ==> loc(a, i).val < loc(a, j).val)
 
 define disjoint(a, b)
     (forall i: Int, j: Int :: {loc(a, i), loc(b, j)}
         loc(a, i) != loc(b, j))
 
-method coincidenceCount(a: Array, b: Array) returns (res: Int)
-    requires access_array(a, 0, len(a)) && access_array(b, 0, len(b)) && 
+method coincidenceCount(a: Array, b: Array) returns (res: Int, m: Int, n: Int)
+    requires access_array(a, 0, len(a)) && access_array(b, 0, len(b)) &&
         access_array_2(a, 0, len(a), b, 0, len(b)) &&
         (forall i: Int, j: Int :: {loc(a, i), loc(b, j)} {loc2(a, b, pair(i,j))}
-            inRange(i, 0, len(a)) && inRange(j, 0, len(b)) ==> 
-            (loc(a, i).val == first(loc2(a, b, pair(i,j)).val2) && 
+            inRange(i, 0, len(a)) && inRange(j, 0, len(b)) ==>
+            (loc(a, i).val == first(loc2(a, b, pair(i,j)).val2) &&
             loc(b, j).val == second(loc2(a, b, pair(i,j)).val2)))
     requires disjoint(a, b)
     requires sorted(a, 0, len(a)) && sorted(b, 0, len(b))
     ensures  access_array(a, 0, len(a)) && access_array(b, 0, len(b))
-    ensures  res == hreduce[add()](compPairToInt(arrayRec(a,b).val2) | allInt2(0, len(a), 0, len(b)))
+    ensures  m == len(a) || n == len(b)
+    ensures  res == hreduce[add()](compPairToInt(arrayRec(a,b).val2) | allInt2(0, m, 0,n))
 {
-    var m: Int := 0
-    var n: Int := 0
+    m := 0
+    n := 0
     res := 0
     while (m < len(a) && n < len(b))
-        invariant access_array(a, 0, len(a)) && access_array(b, 0, len(b))
+        invariant access_array(a, 0, len(a)) && access_array(b, 0, len(b)) &&
+                  access_array_2(a, 0, len(a), b, 0, len(b))
         invariant sorted(a, 0, len(a)) && sorted(b, 0, len(b))
         invariant 0 <= m <= len(a) && 0 <= n <= len(b)
-        invariant m != len(a) && inRange(n, 0, len(b)) ==> 
-            (forall i: Int :: {inRange(i, 0, m)} 
+        invariant m != len(a) && inRange(n, 0, len(b)) ==>
+            (forall i: Int :: {inRange(i, 0, m)}
                 inRange(i, 0, m) ==> loc(a, i).val < loc(b, n).val)
-        invariant n != len(b) && inRange(m, 0, len(a)) ==> 
-            (forall j: Int :: {inRange(j, 0, n)} 
+        invariant n != len(b) && inRange(m, 0, len(a)) ==>
+            (forall j: Int :: {inRange(j, 0, n)}
                 inRange(j, 0, n) ==> loc(b, j).val < loc(a, m).val)
         invariant res == hreduce[add()](compPairToInt(arrayRec(a,b).val2) | allInt2(0, m, 0, n))
     {
-        if (loc(a, m).val < loc(b, n).val) { m := m + 1 } 
+        if (sgnCmp(loc2(a, b, pair(m,n)).val2) == -1) { m := m + 1 }
         else {
-            if (loc(a, m).val > loc(b, n).val) { n := n + 1 }
-            else { res := res+1; m := m+1; n := n+1 } 
+            if (sgnCmp(loc2(a, b, pair(m,n)).val2) == 1) { n := n + 1 }
+            else { res := res+1; m := m+1; n := n+1 }
         }
+        // if (loc(a, m).val < loc(b, n).val) { m := m + 1 }
+        // else {
+        //     if (loc(a, m).val > loc(b, n).val) { n := n + 1 }
+        //     else { res := res+1; m := m+1; n := n+1 }
+        // }
     }
 }
 

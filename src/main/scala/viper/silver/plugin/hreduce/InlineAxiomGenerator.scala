@@ -89,55 +89,55 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
 
   // Add axioms for exhales, inhales and heap writes, tracking rHeap insertions
   def addAxiomsToBody(): PartialFunction[Node, Node] = {
-    case e: Exhale =>
-      if (!helper.checkIfPure(e)) {
-        val fields = helper.extractFieldAcc(e)
-        generateExhaleAxioms(e, fields)
-      } else {
-        e.withMeta(e.pos, MakeInfoPair(e.info, rHeapInfo(getCurrentRHeap)), e.errT)
-      }
-    case i: Inhale =>
-      if (!helper.checkIfPure(i)) {
-        val fields = helper.extractFieldAcc(i)
-        generateInhaleAxioms(i, fields)
-      } else {
-        i.withMeta(i.pos, MakeInfoPair(i.info, rHeapInfo(getCurrentRHeap)), i.errT)
-      }
+    case e: Exhale if !helper.checkIfPure(e) =>
+      val fields = helper.extractFieldAcc(e)
+      generateExhaleAxioms(e, fields)
+    case i: Inhale if !helper.checkIfPure(i) =>
+      val fields = helper.extractFieldAcc(i)
+      generateInhaleAxioms(i, fields)
     case fa: FieldAssign =>
       generateHeapWriteAxioms(fa)
     case l@Label(name, _) =>
       mapUserLabelToCurrentARHeap(name)
       l
-    case a: Assert =>
-      a.withMeta(a.pos, MakeInfoPair(a.info, rHeapInfo(getCurrentRHeap)), a.errT)
-    case a: Assume =>
-      a.withMeta(a.pos, MakeInfoPair(a.info, rHeapInfo(getCurrentRHeap)), a.errT)
+//    case a: Assert =>
+//      a.withMeta(a.pos, MakeInfoPair(a.info, rHeapInfo(getCurrentRHeap)), a.errT)
+//    case a: Assume =>
+//      a.withMeta(a.pos, MakeInfoPair(a.info, rHeapInfo(getCurrentRHeap)), a.errT)
     case i: If =>
       ifRHeapJoin(i)
     case w: While =>
       whileRHeapFlattenInvariants(w)
+    case s: Stmt if !s.isInstanceOf[Seqn] && !s.isInstanceOf[If] && !s.isInstanceOf[While] =>
+      s.withMeta(s.pos, MakeInfoPair(s.info, rHeapInfo(getCurrentRHeap)), s.errT)
   }
 
   // Add axioms to each branch, "join" branches with next rHeap and triggers
   private def ifRHeapJoin(i: If): Seqn = {
     val rHeapOrig = getCurrentRHeap
+    val cndFields = helper.extractFieldAcc(i.cond)
     val thnFields = helper.extractFieldAcc(i.thn)
     val thnAxs = i.thn.transform(addAxiomsToBody())
     val rHeapThn = getCurrentRHeap
     val elsFields = helper.extractFieldAcc(i.els)
     val elsAxs = i.els.transform(addAxiomsToBody())
     val rHeapEls = if (i.els == EmptyStmt) rHeapOrig else getCurrentRHeap
+    val relevantFields = cndFields ++ thnFields ++ elsFields
     labelIncrement()
-    val ifJoinAxsThn = thnAxs.copy(
-      ss = thnAxs.ss ++ makeIfJoinAxioms(rHeapThn, getCurrentRHeap, thnFields ++ elsFields)
+    val ifJoinAxsThn = makeIfJoinAxioms(rHeapThn, getCurrentRHeap, relevantFields)
+    val ifJoinThn = Seqn(
+      thnAxs.ss ++ ifJoinAxsThn,
+      thnAxs.scopedSeqnDeclarations
     )(thnAxs.pos, thnAxs.info, thnAxs.errT)
-    val ifJoinAxsEls = elsAxs.copy(
-      ss = elsAxs.ss ++ makeIfJoinAxioms(rHeapEls, getCurrentRHeap, thnFields ++ elsFields)
+    val ifJoinAxsEls = makeIfJoinAxioms(rHeapEls, getCurrentRHeap, relevantFields)
+    val ifJoinEls = Seqn(
+      elsAxs.ss ++ ifJoinAxsEls,
+      elsAxs.scopedSeqnDeclarations
     )(elsAxs.pos, elsAxs.info, elsAxs.errT)
     Seqn(
       Seq(i.copy(
-        thn = ifJoinAxsThn,
-        els = ifJoinAxsEls
+        thn = ifJoinThn,
+        els = ifJoinEls
       )(i.pos, MakeInfoPair(i.info, rHeapInfo(rHeapOrig)), i.errT)),
       Seq()
     )(i.pos, MakeInfoPair(i.info, rHeapInfo(rHeapOrig)), i.errT)
@@ -348,18 +348,16 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
   def generateHeapReadAxioms(readStmt: Stmt): Stmt = {
     var accLHS = Set[FieldAccess]()
     val relevantPart: Node = readStmt match {
-      case w : While =>
+      case w: While =>
         w.copy(body = Seqn(Seq(), Seq())())(w.pos, w.info, w.errT)
-      case i : If =>
+      case i: If =>
         i.copy(thn = Seqn(Seq(), Seq())(), els = Seqn(Seq(), Seq())())(i.pos, i.info, i.errT)
-      case out@ Seqn(_, _) =>
+      case out@Seqn(_, _) =>
         return out
       // Do this to ignore LHS in case of a heap write tgt with heap read. Could cause redundancy.
       case a: FieldAssign =>
         accLHS = accLHS + a.lhs
         a.rhs
-      case generated: Assume =>
-        return generated
       case _ => readStmt
     }
 

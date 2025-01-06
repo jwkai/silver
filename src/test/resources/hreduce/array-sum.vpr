@@ -22,18 +22,19 @@ filter allInt(start: Int, end: Int) (fun i: Int :: i >= start && i < end )
 operator add() (0, fun a: Int, b: Int :: a + b )
 
 define access_array(a, i1, i2)
-    (forall j: Int :: {j in allInt(i1, i2)} j in allInt(i1, i2) ==> acc(loc(a, j).val))
+    (forall j: Int :: {loc(a, j)} j in allInt(i1, i2) ==> acc(loc(a, j).val))
 
 method arraySum(a: Array) returns (res: Int)
   requires access_array(a, 0, len(a))
-  ensures  access_array(a, 0, len(a)) 
+  ensures  access_array(a, 0, len(a))
   ensures  res == hreduce[add()](arrayRec(a).val | allInt(0, len(a)))
 {
-  var n: Int := 0; res := 0 
+  var n: Int := 0; res := 0
   while (n < len(a))
-    invariant access_array(a, 0, len(a)) 
-    invariant 0 <= n && n <= len(a) 
-    invariant res == hreduce[add()](arrayRec(a).val | allInt(0, n)) /* I1 */ 
+    invariant access_array(a, 0, len(a))
+    invariant 0 <= n && n <= len(a)
+    invariant (n == len(a) ==> res == hreduce[add()](arrayRec(a).val | allInt(0, (len(a): Int)))) &&
+              (n < len(a)  ==> res == hreduce[add()](arrayRec(a).val | allInt(0, n))) /* I1 */
     // invariant res + hreduce[add()](arrayRec(a).val | allInt(n, len(a))) ==
     //                 hreduce[add()](arrayRec(a).val | allInt(0,len(a))) /* I2 */
   {

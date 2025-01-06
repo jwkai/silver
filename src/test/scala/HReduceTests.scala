@@ -19,6 +19,7 @@ class HReduceTests extends AnyFunSuite {
 //  val inputfile = "hreduce/arrayTestExhaleExhale.vpr"
 //  val inputfile = "hreduce/arrayBubbleSort.vpr"
 //  val inputfile = "hreduce/array-sum.vpr"
+//  val inputfile = "hreduce/array-sum-i2.vpr"
 //  val inputfile = "hreduce/flip.vpr"
 //  val inputfile = "hreduce/flipTwo.vpr"
 //  val inputfile = "hreduce/flipThree.vpr"
