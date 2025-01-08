@@ -33,7 +33,7 @@ method arraySum(a: Array) returns (res: Int)
   while (n < len(a))
     invariant access_array(a, 0, len(a))
     invariant 0 <= n && n <= len(a)
-    invariant (n == len(a) ==> res == hreduce[add()](arrayRec(a).val | allInt(0, (len(a): Int)))) &&
+    invariant (n == len(a) ==> res == hreduce[add()](arrayRec(a).val | allInt(0, len(a)))) &&
               (n < len(a)  ==> res == hreduce[add()](arrayRec(a).val | allInt(0, n))) /* I1 */
     // invariant res + hreduce[add()](arrayRec(a).val | allInt(n, len(a))) ==
     //                 hreduce[add()](arrayRec(a).val | allInt(0,len(a))) /* I2 */

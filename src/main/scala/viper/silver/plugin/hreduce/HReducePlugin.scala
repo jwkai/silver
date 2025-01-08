@@ -354,7 +354,7 @@ object HReducePlugin {
               axiomGenerator.getOldLabel +: mBody.ss
             )(mBody.pos, mBody.info, mBody.errT))
           )(outM.pos, outM.info, outM.errT)
-        case None => return m
+        case None => outM
       }
 
       // Add axioms for exhales, inhales and heap writes, tracking rHeap insertions
@@ -363,14 +363,14 @@ object HReducePlugin {
           outM.copy(body =
             Some(mBody.transform(axiomGenerator.addAxiomsToBody()))
           )(outM.pos, outM.info, outM.errT)
-        case None => return m
+        case None => outM
       }
 
       // add axioms for heap reads, using bottom up traversal
       // TODO: ensure that the correct rHeap annotations are observed by these axioms
       outM = outM.transform({
-        case s: Stmt  =>
-          axiomGenerator.generateHeapReadAxioms(s)
+        case s@NodeWithRHeapInfo(rHeapInfo(rh)) if s.isInstanceOf[Stmt]  =>
+          axiomGenerator.generateHeapReadAxioms(s.asInstanceOf[Stmt], rh)
       }, recurse = Traverse.BottomUp)
 
       // Now, transform AReduceApply nodes in context of rHeap annotations
@@ -418,7 +418,7 @@ object HReducePlugin {
                 (ra.toViper(p), rh)
             }, initialContext = axiomGenerator.getOldRHeap))
           )(outM.pos, outM.info, outM.errT)
-        case None => return m
+        case None => outM
       }
 
       // TODO: figure out why this doesn't work...
@@ -434,7 +434,7 @@ object HReducePlugin {
 //                stripRHeapInfo(n)
 //            }))
 //          )(outM.pos, outM.info, outM.errT)
-//        case None => return m
+//        case None => outM
 //      }
 
       val setRHeapApply: ARHeap => PartialFunction[Node, Node] = (rh: ARHeap) => {

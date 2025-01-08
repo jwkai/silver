@@ -113,7 +113,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
   }
 
   // Add axioms to each branch, "join" branches with next rHeap and triggers
-  private def ifRHeapJoin(i: If): Seqn = {
+  private def ifRHeapJoin(i: If): If = {
     val rHeapOrig = getCurrentRHeap
     val cndFields = helper.extractFieldAcc(i.cond)
     val thnFields = helper.extractFieldAcc(i.thn)
@@ -134,12 +134,9 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
       elsAxs.ss ++ ifJoinAxsEls,
       elsAxs.scopedSeqnDeclarations
     )(elsAxs.pos, elsAxs.info, elsAxs.errT)
-    Seqn(
-      Seq(i.copy(
-        thn = ifJoinThn,
-        els = ifJoinEls
-      )(i.pos, MakeInfoPair(i.info, rHeapInfo(rHeapOrig)), i.errT)),
-      Seq()
+    i.copy(
+      thn = ifJoinThn,
+      els = ifJoinEls
     )(i.pos, MakeInfoPair(i.info, rHeapInfo(rHeapOrig)), i.errT)
   }
 
@@ -345,7 +342,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     Seqn(out :+ writeStmt :+ getCurrentLabel, Seq())(writeStmt.pos, infoPair, writeStmt.errT)
   }
 
-  def generateHeapReadAxioms(readStmt: Stmt): Stmt = {
+  def generateHeapReadAxioms(readStmt: Stmt, rHeap: ARHeap): Stmt = {
     var accLHS = Set[FieldAccess]()
     val relevantPart: Node = readStmt match {
       case w: While =>
@@ -388,7 +385,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
       reduceDeclsUsed.filter(rd => rd.findFieldInProgram(program) == r.field).zipAll(Seq(), null, r)
     ).toSeq
     val out = reduceAndFields.flatMap(reduceAndField =>
-      generateHeapReadAxiomPerReduce(reduceAndField._1, reduceAndField._2.rcv)
+      generateHeapReadAxiomPerReduce(reduceAndField._1, reduceAndField._2.rcv, rHeap)
     )
     Seqn(readStmt +: out, Seq())(readStmt.pos, readStmt.info, readStmt.errT)
   }
@@ -511,7 +508,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     Seq(reduceFraming, lookupUnmodified, lookupModified)
   }
 
-  private def generateHeapReadAxiomPerReduce(reduceADecl: AReduceDecl, readFrom: Exp) : Seq[Stmt] = {
+  private def generateHeapReadAxiomPerReduce(reduceADecl: AReduceDecl, readFrom: Exp, rh: ARHeap) : Seq[Stmt] = {
     val field = program.findField(reduceADecl.fieldName)
 
     // Extract the reduce Domain type
@@ -523,9 +520,6 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     // Reduce var declaration
     val forallVarR = LocalVarDecl("__r", reduceDType)()
     val reduceVar = forallVarR.localVar
-
-    // rHeap declaration
-    val rh = getCurrentRHeap
 
     // Filter Var declaration
     val forallVarFS = LocalVarDecl("__fs", SetType(reduceIdxType))()
