@@ -30,17 +30,12 @@ class HReducePlugin(@unused reporter: viper.silver.reporter.Reporter,
   private var setOperators: Set[PReduceOperator] = Set()
 
   /** Parser for reduce statements. */
-  def reduceOp[$: P]: P[(PReduceKeywordType, PCall)] =
-    P(P(PReduceKeyword) ~/ "[" ~ funcApp ~ "]")
-
-  def reduceDef[$: P]: P[(PMappingFieldReceiver, PExp)] =
-    P(P("(") ~/ mapRecBoth ~ "|" ~ exp ~ ")")
+  def reduceOp[$: P]: P[(PReduceKeywordType, PCall, PMappingFieldReceiver, PExp)] =
+    P(P(PReduceKeyword) ~/ "[" ~ funcApp ~ "]" ~/ "(" ~ mapRecBoth ~ "|" ~ exp ~ ")")
 
   def reduce[$: P]: P[PReduce] =
     P(
-      (reduceOp ~/ reduceDef) map {
-        case (kw, op, (mRf, f)) => (kw, op, mRf, f)
-      } map (PReduce.apply _).tupled
+      reduceOp map (PReduce.apply _).tupled
     ).pos
 
   def funDef[$:P]: P[PFunInline] =
