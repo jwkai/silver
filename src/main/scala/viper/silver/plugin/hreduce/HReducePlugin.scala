@@ -10,7 +10,7 @@ import viper.silver.parser.FastParser
 import viper.silver.parser._
 import viper.silver.plugin.hreduce.HReducePlugin.{addInlinedAxioms, defaultMappingIden}
 import viper.silver.plugin.hreduce.DomainsGenerator._
-import viper.silver.plugin.hreduce.ast.{AReduceApply, ARHeap, rHeapInfo}
+import viper.silver.plugin.hreduce.ast.{ARHeap, AReduceApply, rHeapInfo}
 import viper.silver.plugin.hreduce.parser.PReduce.PReduceKeywordType
 import viper.silver.plugin.hreduce.parser._
 import viper.silver.plugin.hreduce.util.AxiomHelper
@@ -369,8 +369,11 @@ object HReducePlugin {
       // add axioms for heap reads, using bottom up traversal
       // TODO: ensure that the correct rHeap annotations are observed by these axioms
       outM = outM.transform({
-        case s@NodeWithRHeapInfo(rHeapInfo(rh)) if s.isInstanceOf[Stmt]  =>
-          axiomGenerator.generateHeapReadAxioms(s.asInstanceOf[Stmt], rh)
+        case s: Stmt  =>
+          axiomGenerator.generateHeapReadAxioms(s, s match {
+            case NodeWithRHeapInfo(rHeapInfo(rh)) => rh
+            case _ => axiomGenerator.getCurrentRHeap
+          })
       }, recurse = Traverse.BottomUp)
 
       // Now, transform AReduceApply nodes in context of rHeap annotations

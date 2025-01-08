@@ -227,7 +227,12 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
             body = Seqn(
               Seq(labelOnEntry) ++
               foldInvsAssume(rHeapOnEntry) ++
-              wBodyRec.ss ++
+              wBodyRec.ss.map(s => {
+                s.info.getUniqueInfo[rHeapInfo] match {
+                  case Some(_) => s
+                  case None => s.withMeta(s.pos, MakeInfoPair(s.info, rHeapInfo(getCurrentRHeap)), s.errT)
+                }
+              }) ++
               foldInvsAssert(getCurrentRHeap),
               wBodyRec.scopedSeqnDeclarations
             )(wBodyRec.pos, wBodyRec.info, wBodyRec.errT),
@@ -373,8 +378,8 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     })
 
     // Filters things in ignoreAcc, using reference equality, then convert to Set
-    var reads = allReads.filterNot(r => ignoreAcc.exists(p => p eq r)).toSet
-    reads = reads.filterNot(r => allQuantifiedVars.exists(p =>  r.contains(p.localVar)))
+//    var reads = allReads.filterNot(r => ignoreAcc.exists(p => p eq r)).toSet
+    var reads = allReads.filterNot(r => allQuantifiedVars.exists(p =>  r.contains(p.localVar))).toSet
     reads = reads -- accLHS // remove all reads with quantified var
 
     if (reads.isEmpty) {
