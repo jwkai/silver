@@ -109,7 +109,8 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     case w: While =>
       whileRHeapFlattenInvariants(w)
     case s: Stmt if !s.isInstanceOf[Seqn] && !s.isInstanceOf[If] && !s.isInstanceOf[While] =>
-      s.withMeta(s.pos, MakeInfoPair(s.info, rHeapInfo(getCurrentRHeap)), s.errT)
+      generateHeapReadAxioms(s, getCurrentRHeap)
+//      s.withMeta(s.pos, MakeInfoPair(s.info, rHeapInfo(getCurrentRHeap)), s.errT)
   }
 
   // Add axioms to each branch, "join" branches with next rHeap and triggers
@@ -382,8 +383,10 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     var reads = allReads.filterNot(r => allQuantifiedVars.exists(p =>  r.contains(p.localVar))).toSet
     reads = reads -- accLHS // remove all reads with quantified var
 
+    val readStmtWrHeap = readStmt.withMeta(readStmt.pos, MakeInfoPair(readStmt.info, rHeapInfo(getCurrentRHeap)), readStmt.errT)
+
     if (reads.isEmpty) {
-      return readStmt
+      return readStmtWrHeap
     }
 
     val reduceAndFields = reads.flatMap(r =>
@@ -392,7 +395,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val out = reduceAndFields.flatMap(reduceAndField =>
       generateHeapReadAxiomPerReduce(reduceAndField._1, reduceAndField._2.rcv, rHeap)
     )
-    Seqn(readStmt +: out, Seq())(readStmt.pos, readStmt.info, readStmt.errT)
+    Seqn(readStmtWrHeap +: out, Seq())(readStmtWrHeap.pos, readStmtWrHeap.info, readStmtWrHeap.errT)
   }
 
   private def generateHeapWriteAxiomPerReduce(reduceADecl: AReduceDecl, writeTo: Exp, writeExp: Exp): Seq[Stmt] = {
