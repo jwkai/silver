@@ -18,8 +18,8 @@ domain Array {
 }
 
 receiver arrayRec(a: Array) (fun i: Int :: loc(a, i))
-filter allInt(start: Int, end: Int) (fun i: Int :: i >= start && i < end )
-operator add() (0, fun a: Int, b: Int :: a + b )
+filter allInt(start: Int, end: Int) (fun i: Int :: i >= start && i < end)
+operator add() (0, fun a: Int, b: Int :: a + b)
 
 define access_array(a, i1, i2)
     (forall j: Int :: {loc(a, j)} j in allInt(i1, i2) ==> acc(loc(a, j).val))
@@ -33,10 +33,9 @@ method arraySum(a: Array) returns (res: Int)
   while (n < len(a))
     invariant access_array(a, 0, len(a))
     invariant 0 <= n && n <= len(a)
-    invariant (n == len(a) ==> res == hreduce[add()](arrayRec(a).val | allInt(0, len(a)))) &&
-              (n < len(a)  ==> res == hreduce[add()](arrayRec(a).val | allInt(0, n))) /* I1 */
+    invariant res == hreduce[add()](arrayRec(a).val | allInt(0, n)) /* I1 */
     // invariant res + hreduce[add()](arrayRec(a).val | allInt(n, len(a))) ==
-    //                 hreduce[add()](arrayRec(a).val | allInt(0,len(a))) /* I2 */
+    //                 hreduce[add()](arrayRec(a).val | allInt(0, len(a))) /* I2 */
   {
     res := res + loc(a, n).val
     n := n + 1

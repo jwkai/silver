@@ -26,14 +26,14 @@ define access_array(a, i1, i2)
 
 method arraySum(a: Array) returns (res: Int)
   requires access_array(a, 0, len(a))
-  ensures  access_array(a, 0, len(a)) 
+  ensures  access_array(a, 0, len(a))
   ensures  res == hreduce[add()](arrayRec(a).val | allInt(0, len(a)))
 {
-  var n: Int := 0; res := 0 
+  var n: Int := 0; res := 0
   while (n < len(a))
-    invariant access_array(a, 0, len(a)) 
-    invariant 0 <= n && n <= len(a) 
-    // invariant res == hreduce[add()](arrayRec(a).val | allInt(0, n)) /* I1 */ 
+    invariant access_array(a, 0, len(a))
+    invariant 0 <= n && n <= len(a)
+    // invariant res == hreduce[add()](arrayRec(a).val | allInt(0, n)) /* I1 */
     invariant res + hreduce[add()](arrayRec(a).val | allInt(n, len(a))) ==
                     hreduce[add()](arrayRec(a).val | allInt(0, len(a))) /* I2 */
   {

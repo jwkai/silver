@@ -24,7 +24,7 @@ operator msSum() (Multiset[Int](), fun a: Multiset[Int], b: Multiset[Int] :: a u
 
 define access_array(a, i, j)
     (forall k: Int :: {k in arrayRange(i,j)} k in arrayRange(i,j) ==> acc(loc(a,k).val))
-define toMultiset(a, f)
+define toMultiset(a, f) 
     (hreduce[msSum()](msSingleton(arrayRec(a).val) | f))
 define preservesMultiset(a, f)
     toMultiset(a, f) == old(toMultiset(a, f))
@@ -38,30 +38,4 @@ method swap(a:Array, i: Int, j: Int)
     var temp: Int := loc(a,i).val
     loc(a,i).val := loc(a,j).val
     loc(a,j).val := temp
-}
-
-method bubbleSort(a: Array)
-    requires access_array(a, 0, len(a))
-    ensures access_array(a, 0, len(a))
-    ensures preservesMultiset(a, arrayRange(0, len(a)))
-{
-    var n : Int := len(a)
-    var swapped : Bool := true
-    while(swapped)
-        invariant access_array(a, 0, len(a))
-        invariant preservesMultiset(a, arrayRange(0, len(a)))
-    {
-        swapped := false
-        var i : Int := 1
-        while(i < len(a))
-            invariant access_array(a, 0, len(a))
-            invariant preservesMultiset(a, arrayRange(0, len(a)))
-        {
-            assert i in arrayRange(0, len(a)) && i-1 in arrayRange(0, len(a))
-            if (loc(a,i-1).val > loc(a,i).val) {
-                swap(a, i-1, i)
-                swapped := true
-            }
-        }
-    }
 }

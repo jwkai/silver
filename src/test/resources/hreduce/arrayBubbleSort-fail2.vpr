@@ -35,9 +35,9 @@ method swap(a:Array, i: Int, j: Int)
     ensures access_array(a,0,len(a))
     ensures preservesMultiset(a, arrayRange(0, len(a)))
 {
-    var temp: Int := loc(a,i).val
-    loc(a,i).val := loc(a,j).val
-    loc(a,j).val := temp
+    var temp: Int
+    loc(a,j).val := loc(a,i).val
+    loc(a,i).val := temp
 }
 
 method bubbleSort(a: Array)
