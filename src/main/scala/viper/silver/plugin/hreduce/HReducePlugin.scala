@@ -179,22 +179,21 @@ class HReducePlugin(@unused reporter: viper.silver.reporter.Reporter,
           case _: PReduceOperatorWithoutId => true
           case _ => false
         }.members.nonEmpty
-      val reduceDomains: String =
+      val reduceDomains: Seq[String] =
         if (hasReduceDSWithId && !hasReduceDSWithoutId)
-          reduceDomainString()
+          Seq(reduceDomainString())
         else if (!hasReduceDSWithId && hasReduceDSWithoutId)
-          reduceDomainStringNoId()
+          Seq(reduceDomainStringNoId())
         else if (hasReduceDSWithId && hasReduceDSWithoutId)
-          reduceDomainString() + reduceDomainStringNoId()
+          Seq(reduceDomainString(), reduceDomainStringNoId())
         else
-          reduceDomainString()
-      val domainsToAdd = Seq(
-        reduceDomains,
+          Seq(reduceDomainString())
+      val domainsToAdd = (reduceDomains ++ Seq(
         receiverDomainString(),
         opDomainString(),
         mappingDomainString(),
         setEditDomainString()
-      ).map(parseDomainString) // :+ convertUserDefs(input.extensions)
+      )).map(parseDomainString) // :+ convertUserDefs(input.extensions)
 
       val newInput = input.copy(
         members = input.members ++ domainsToAdd
@@ -238,7 +237,7 @@ class HReducePlugin(@unused reporter: viper.silver.reporter.Reporter,
     newInput = newInput.transform({
       case e@Assume(a) => Inhale(a)(e.pos, e.info, e.errT)
     })
-//    print(pretty(newInput) + "\n\n")
+    print(pretty(newInput) + "\n\n")
     newInput
   }
 

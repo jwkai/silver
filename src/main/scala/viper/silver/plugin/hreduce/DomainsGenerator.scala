@@ -14,6 +14,16 @@ object DomainsGenerator {
   final val reduceDTV2 = "B"
   final val prefix = "__reduce_"
 
+  final val emptyReduceAxiomM = "_emptyReduceM"
+  final val applyReduce1EqAxiomM = "applyReduce1EqM"
+  final val invAxReduceAxiomM = "_invAxReduceM"
+  final val singletonAxiomM = "_singletonM"
+  final val dropOne1AxiomM = "_dropOne1M"
+  final val loseManyAxiomM = "_loseManyM"
+  final val setExtEqAxiomM = "_setExtEqM"
+  final val disjUnionAxiomM = "_disjUnionM"
+  final val trigExtensionalityAxiomM = "_trigExtensionalityM"
+  final val extensionalityAxiomM = "_extensionalityM"
   final val reduceConstructKeyM = "hreduceM"
   final val reduceApplyKeyM = "hreduceApplyM"
   final val reduceApplyPrimeKeyM = "hreduceApply1M"
@@ -30,6 +40,15 @@ object DomainsGenerator {
   final val skExtKeyM = "skExtM"
   final val trigExtKeyM = "triggerExtM"
 
+  final val applyReduce1EqAxiomS = "applyReduce1EqS"
+  final val invAxReduceAxiomS = "_invAxReduceS"
+  final val singletonAxiomS = "_singletonS"
+  final val dropOne1AxiomS = "_dropOne1S"
+  final val loseManyAxiomS = "_loseManyS"
+  final val setExtEqAxiomS = "_setExtEqS"
+  final val disjUnionAxiomS = "_disjUnionS"
+  final val trigExtensionalityAxiomS = "_trigExtensionalityS"
+  final val extensionalityAxiomS = "_extensionalityS"
   final val reduceDKeyS = "ReduceS"
   final val reduceConstructKeyS = "hreduceS"
   final val reduceApplyKeyS = "hreduceApplyS"
@@ -172,7 +191,7 @@ object DomainsGenerator {
 
   private def emptyReduceAxiom(): String = {
     s"""
-    axiom _emptyReduce {
+    axiom $emptyReduceAxiomM {
       forall ${prefix}rh: $intKey,
       ${prefix}c: $reduceDKeyM[$reduceDTV0,$reduceDTV1,$reduceDTV2],
       ${prefix}fs: Set[$reduceDTV0] ::
@@ -186,7 +205,7 @@ object DomainsGenerator {
   }
 
   private def dropOneAxiomWithoutId(): String = {
-    s"""axiom _dropOne1 {
+    s"""axiom $dropOne1AxiomS {
         forall ${prefix}rh: $intKey,
                ${prefix}c: $reduceDKeyS[$reduceDTV0,$reduceDTV1,$reduceDTV2],
                ${prefix}fs: Set[$reduceDTV0],
@@ -203,7 +222,7 @@ object DomainsGenerator {
   }
 
   private def dropOneAxiom(): String = {
-    s"""axiom _dropOne1 {
+    s"""axiom $dropOne1AxiomM {
         forall ${prefix}rh: $intKey,
                ${prefix}c: $reduceDKeyM[$reduceDTV0,$reduceDTV1,$reduceDTV2],
                ${prefix}fs: Set[$reduceDTV0],
@@ -220,7 +239,7 @@ object DomainsGenerator {
   }
 
   private def loseManyAxiomWithoutId(): String = {
-    s"""axiom _loseMany {
+    s"""axiom $loseManyAxiomS {
         forall ${prefix}rh: $intKey,
                ${prefix}c: $reduceDKeyS[$reduceDTV0,$reduceDTV1,$reduceDTV2],
                ${prefix}fs: Set[$reduceDTV0],
@@ -236,7 +255,7 @@ object DomainsGenerator {
   }
 
   private def loseManyAxiom(): String = {
-    s"""axiom _loseMany {
+    s"""axiom $loseManyAxiomM {
         forall ${prefix}rh: $intKey,
                ${prefix}c: $reduceDKeyM[$reduceDTV0,$reduceDTV1,$reduceDTV2],
                ${prefix}fs: Set[$reduceDTV0],
@@ -252,7 +271,7 @@ object DomainsGenerator {
   }
 
   private def disjUnionAxiomWithoutId(): String = {
-    s"""axiom _disjUnion {
+    s"""axiom $disjUnionAxiomS {
         forall ${prefix}rh: $intKey,
                ${prefix}c: $reduceDKeyS[$reduceDTV0,$reduceDTV1,$reduceDTV2],
                ${prefix}fs1: Set[$reduceDTV0],
@@ -260,8 +279,8 @@ object DomainsGenerator {
                ${prefix}dus: Set[$reduceDTV0] ::
         { ($reduceApplyKeyS(${prefix}rh, ${prefix}c, ${prefix}fs1): $reduceDTV2),
           ($reduceApplyKeyS(${prefix}rh, ${prefix}c, ${prefix}fs2): $reduceDTV2),
-          (disjUnionEq(${prefix}fs1, ${prefix}fs2, ${prefix}dus): Bool) }
-        ((disjUnionEq(${prefix}fs1, ${prefix}fs2, ${prefix}dus): Bool) &&
+          ($disjUnionKey(${prefix}fs1, ${prefix}fs2, ${prefix}dus): Bool) }
+        (($disjUnionKey(${prefix}fs1, ${prefix}fs2, ${prefix}dus): Bool) &&
          (${prefix}fs1 != Set()) && (${prefix}fs2 != Set())) ==>
           ($reduceApplyKeyS(${prefix}rh, ${prefix}c, ${prefix}dus): $reduceDTV2) ==
           ($opApplyKey($reduceGetOperKeyS(${prefix}c),
@@ -271,7 +290,7 @@ object DomainsGenerator {
   }
 
   private def disjUnionAxiom(): String = {
-    s"""axiom _disjUnion {
+    s"""axiom $disjUnionAxiomM {
         forall ${prefix}rh: $intKey,
                ${prefix}c: $reduceDKeyM[$reduceDTV0,$reduceDTV1,$reduceDTV2],
                ${prefix}fs1: Set[$reduceDTV0],
@@ -279,8 +298,8 @@ object DomainsGenerator {
                ${prefix}dus: Set[$reduceDTV0] ::
         { ($reduceApplyKeyM(${prefix}rh, ${prefix}c, ${prefix}fs1): $reduceDTV2),
           ($reduceApplyKeyM(${prefix}rh, ${prefix}c, ${prefix}fs2): $reduceDTV2),
-          (disjUnionEq(${prefix}fs1, ${prefix}fs2, ${prefix}dus): Bool) }
-        (disjUnionEq(${prefix}fs1, ${prefix}fs2, ${prefix}dus): Bool) ==>
+          ($disjUnionKey(${prefix}fs1, ${prefix}fs2, ${prefix}dus): Bool) }
+        ($disjUnionKey(${prefix}fs1, ${prefix}fs2, ${prefix}dus): Bool) ==>
           ($reduceApplyKeyM(${prefix}rh, ${prefix}c, ${prefix}dus): $reduceDTV2) ==
           ($opApplyKey($reduceGetOperKeyM(${prefix}c),
             ($reduceApplyKeyM(${prefix}rh, ${prefix}c, ${prefix}fs1): $reduceDTV2),
@@ -289,7 +308,7 @@ object DomainsGenerator {
   }
 
   private def extensionalityAxiomWithoutId(): String = {
-    s"""axiom _extensionality {
+    s"""axiom $extensionalityAxiomS {
         forall ${prefix}rh_old: $intKey,
                ${prefix}rh_new: $intKey,
                ${prefix}c: $reduceDKeyS[$reduceDTV0,$reduceDTV1,$reduceDTV2],
@@ -306,7 +325,7 @@ object DomainsGenerator {
   }
 
   private def extensionalityAxiom(): String = {
-    s"""axiom _extensionality {
+    s"""axiom $extensionalityAxiomM {
         forall ${prefix}rh_old: $intKey,
                ${prefix}rh_new: $intKey,
                ${prefix}c: $reduceDKeyM[$reduceDTV0,$reduceDTV1,$reduceDTV2],
@@ -342,7 +361,12 @@ object DomainsGenerator {
                                      dropAxiom: String,
                                      loseAxiom: String,
                                      disjAxiom: String,
-                                     extAxiom: String): String = {
+                                     extAxiom: String,
+                                     applyReduce1EqAxiom: String,
+                                     invAxReduceAxiom: String,
+                                     singletonAxiom: String,
+                                     setExtEqAxiom: String,
+                                     trigExtensionalityAxiom: String): String = {
     val reduceOut =
       s"""domain $domainName[$reduceDTV0,$reduceDTV1,$reduceDTV2] {
          |
@@ -352,7 +376,7 @@ object DomainsGenerator {
          |    function $reduceApplyDummyKey(a: $reduceDTV2): Bool
          |    function $setEqDummyKey(b: Bool): Bool
          |
-         |    axiom applyReduce1Eq {
+         |    axiom $applyReduce1EqAxiom {
          |        forall ${prefix}rh: $intKey, ${prefix}c: $domainName[$reduceDTV0,$reduceDTV1,$reduceDTV2], ${prefix}fs: Set[$reduceDTV0] ::
          |            { ($reduceApplyKey(${prefix}rh, ${prefix}c, ${prefix}fs): $reduceDTV2) }
          |        $reduceApplyKey(${prefix}rh, ${prefix}c, ${prefix}fs) == $reduceApplyPrimeKey(${prefix}rh, ${prefix}c, ${prefix}fs)
@@ -374,7 +398,7 @@ object DomainsGenerator {
          |
          |    function $getFieldIDKey(c: $domainName[$reduceDTV0,$reduceDTV1,$reduceDTV2]): Int
          |
-         |    axiom _invAxReduce {
+         |    axiom $invAxReduceAxiom {
          |        forall ${prefix}r: $recDKey[$reduceDTV0],
          |               ${prefix}m: $mapDKey[$reduceDTV1,$reduceDTV2],
          |               ${prefix}o: $opDKey[$reduceDTV2] ::
@@ -384,7 +408,7 @@ object DomainsGenerator {
          |        $reduceGetOperKey($reduceConstructKey(${prefix}r, ${prefix}m, ${prefix}o)) == ${prefix}o
          |    }
          |    $emptyAxiom
-         |    axiom _singleton {
+         |    axiom $singletonAxiom {
          |        forall ${prefix}rh: $intKey,
          |               ${prefix}c: $domainName[$reduceDTV0,$reduceDTV1,$reduceDTV2],
          |               ${prefix}elem: $reduceDTV0 ::
@@ -397,7 +421,7 @@ object DomainsGenerator {
          |
          |    $loseAxiom
          |
-         |    axiom _setExtEq {
+         |    axiom $setExtEqAxiom {
          |        forall ${prefix}rh: $intKey,
          |               ${prefix}c: $domainName[$reduceDTV0,$reduceDTV1,$reduceDTV2],
          |               ${prefix}fs1: Set[$reduceDTV0],
@@ -412,7 +436,7 @@ object DomainsGenerator {
          |    function $skExtKey(c: $domainName[$reduceDTV0,$reduceDTV1,$reduceDTV2], hfA1: $reduceDTV2, hfA2: $reduceDTV2): $reduceDTV0
          |    function $trigExtKey(hfA1: $reduceDTV2, hfA2: $reduceDTV2): Bool
          |
-         |    axiom _trigExtensionality {
+         |    axiom $trigExtensionalityAxiom {
          |        forall ${prefix}rh_old: $intKey,
          |               ${prefix}rh_new: $intKey,
          |               ${prefix}c: $domainName[$reduceDTV0,$reduceDTV1,$reduceDTV2],
@@ -450,7 +474,12 @@ object DomainsGenerator {
       dropOneAxiomWithoutId(),
       loseManyAxiomWithoutId(),
       disjUnionAxiomWithoutId(),
-      extensionalityAxiomWithoutId()
+      extensionalityAxiomWithoutId(),
+      applyReduce1EqAxiomS,
+      invAxReduceAxiomS,
+      singletonAxiomS,
+      setExtEqAxiomS,
+      trigExtensionalityAxiomS
     )
 
   def reduceDomainString(): String =
@@ -475,19 +504,24 @@ object DomainsGenerator {
       dropOneAxiom(),
       loseManyAxiom(),
       disjUnionAxiom(),
-      extensionalityAxiom()
+      extensionalityAxiom(),
+      applyReduce1EqAxiomM,
+      invAxReduceAxiomM,
+      singletonAxiomM,
+      setExtEqAxiomM,
+      trigExtensionalityAxiomM
     )
 
   def setEditDomainString(): String = {
     val setOut =
       s"""domain SetEdit[$reduceDTV0] {
          |    function $setDeleteKey(m: Set[$reduceDTV0], e: Set[$reduceDTV0]): Set[$reduceDTV0]
-         |    function disjUnionEq(s1: Set[$reduceDTV0], s2: Set[$reduceDTV0], s3: Set[$reduceDTV0]): Bool
+         |    function $disjUnionKey(s1: Set[$reduceDTV0], s2: Set[$reduceDTV0], s3: Set[$reduceDTV0]): Bool
          |
          |    axiom _disjUnionEqDef {
          |        (forall ${prefix}s1: Set[$reduceDTV0], ${prefix}s2: Set[$reduceDTV0], ${prefix}s3: Set[$reduceDTV0] ::
-         |            { (disjUnionEq(${prefix}s1, ${prefix}s2, ${prefix}s3): Bool) }
-         |        (disjUnionEq(${prefix}s1, ${prefix}s2, ${prefix}s3): Bool) ==
+         |            { ($disjUnionKey(${prefix}s1, ${prefix}s2, ${prefix}s3): Bool) }
+         |        ($disjUnionKey(${prefix}s1, ${prefix}s2, ${prefix}s3): Bool) ==
          |        ((${prefix}s1 intersection ${prefix}s2) == Set[$reduceDTV0]() &&
          |          (${prefix}s1 union ${prefix}s2) == ${prefix}s3))
          |    }
