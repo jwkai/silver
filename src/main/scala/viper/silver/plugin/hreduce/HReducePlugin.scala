@@ -402,14 +402,17 @@ object HReducePlugin {
               case (o@Old(exp), rh) =>
                 exp match {
                   case ra: AReduceApply =>
-                    val rap = ra.copy()(o.pos, o.info, o.errT)
-                    rap.rHeap = Some(axiomGenerator.getOldRHeap)
-                    (rap.toViper(p), rh)
+                    if (ra.rHeap.isEmpty) {
+                      ra.rHeap = Some(axiomGenerator.getOldRHeap)
+                    }
+                    (ra.toViper(p), rh)
                   case _ =>
                     val newO = Old(
                       exp.transform({
                         case ra: AReduceApply =>
-                          ra.rHeap = Some(axiomGenerator.getOldRHeap)
+                          if (ra.rHeap.isEmpty) {
+                            ra.rHeap = Some(axiomGenerator.getOldRHeap)
+                          }
                           ra.toViper(p)
                       })
                     )(o.pos, o.info, o.errT)

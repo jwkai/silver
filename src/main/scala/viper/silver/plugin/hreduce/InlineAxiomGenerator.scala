@@ -113,6 +113,18 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
 //      s.withMeta(s.pos, MakeInfoPair(s.info, rHeapInfo(getCurrentRHeap)), s.errT)
   }
 
+  private def overwriteRHeap(rh: ARHeap): PartialFunction[Node, Node] = {
+    case ra: AReduceApply =>
+      ra.rHeap = Some(rh)
+      ra
+  }
+
+  // Overwrites the ARHeap info for any old(...) expressions (used in while bodies)
+  private def overwriteOldRHeap(rh: ARHeap): PartialFunction[Node, Node] = {
+    case old@Old(e) =>
+      old.copy(exp = e.transform(overwriteRHeap(rh)))(old.pos, old.info, old.errT)
+  }
+
   // Add axioms to each branch, "join" branches with next rHeap and triggers
   private def ifRHeapJoin(i: If): If = {
     val rHeapOrig = getCurrentRHeap
@@ -220,7 +232,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     labelIncrement()
     val rHeapOnEntry = getCurrentRHeap
     val labelOnEntry = getCurrentLabel
-    val wBodyRec: Seqn = w.body.transform(addAxiomsToBody())
+    val wBodyRec: Seqn = w.body.transform(addAxiomsToBody()).transform(overwriteOldRHeap(rHeapOnEntry))
     Seqn(
       foldInvsAssert(rHeapOrig) ++
         Seq(
