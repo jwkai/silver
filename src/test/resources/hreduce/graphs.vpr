@@ -1,12 +1,12 @@
 
 define graph(root,nodes) root in nodes && forall r:Ref :: 
-{r in nodes, r.north}{r in nodes, r.south}  //{r in nodes, r.east} {r in nodes, r.west} 
+{r in nodes, r.north}{r in nodes, r.south}{r in nodes, r.east} {r in nodes, r.west} 
   r in nodes ==> 
-    acc(r.north) && acc(r.marked) && acc(r.col) && acc(r.south) && // && acc(r.east) && acc(r.west) 
+    acc(r.north) && acc(r.south) && acc(r.east) && acc(r.west) && acc(r.marked) && acc(r.col) &&
     (r.north != null ==> r.north in nodes) &&
-    (r.south != null ==> r.south in nodes) // &&
-    // (r.east != null ==>  r.east  in nodes) &&
-    // (r.west != null ==>  r.west  in nodes)
+    (r.south != null ==> r.south in nodes) &&
+    (r.east != null ==>  r.east  in nodes) &&
+    (r.west != null ==>  r.west  in nodes)
 
 domain Colour {
   function white() : Colour
@@ -18,8 +18,8 @@ domain Colour {
 
 field north: Ref
 field south: Ref
-// field east : Ref
-// field west : Ref
+field east : Ref
+field west : Ref
 field marked : Bool
 field col : Colour
 
@@ -47,9 +47,9 @@ method bfs(x:Ref, s:Set[Ref])
     invariant graph(x,s)
     invariant x in seen && seen subset s
     invariant forall m : Ref :: {m.marked} m in seen ==> m.marked
-    invariant forall m : Ref :: {m in seen, m.north}{m in seen, m.south}//{m in seen, m.east}{m in seen, m.west}
+    invariant forall m : Ref :: {m in seen, m.north}{m in seen, m.south}{m in seen, m.east}{m in seen, m.west}
       m in seen && !(m in todo) ==> (m.north != null ==> m.north.marked) && (m.south != null ==> m.south.marked)
-      // && (m.east != null ==> m.east.marked) && (m.west != null ==> m.west.marked)
+                                    && (m.east != null ==> m.east.marked) && (m.west != null ==> m.west.marked)
     invariant forall m : Ref :: {m.marked} m in s && !(m in seen) ==> !m.marked
     invariant forall i : Int :: {todo[i]} 0 <= i < |todo| ==> todo[i] in seen
     // decreases |s setminus seen|, |todo|
@@ -77,16 +77,16 @@ method bfs(x:Ref, s:Set[Ref])
         seen := seen union Set(n.south)
     }
     // assert (n.south != null ==> n.south.marked)
-    // if(n.east != null && !n.east.marked) {
-    //     n.east.marked := true
-    //     todo := todo ++ Seq(n.east)
-    //     seen := seen union Set(n.east)
-    // }
-    // if(n.west != null && !n.west.marked) {
-    //     n.west.marked := true
-    //     todo := todo ++ Seq(n.west)
-    //     seen := seen union Set(n.west)
-    // }    
+    if(n.east != null && !n.east.marked) {
+        n.east.marked := true
+        todo := todo ++ Seq(n.east)
+        seen := seen union Set(n.east)
+    }
+    if(n.west != null && !n.west.marked) {
+        n.west.marked := true
+        todo := todo ++ Seq(n.west)
+        seen := seen union Set(n.west)
+    }    
     todo := todo[1..]
     assert (unmarkedCount(s) < old(unmarkedCount(s))) || 
             ((unmarkedCount(s) == old(unmarkedCount(s))) && (|todo| < |old_todo|))
