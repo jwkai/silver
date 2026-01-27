@@ -1,0 +1,54 @@
+field val: Int
+
+domain Array {
+  function loc(a: Array, i: Int): Ref
+  function len(a: Array): Int
+  function first(r: Ref): Array
+  function second(r: Ref): Int
+
+  axiom all_diff {
+    forall a: Array, i: Int :: {loc(a,i)}
+      first(loc(a,i)) == a && second(loc(a,i)) == i
+  }
+
+  axiom len_nonneg {
+    forall a: Array :: { len(a) }
+      len(a) >= 0
+  }
+}
+
+function max(a: Int, b: Int): Int
+  ensures (a <= b ==> result == b) && (a > b ==> result == a)
+
+receiver arrayRec(a: Array) (fun i: Int :: loc(a,i))
+filter arrayRange(start: Int, end: Int) (fun i: Int :: i >= start && i < end )
+mapping msSingleton() (fun i: Int :: Multiset(i))
+operator msSum() (Multiset[Int](), fun a: Multiset[Int], b: Multiset[Int] :: a union b )
+operator maxOp() (fun a: Int, b: Int :: max(a,b))
+
+define access_array(a, i, j)
+    (forall k: Int :: {k in arrayRange(i,j)} k in arrayRange(i,j) ==> acc(loc(a,k).val))
+define toMultiset(a, f) 
+    (hreduce[msSum()](msSingleton(arrayRec(a).val) | f))
+define preservesMultiset(a, f)
+    toMultiset(a, f) == old(toMultiset(a, f))
+define maxArray(a, f)   (hreduce[maxOp()](arrayRec(a).val | f))
+define preservesMax(a, f) maxArray(a, f) == old(maxArray(a, f))
+
+method swap(a:Array, j1: Int, j2: Int, j3: Int, j4: Int, j5: Int, j6: Int, j7: Int, j8: Int, j9: Int)
+    requires access_array(a,0,len(a))
+    requires j1 in arrayRange(0, len(a)) && j2 in arrayRange(0, len(a)) && j3 in arrayRange(0, len(a)) && j4 in arrayRange(0, len(a)) && j5 in arrayRange(0, len(a)) && j6 in arrayRange(0, len(a)) && j7 in arrayRange(0, len(a)) && j8 in arrayRange(0, len(a)) && j9 in arrayRange(0, len(a))
+    ensures preservesMax(a, arrayRange(0, len(a)))
+    ensures preservesMultiset(a, arrayRange(0, len(a)))
+{
+    var temp: Int := loc(a,j1).val
+    loc(a,j1).val := loc(a,j2).val
+    loc(a,j2).val := loc(a,j3).val
+    loc(a,j3).val := loc(a,j4).val
+    loc(a,j4).val := loc(a,j5).val
+    loc(a,j5).val := loc(a,j6).val
+    loc(a,j6).val := loc(a,j7).val
+    loc(a,j7).val := loc(a,j8).val
+    loc(a,j8).val := loc(a,j9).val
+    loc(a,j9).val := temp
+}

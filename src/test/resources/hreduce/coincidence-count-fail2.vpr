@@ -132,7 +132,7 @@ method coincidenceCount(a: Array, b: Array) returns (res: Int, m: Int, n: Int)
         if (sgnCmp(loc2(a, b, pair(m,n)).val2) == -1) { m := m + 1 }
         else {
             if (sgnCmp(loc2(a, b, pair(m,n)).val2) == 1) { n := n + 1 }
-            else { res := res+1; m := m+1; n := n+1 }
+            else { res := res+1; m := m+1 }
         }
         var x : Int := sgnCmp(loc2(a, b, pair(m,n)).val2)
         // if (loc(a, m).val < loc(b, n).val) { m := m + 1 }

@@ -116,7 +116,7 @@ method coincidenceCount(a: Array, b: Array) returns (res: Int, m: Int, n: Int)
     m := 0
     n := 0
     res := 0
-    while (m < len(a) && n < len(b))
+    while (m < (len(a)-1) && n < (len(b)-1))
         invariant access_array(a, 0, len(a)) && access_array(b, 0, len(b)) &&
                   access_array_2(a, 0, len(a), b, 0, len(b))
         invariant sorted(a, 0, len(a)) && sorted(b, 0, len(b))

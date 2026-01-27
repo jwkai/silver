@@ -435,7 +435,8 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
 
     val receiverApp = helper.getReceiverApply(reduceVar)(reduceHasID)
 
-    val trigger1 = Trigger(Seq(helper.reduceApply(rhOld.toExp, reduceVar, forallVarFS.localVar)(reduceHasID)))()
+    val triggerOld = Trigger(Seq(helper.reduceApply(rhOld.toExp, reduceVar, forallVarFS.localVar)(reduceHasID)))()
+    val triggerNew = Trigger(Seq(helper.reduceApply(rhNew.toExp, reduceVar, forallVarFS.localVar)(reduceHasID)))()
 
     val invRecvApp = helper.applyDomainFunc(
       DomainsGenerator.recInvKey,
@@ -460,7 +461,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val reduceFraming = Assume(
       Forall(
         Seq(forallVarR, forallVarFS),
-        Seq(trigger1),
+        Seq(triggerOld, triggerNew),
         helper.foldedConjImplies(
           Seq(frGoodOrInj, fAccess),
           Seq(frGood, triggerDeleteKeyOld, triggerDeleteKeyNew, framingEq),
@@ -677,7 +678,8 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     // Filter Var declaration
     val forallVarFS = LocalVarDecl("__fs", SetType(reduceIdxType))()
 
-    val trigger = Trigger(Seq(helper.reduceApply(rhOld.toExp, reduceVar, forallVarFS.localVar)(reduceHasID)))()
+    val triggerOld = Trigger(Seq(helper.reduceApply(rhOld.toExp, reduceVar, forallVarFS.localVar)(reduceHasID)))()
+    val triggerNew = Trigger(Seq(helper.reduceApply(rhNew.toExp, reduceVar, forallVarFS.localVar)(reduceHasID)))()
 
     // ---------------Making the LHS---------------
     // FilterReceiverGood
@@ -717,7 +719,7 @@ class InlineAxiomGenerator(program: Program, methodName: String) {
     val reduceFraming = Assume(
       Forall(
         Seq(forallVarR, forallVarFS),
-        Seq(trigger),
+        Seq(triggerOld, triggerNew),
         helper.foldedConjImplies(
           Seq(frGoodOrInj, forallOldHasPerm, forallNewStillHasPerm),
           Seq(frGood, triggerDeleteBlockOld, dummyApplyNew, framingEq, exhaleCF)
