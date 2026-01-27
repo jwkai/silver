@@ -1,0 +1,958 @@
+domain Colour  {
+  
+  function white(): Colour 
+  
+  function black(): Colour 
+  
+  function colour(r: Int, g: Int, b: Int): Colour 
+  
+  axiom {
+    white() != black()
+  }
+}
+
+domain ReduceM[A, V, B]  {
+  
+  function hreduceM(r: Receiver[A], m: Mapping[V, B], op: Operator[B]): ReduceM[A, V, B] 
+  
+  function hreduceApplyM(rh: Int, c: ReduceM[A, V, B], fs: Set[A]): B 
+  
+  function hreduceApply1M(rh: Int, c: ReduceM[A, V, B], fs: Set[A]): B 
+  
+  function hreduceApplyDummyM(a: B): Bool 
+  
+  function setEqDummyM(b: Bool): Bool 
+  
+  function getreceiverM(c: ReduceM[A, V, B]): Receiver[A] 
+  
+  function getoperatorM(c: ReduceM[A, V, B]): Operator[B] 
+  
+  function getmappingM(c: ReduceM[A, V, B]): Mapping[V, B] 
+  
+  function rHeapElemM(rh: Int, c: ReduceM[A, V, B], a: A): B 
+  
+  function triggerDeleteBlockM(applyC: B, block: Set[A]): Bool 
+  
+  function triggerDeleteKey1M(applyC: B, key: A): Bool 
+  
+  function exhaleReduceSetM(rh: Int, c: ReduceM[A, V, B], fs: Set[A], fieldID: Int): Bool 
+  
+  function getFieldIDM(c: ReduceM[A, V, B]): Int 
+  
+  function skExtM(c: ReduceM[A, V, B], hfA1: B, hfA2: B): A 
+  
+  function triggerExtM(hfA1: B, hfA2: B): Bool 
+  
+  axiom applyReduce1EqM {
+    (forall __reduce_rh: Int, __reduce_c: ReduceM[A, V, B], __reduce_fs: Set[A] ::
+      { (hreduceApplyM(__reduce_rh, __reduce_c, __reduce_fs): B) }
+      (hreduceApplyM(__reduce_rh, __reduce_c, __reduce_fs): B) ==
+      (hreduceApply1M(__reduce_rh, __reduce_c, __reduce_fs): B))
+  }
+  
+  axiom _invAxReduceM {
+    (forall __reduce_r: Receiver[A], __reduce_m: Mapping[V, B], __reduce_o: Operator[B] ::
+      { (hreduceM(__reduce_r, __reduce_m, __reduce_o): ReduceM[A, V, B]) }
+      (getreceiverM((hreduceM(__reduce_r, __reduce_m, __reduce_o): ReduceM[A, V, B])): Receiver[A]) ==
+      __reduce_r &&
+      ((getmappingM((hreduceM(__reduce_r, __reduce_m, __reduce_o): ReduceM[A, V, B])): Mapping[V, B]) ==
+      __reduce_m &&
+      (getoperatorM((hreduceM(__reduce_r, __reduce_m, __reduce_o): ReduceM[A, V, B])): Operator[B]) ==
+      __reduce_o))
+  }
+  
+  axiom _emptyReduceM {
+    (forall __reduce_rh: Int, __reduce_c: ReduceM[A, V, B], __reduce_fs: Set[A] ::
+      { (hreduceApplyM(__reduce_rh, __reduce_c, __reduce_fs): B) }
+      __reduce_fs == Set[A]() ==>
+      __reduce_fs == Set[A]() &&
+      (hreduceApplyM(__reduce_rh, __reduce_c, __reduce_fs): B) ==
+      (opGetIden((getoperatorM(__reduce_c): Operator[B])): B))
+  }
+  
+  axiom _singletonM {
+    (forall __reduce_rh: Int, __reduce_c: ReduceM[A, V, B], __reduce_elem: A ::
+      { (hreduceApplyM(__reduce_rh, __reduce_c, Set(__reduce_elem)): B), (rHeapElemM(__reduce_rh,
+      __reduce_c, __reduce_elem): B) }
+      (hreduceApplyM(__reduce_rh, __reduce_c, Set(__reduce_elem)): B) ==
+      (rHeapElemM(__reduce_rh, __reduce_c, __reduce_elem): B))
+  }
+  
+  axiom _dropOne1M {
+    (forall __reduce_rh: Int, __reduce_c: ReduceM[A, V, B], __reduce_fs: Set[A],
+    __reduce_key: A ::
+      { (triggerDeleteKey1M((hreduceApplyM(__reduce_rh, __reduce_c, __reduce_fs): B),
+      __reduce_key): Bool), (rHeapElemM(__reduce_rh, __reduce_c, __reduce_key): B) }
+      (__reduce_key in __reduce_fs) ==>
+      (__reduce_key in __reduce_fs) &&
+      (hreduceApplyM(__reduce_rh, __reduce_c, __reduce_fs): B) ==
+      (opApply((getoperatorM(__reduce_c): Operator[B]), (hreduceApply1M(__reduce_rh,
+      __reduce_c, (setDelete(__reduce_fs, Set(__reduce_key)): Set[A])): B),
+      (rHeapElemM(__reduce_rh, __reduce_c, __reduce_key): B)): B))
+  }
+  
+  axiom _loseManyM {
+    (forall __reduce_rh: Int, __reduce_c: ReduceM[A, V, B], __reduce_fs: Set[A],
+    __reduce_keys: Set[A] ::
+      { (triggerDeleteBlockM((hreduceApplyM(__reduce_rh, __reduce_c, __reduce_fs): B),
+      __reduce_keys): Bool) }
+      (__reduce_keys subset __reduce_fs) ==>
+      (__reduce_keys subset __reduce_fs) &&
+      (hreduceApplyM(__reduce_rh, __reduce_c, __reduce_fs): B) ==
+      (opApply((getoperatorM(__reduce_c): Operator[B]), (hreduceApply1M(__reduce_rh,
+      __reduce_c, (setDelete(__reduce_fs, __reduce_keys): Set[A])): B), (hreduceApply1M(__reduce_rh,
+      __reduce_c, __reduce_keys): B)): B))
+  }
+  
+  axiom _setExtEqM {
+    (forall __reduce_rh: Int, __reduce_c: ReduceM[A, V, B], __reduce_fs1: Set[A],
+    __reduce_fs2: Set[A] ::
+      { (hreduceApply1M(__reduce_rh, __reduce_c, __reduce_fs1): B), (hreduceApply1M(__reduce_rh,
+      __reduce_c, __reduce_fs2): B) }
+      (setEqDummyM(__reduce_fs1 == __reduce_fs2): Bool))
+  }
+  
+  axiom _disjUnionM {
+    (forall __reduce_rh: Int, __reduce_c: ReduceM[A, V, B], __reduce_fs1: Set[A],
+    __reduce_fs2: Set[A], __reduce_dus: Set[A] ::
+      { (hreduceApplyM(__reduce_rh, __reduce_c, __reduce_fs1): B), (hreduceApplyM(__reduce_rh,
+      __reduce_c, __reduce_fs2): B), (disjUnionEq(__reduce_fs1, __reduce_fs2,
+      __reduce_dus): Bool) }
+      (disjUnionEq(__reduce_fs1, __reduce_fs2, __reduce_dus): Bool) ==>
+      (hreduceApplyM(__reduce_rh, __reduce_c, __reduce_dus): B) ==
+      (opApply((getoperatorM(__reduce_c): Operator[B]), (hreduceApplyM(__reduce_rh,
+      __reduce_c, __reduce_fs1): B), (hreduceApplyM(__reduce_rh, __reduce_c,
+      __reduce_fs2): B)): B))
+  }
+  
+  axiom _trigExtensionalityM {
+    (forall __reduce_rh_old: Int, __reduce_rh_new: Int, __reduce_c: ReduceM[A, V, B],
+    __reduce_fs: Set[A] ::
+      { (hreduceApplyM(__reduce_rh_old, __reduce_c, __reduce_fs): B), (hreduceApplyM(__reduce_rh_new,
+      __reduce_c, __reduce_fs): B) }
+      (triggerExtM((hreduceApply1M(__reduce_rh_old, __reduce_c, __reduce_fs): B),
+      (hreduceApply1M(__reduce_rh_new, __reduce_c, __reduce_fs): B)): Bool))
+  }
+  
+  axiom _extensionalityM {
+    (forall __reduce_rh_old: Int, __reduce_rh_new: Int, __reduce_c: ReduceM[A, V, B],
+    __reduce_fs: Set[A] ::
+      { (triggerExtM((hreduceApply1M(__reduce_rh_old, __reduce_c, __reduce_fs): B),
+      (hreduceApply1M(__reduce_rh_new, __reduce_c, __reduce_fs): B)): Bool) }
+      (hreduceApplyM(__reduce_rh_old, __reduce_c, __reduce_fs): B) ==
+      (hreduceApplyM(__reduce_rh_new, __reduce_c, __reduce_fs): B) ||
+      ((((skExtM(__reduce_c, (hreduceApply1M(__reduce_rh_old, __reduce_c, __reduce_fs): B),
+      (hreduceApply1M(__reduce_rh_new, __reduce_c, __reduce_fs): B)): A) in
+      __reduce_fs) ==>
+      (rHeapElemM(__reduce_rh_old, __reduce_c, (skExtM(__reduce_c, (hreduceApply1M(__reduce_rh_old,
+      __reduce_c, __reduce_fs): B), (hreduceApply1M(__reduce_rh_new, __reduce_c,
+      __reduce_fs): B)): A)): B) ==
+      (rHeapElemM(__reduce_rh_new, __reduce_c, (skExtM(__reduce_c, (hreduceApply1M(__reduce_rh_old,
+      __reduce_c, __reduce_fs): B), (hreduceApply1M(__reduce_rh_new, __reduce_c,
+      __reduce_fs): B)): A)): B)) ==>
+      (hreduceApply1M(__reduce_rh_old, __reduce_c, __reduce_fs): B) ==
+      (hreduceApply1M(__reduce_rh_new, __reduce_c, __reduce_fs): B)))
+  }
+}
+
+domain Receiver[A]  {
+  
+  function recApply(r: Receiver[A], a: A): Ref 
+  
+  function recInv(rec: Receiver[A], ref: Ref): A 
+  
+  function filterReceiverGood(f: Set[A], r: Receiver[A]): Bool 
+  
+  function subsetNotInRefs(f1: Set[A], r: Receiver[A], lostR: Set[Ref]): Set[A] 
+  
+  function idxNotInRefs(a: A, r: Receiver[A], domR: Set[Ref]): Bool 
+  
+  axiom _inverse_receiver {
+    (forall __reduce_a: A, __reduce_f: Set[A], __reduce_r: Receiver[A] ::
+      { (recApply(__reduce_r, __reduce_a): Ref), (filterReceiverGood(__reduce_f,
+      __reduce_r): Bool) }
+      { (filterReceiverGood(__reduce_f, __reduce_r): Bool), (__reduce_a in
+      __reduce_f) }
+      (filterReceiverGood(__reduce_f, __reduce_r): Bool) &&
+      (__reduce_a in __reduce_f) ==>
+      (filterReceiverGood(__reduce_f, __reduce_r): Bool) &&
+      ((__reduce_a in __reduce_f) &&
+      (recInv(__reduce_r, (recApply(__reduce_r, __reduce_a): Ref)): A) ==
+      __reduce_a))
+  }
+  
+  axiom _inverse_receiver1 {
+    (forall __reduce_ref: Ref, __reduce_f: Set[A], __reduce_r: Receiver[A] ::
+      { (filterReceiverGood(__reduce_f, __reduce_r): Bool), (recInv(__reduce_r,
+      __reduce_ref): A) }
+      (filterReceiverGood(__reduce_f, __reduce_r): Bool) &&
+      ((recInv(__reduce_r, __reduce_ref): A) in __reduce_f) ==>
+      (filterReceiverGood(__reduce_f, __reduce_r): Bool) &&
+      (((recInv(__reduce_r, __reduce_ref): A) in __reduce_f) &&
+      (recApply(__reduce_r, (recInv(__reduce_r, __reduce_ref): A)): Ref) ==
+      __reduce_ref))
+  }
+  
+  axiom _smallerF {
+    (forall __reduce_f1: Set[A], __reduce_f2: Set[A], __reduce_r: Receiver[A] ::
+      { (__reduce_f2 subset __reduce_f1), (filterReceiverGood(__reduce_f1, __reduce_r): Bool) }
+      (filterReceiverGood(__reduce_f1, __reduce_r): Bool) &&
+      (__reduce_f2 subset __reduce_f1) ==>
+      (filterReceiverGood(__reduce_f1, __reduce_r): Bool) &&
+      ((__reduce_f2 subset __reduce_f1) &&
+      (filterReceiverGood(__reduce_f2, __reduce_r): Bool)))
+  }
+  
+  axiom _smallerFDelete {
+    (forall __reduce_f1: Set[A], __reduce_f2: Set[A], __reduce_r: Receiver[A] ::
+      { (filterReceiverGood(__reduce_f1, __reduce_r): Bool), (__reduce_f1 setminus
+      __reduce_f2) }
+      (filterReceiverGood(__reduce_f1, __reduce_r): Bool) ==>
+      (filterReceiverGood(__reduce_f1, __reduce_r): Bool) &&
+      (filterReceiverGood((__reduce_f1 setminus __reduce_f2), __reduce_r): Bool))
+  }
+  
+  axiom _unionF {
+    (forall __reduce_f1: Set[A], __reduce_f2: Set[A], __reduce_r: Receiver[A] ::
+      { (filterReceiverGood((__reduce_f1 union __reduce_f2), __reduce_r): Bool) }
+      (filterReceiverGood((__reduce_f1 union __reduce_f2), __reduce_r): Bool) ==>
+      (filterReceiverGood((__reduce_f1 union __reduce_f2), __reduce_r): Bool) &&
+      ((filterReceiverGood(__reduce_f1, __reduce_r): Bool) &&
+      (filterReceiverGood(__reduce_f2, __reduce_r): Bool)))
+  }
+  
+  axiom _subsetNotInRefsAxiom {
+    (forall __reduce_a: A, __reduce_fs: Set[A], __reduce_r: Receiver[A], __reduce_lostR: Set[Ref] ::
+      { (__reduce_a in
+      (subsetNotInRefs(__reduce_fs, __reduce_r, __reduce_lostR): Set[A])) }
+      (__reduce_a in
+      (subsetNotInRefs(__reduce_fs, __reduce_r, __reduce_lostR): Set[A])) ==
+      ((__reduce_a in __reduce_fs) &&
+      !(((recApply(__reduce_r, __reduce_a): Ref) in __reduce_lostR))))
+  }
+  
+  axiom _subsetNotInRefsSubset {
+    (forall __reduce_fs: Set[A], __reduce_r: Receiver[A], __reduce_lostR: Set[Ref] ::
+      { (subsetNotInRefs(__reduce_fs, __reduce_r, __reduce_lostR): Set[A]) }
+      ((subsetNotInRefs(__reduce_fs, __reduce_r, __reduce_lostR): Set[A]) subset
+      __reduce_fs))
+  }
+  
+  axiom _idxNotInRefSetAxiom {
+    (forall __reduce_a: A, __reduce_recv: Receiver[A], __reduce_domR: Set[Ref] ::
+      { (idxNotInRefs(__reduce_a, __reduce_recv, __reduce_domR): Bool) }
+      !(((recApply(__reduce_recv, __reduce_a): Ref) in __reduce_domR)) ==>
+      (idxNotInRefs(__reduce_a, __reduce_recv, __reduce_domR): Bool))
+  }
+}
+
+domain Operator[B]  {
+  
+  function _noTrigOp(out: B): Bool 
+  
+  function opApply(op: Operator[B], val1: B, val2: B): B 
+  
+  function opGetIden(op: Operator[B]): B 
+}
+
+domain Mapping[V, B]  {
+  
+  function mapApply(m: Mapping[V, B], _mInput: V): B 
+  
+  function mapIdentity(): Mapping[V, V] 
+  
+  axiom {
+    (forall __v: V ::
+      { (mapApply((mapIdentity(): Mapping[V, V]), __v): V) }
+      (mapApply((mapIdentity(): Mapping[V, V]), __v): V) == __v)
+  }
+}
+
+domain SetEdit[A]  {
+  
+  function setDelete(m: Set[A], e: Set[A]): Set[A] 
+  
+  function disjUnionEq(s1: Set[A], s2: Set[A], s3: Set[A]): Bool 
+  
+  axiom _disjUnionEqDef {
+    (forall __reduce_s1: Set[A], __reduce_s2: Set[A], __reduce_s3: Set[A] ::
+      { (disjUnionEq(__reduce_s1, __reduce_s2, __reduce_s3): Bool) }
+      (disjUnionEq(__reduce_s1, __reduce_s2, __reduce_s3): Bool) ==
+      ((__reduce_s1 intersection __reduce_s2) == Set[A]() &&
+      (__reduce_s1 union __reduce_s2) == __reduce_s3))
+  }
+  
+  axiom _setDeleteAxiom {
+    (forall __reduce_s: Set[A], __reduce_e: Set[A] ::
+      { (setDelete(__reduce_s, __reduce_e): Set[A]) }
+      (setDelete(__reduce_s, __reduce_e): Set[A]) ==
+      (__reduce_s setminus __reduce_e))
+  }
+  
+  axiom _setDeleteSubset {
+    (forall __reduce_s: Set[A], __reduce_e: Set[A] ::
+      { (setDelete(__reduce_s, __reduce_e): Set[A]) }
+      ((setDelete(__reduce_s, __reduce_e): Set[A]) subset __reduce_s))
+  }
+}
+
+domain ___idrec_Receiver_Domain  {
+  
+  function idrec(): Receiver[Ref] 
+  
+  axiom {
+    (forall r: Ref ::
+      { (recApply(idrec(), r): Ref) }
+      (recApply(idrec(), r): Ref) == r)
+  }
+}
+
+domain ___countNot_Mapping_Domain  {
+  
+  function countNot(): Mapping[Bool, Int] 
+  
+  axiom {
+    (forall b: Bool ::
+      { (mapApply(countNot(), b): Int) }
+      { boolNegToInt(b) }
+      (mapApply(countNot(), b): Int) == boolNegToInt(b))
+  }
+}
+
+domain ___add_Operator_Domain  {
+  
+  function add(): Operator[Int] 
+  
+  axiom {
+    (forall a: Int, b: Int ::
+      { (opApply(add(), a, b): Int) }
+      (opApply(add(), a, b): Int) == a + b)
+  }
+  
+  axiom {
+    (opGetIden(add()): Int) == 0
+  }
+}
+
+field north: Ref
+
+field south: Ref
+
+field east: Ref
+
+field west: Ref
+
+field marked: Bool
+
+field col: Colour
+
+function boolNegToInt(b: Bool): Int
+  ensures (b ==> result == 0) && (!b ==> result == 1)
+
+
+method operator_add_welldef_check()
+{
+  assert (forall _i1: Int, _i2: Int ::
+      { (_noTrigOp((opApply((add(): Operator[Int]), _i1, _i2): Int)): Bool) }
+      (opApply((add(): Operator[Int]), _i1, _i2): Int) ==
+      (opApply((add(): Operator[Int]), _i2, _i1): Int))
+  assert (forall _i1: Int, _i2: Int, _i3: Int ::
+      { (_noTrigOp((opApply((add(): Operator[Int]), (opApply((add(): Operator[Int]),
+      _i1, _i2): Int), _i3): Int)): Bool) }
+      (opApply((add(): Operator[Int]), (opApply((add(): Operator[Int]), _i1,
+      _i2): Int), _i3): Int) ==
+      (opApply((add(): Operator[Int]), _i1, (opApply((add(): Operator[Int]),
+      _i2, _i3): Int)): Int))
+  assert (forall _i1: Int ::
+      { (_noTrigOp((opApply((add(): Operator[Int]), _i1, (opGetIden((add(): Operator[Int])): Int)): Int)): Bool) }
+      (opApply((add(): Operator[Int]), _i1, (opGetIden((add(): Operator[Int])): Int)): Int) ==
+      _i1)
+}
+
+method bfs(x: Ref, s: Set[Ref])
+  requires (x in s) &&
+    ((forall r: Ref ::
+      { (r in s), r.north }
+      { (r in s), r.south }
+      { (r in s), r.east }
+      { (r in s), r.west }
+      (r in s) ==> acc(r.north, write)) &&
+    (forall r: Ref ::
+      { (r in s), r.north }
+      { (r in s), r.south }
+      { (r in s), r.east }
+      { (r in s), r.west }
+      (r in s) ==> acc(r.south, write)) &&
+    (forall r: Ref ::
+      { (r in s), r.north }
+      { (r in s), r.south }
+      { (r in s), r.east }
+      { (r in s), r.west }
+      (r in s) ==> acc(r.east, write)) &&
+    (forall r: Ref ::
+      { (r in s), r.north }
+      { (r in s), r.south }
+      { (r in s), r.east }
+      { (r in s), r.west }
+      (r in s) ==> acc(r.west, write)) &&
+    (forall r: Ref ::
+      { (r in s), r.north }
+      { (r in s), r.south }
+      { (r in s), r.east }
+      { (r in s), r.west }
+      (r in s) ==> acc(r.marked, write)) &&
+    (forall r: Ref ::
+      { (r in s), r.north }
+      { (r in s), r.south }
+      { (r in s), r.east }
+      { (r in s), r.west }
+      (r in s) ==> acc(r.col, write)) &&
+    (forall r: Ref ::
+      { (r in s), r.north }
+      { (r in s), r.south }
+      { (r in s), r.east }
+      { (r in s), r.west }
+      (r in s) ==>
+      (r.north != null ==> (r.north in s)) &&
+      ((r.south != null ==> (r.south in s)) &&
+      ((r.east != null ==> (r.east in s)) &&
+      (r.west != null ==> (r.west in s)))))) &&
+    (forall m: Ref :: { m.marked } (m in s) ==> !m.marked)
+  ensures (x in s) &&
+    ((forall r$0: Ref ::
+      { (r$0 in s), r$0.north }
+      { (r$0 in s), r$0.south }
+      { (r$0 in s), r$0.east }
+      { (r$0 in s), r$0.west }
+      (r$0 in s) ==> acc(r$0.north, write)) &&
+    (forall r$0: Ref ::
+      { (r$0 in s), r$0.north }
+      { (r$0 in s), r$0.south }
+      { (r$0 in s), r$0.east }
+      { (r$0 in s), r$0.west }
+      (r$0 in s) ==> acc(r$0.south, write)) &&
+    (forall r$0: Ref ::
+      { (r$0 in s), r$0.north }
+      { (r$0 in s), r$0.south }
+      { (r$0 in s), r$0.east }
+      { (r$0 in s), r$0.west }
+      (r$0 in s) ==> acc(r$0.east, write)) &&
+    (forall r$0: Ref ::
+      { (r$0 in s), r$0.north }
+      { (r$0 in s), r$0.south }
+      { (r$0 in s), r$0.east }
+      { (r$0 in s), r$0.west }
+      (r$0 in s) ==> acc(r$0.west, write)) &&
+    (forall r$0: Ref ::
+      { (r$0 in s), r$0.north }
+      { (r$0 in s), r$0.south }
+      { (r$0 in s), r$0.east }
+      { (r$0 in s), r$0.west }
+      (r$0 in s) ==> acc(r$0.marked, write)) &&
+    (forall r$0: Ref ::
+      { (r$0 in s), r$0.north }
+      { (r$0 in s), r$0.south }
+      { (r$0 in s), r$0.east }
+      { (r$0 in s), r$0.west }
+      (r$0 in s) ==> acc(r$0.col, write)) &&
+    (forall r$0: Ref ::
+      { (r$0 in s), r$0.north }
+      { (r$0 in s), r$0.south }
+      { (r$0 in s), r$0.east }
+      { (r$0 in s), r$0.west }
+      (r$0 in s) ==>
+      (r$0.north != null ==> (r$0.north in s)) &&
+      ((r$0.south != null ==> (r$0.south in s)) &&
+      ((r$0.east != null ==> (r$0.east in s)) &&
+      (r$0.west != null ==> (r$0.west in s)))))) &&
+    (x.marked &&
+    (forall m: Ref ::
+      { (m in s), m.north }
+      { (m in s), m.south }
+      (m in s) && m.marked ==>
+      (m.north != null ==> m.north.marked) &&
+      (m.south != null ==> m.south.marked)))
+{
+  var seen: Set[Ref]
+  var todo: Seq[Ref]
+  label _reduceLabell0
+  // 0
+  seen := Set(x)
+  // 0
+  todo := Seq(x)
+  // 1
+  inhale (forall __r: ReduceM[Ref, Bool, Int], __fs: Set[Ref] ::
+      { (hreduceApplyM(0, __r, __fs): Int) }
+      ((filterReceiverGood(__fs, (getreceiverM(__r): Receiver[Ref])): Bool) ||
+      (forall __ind1: Ref, __ind2: Ref ::
+        { (__ind1 in __fs), (__ind2 in __fs) }
+        (__ind1 in __fs) && ((__ind2 in __fs) && __ind1 != __ind2) ==>
+        (recApply((getreceiverM(__r): Receiver[Ref]), __ind1): Ref) !=
+        (recApply((getreceiverM(__r): Receiver[Ref]), __ind2): Ref))) &&
+      (forall __ind: Ref ::
+        { (__ind in __fs) }
+        (__ind in __fs) ==>
+        perm((recApply((getreceiverM(__r): Receiver[Ref]), __ind): Ref).marked) >
+        none) ==>
+      (filterReceiverGood(__fs, (getreceiverM(__r): Receiver[Ref])): Bool) &&
+      ((triggerDeleteKey1M((hreduceApplyM(0, __r, __fs): Int), (recInv((getreceiverM(__r): Receiver[Ref]),
+      x): Ref)): Bool) &&
+      ((triggerDeleteKey1M((hreduceApplyM(1, __r, __fs): Int), (recInv((getreceiverM(__r): Receiver[Ref]),
+      x): Ref)): Bool) &&
+      (hreduceApply1M(0, __r, (setDelete(__fs, Set((recInv((getreceiverM(__r): Receiver[Ref]),
+      x): Ref))): Set[Ref])): Int) ==
+      (hreduceApply1M(1, __r, (setDelete(__fs, Set((recInv((getreceiverM(__r): Receiver[Ref]),
+      x): Ref))): Set[Ref])): Int))))
+  inhale (forall __r: ReduceM[Ref, Bool, Int] ::
+      { (getreceiverM(__r): Receiver[Ref]) }
+      (forall __ind: Ref ::
+        { (rHeapElemM(0, __r, __ind): Int) }
+        { (rHeapElemM(1, __r, __ind): Int) }
+        __ind != (recInv((getreceiverM(__r): Receiver[Ref]), x): Ref) &&
+        perm((recApply((getreceiverM(__r): Receiver[Ref]), __ind): Ref).marked) >
+        none ==>
+        __ind != (recInv((getreceiverM(__r): Receiver[Ref]), x): Ref) &&
+        ((rHeapElemM(0, __r, __ind): Int) ==
+        (mapApply((getmappingM(__r): Mapping[Bool, Int]), (recApply((getreceiverM(__r): Receiver[Ref]),
+        __ind): Ref).marked): Int) &&
+        (rHeapElemM(1, __r, __ind): Int) ==
+        (mapApply((getmappingM(__r): Mapping[Bool, Int]), (recApply((getreceiverM(__r): Receiver[Ref]),
+        __ind): Ref).marked): Int))))
+  inhale (forall __r: ReduceM[Ref, Bool, Int] ::
+      { (getreceiverM(__r): Receiver[Ref]) }
+      perm((recApply((getreceiverM(__r): Receiver[Ref]), (recInv((getreceiverM(__r): Receiver[Ref]),
+      x): Ref)): Ref).marked) >
+      none ==>
+      (rHeapElemM(0, __r, (recInv((getreceiverM(__r): Receiver[Ref]), x): Ref)): Int) ==
+      (mapApply((getmappingM(__r): Mapping[Bool, Int]), x.marked): Int) &&
+      (rHeapElemM(1, __r, (recInv((getreceiverM(__r): Receiver[Ref]), x): Ref)): Int) ==
+      (mapApply((getmappingM(__r): Mapping[Bool, Int]), true): Int))
+  x.marked := true
+  label _reduceLabell1
+  // 1
+  // 1
+  while (|todo| > 0)
+    invariant (x in s) &&
+      ((forall r$1: Ref ::
+        { (r$1 in s), r$1.north }
+        { (r$1 in s), r$1.south }
+        { (r$1 in s), r$1.east }
+        { (r$1 in s), r$1.west }
+        (r$1 in s) ==> acc(r$1.north, write)) &&
+      (forall r$1: Ref ::
+        { (r$1 in s), r$1.north }
+        { (r$1 in s), r$1.south }
+        { (r$1 in s), r$1.east }
+        { (r$1 in s), r$1.west }
+        (r$1 in s) ==> acc(r$1.south, write)) &&
+      (forall r$1: Ref ::
+        { (r$1 in s), r$1.north }
+        { (r$1 in s), r$1.south }
+        { (r$1 in s), r$1.east }
+        { (r$1 in s), r$1.west }
+        (r$1 in s) ==> acc(r$1.east, write)) &&
+      (forall r$1: Ref ::
+        { (r$1 in s), r$1.north }
+        { (r$1 in s), r$1.south }
+        { (r$1 in s), r$1.east }
+        { (r$1 in s), r$1.west }
+        (r$1 in s) ==> acc(r$1.west, write)) &&
+      (forall r$1: Ref ::
+        { (r$1 in s), r$1.north }
+        { (r$1 in s), r$1.south }
+        { (r$1 in s), r$1.east }
+        { (r$1 in s), r$1.west }
+        (r$1 in s) ==> acc(r$1.marked, write)) &&
+      (forall r$1: Ref ::
+        { (r$1 in s), r$1.north }
+        { (r$1 in s), r$1.south }
+        { (r$1 in s), r$1.east }
+        { (r$1 in s), r$1.west }
+        (r$1 in s) ==> acc(r$1.col, write)) &&
+      (forall r$1: Ref ::
+        { (r$1 in s), r$1.north }
+        { (r$1 in s), r$1.south }
+        { (r$1 in s), r$1.east }
+        { (r$1 in s), r$1.west }
+        (r$1 in s) ==>
+        (r$1.north != null ==> (r$1.north in s)) &&
+        ((r$1.south != null ==> (r$1.south in s)) &&
+        ((r$1.east != null ==> (r$1.east in s)) &&
+        (r$1.west != null ==> (r$1.west in s))))))
+    invariant (x in seen) && (seen subset s)
+    invariant (forall m: Ref :: { m.marked } (m in seen) ==> m.marked)
+    invariant (forall m: Ref ::
+        { (m in seen), m.north }
+        { (m in seen), m.south }
+        { (m in seen), m.east }
+        { (m in seen), m.west }
+        (m in seen) && !((m in todo)) ==>
+        (m.north != null ==> m.north.marked) &&
+        ((m.south != null ==> m.south.marked) &&
+        ((m.east != null ==> m.east.marked) &&
+        (m.west != null ==> m.west.marked))))
+    invariant (forall m: Ref ::
+        { m.marked }
+        (m in s) && !((m in seen)) ==> !m.marked)
+    invariant (forall i: Int ::
+        { todo[i] }
+        0 <= i && i < |todo| ==> (todo[i] in seen)) 
+  {
+    var old_todo: Seq[Ref]
+    var n: Ref
+    label _reduceLabell2
+    // 2
+    old_todo := todo
+    // 2
+    n := todo[0]
+    // 2
+    assert (n in s)
+    // 2
+    if (n.north != null && !n.north.marked) {
+      // 3
+      inhale (forall __r: ReduceM[Ref, Bool, Int], __fs: Set[Ref] ::
+          { (hreduceApplyM(2, __r, __fs): Int) }
+          ((filterReceiverGood(__fs, (getreceiverM(__r): Receiver[Ref])): Bool) ||
+          (forall __ind1: Ref, __ind2: Ref ::
+            { (__ind1 in __fs), (__ind2 in __fs) }
+            (__ind1 in __fs) && ((__ind2 in __fs) && __ind1 != __ind2) ==>
+            (recApply((getreceiverM(__r): Receiver[Ref]), __ind1): Ref) !=
+            (recApply((getreceiverM(__r): Receiver[Ref]), __ind2): Ref))) &&
+          (forall __ind: Ref ::
+            { (__ind in __fs) }
+            (__ind in __fs) ==>
+            perm((recApply((getreceiverM(__r): Receiver[Ref]), __ind): Ref).marked) >
+            none) ==>
+          (filterReceiverGood(__fs, (getreceiverM(__r): Receiver[Ref])): Bool) &&
+          ((triggerDeleteKey1M((hreduceApplyM(2, __r, __fs): Int), (recInv((getreceiverM(__r): Receiver[Ref]),
+          n.north): Ref)): Bool) &&
+          ((triggerDeleteKey1M((hreduceApplyM(3, __r, __fs): Int), (recInv((getreceiverM(__r): Receiver[Ref]),
+          n.north): Ref)): Bool) &&
+          (hreduceApply1M(2, __r, (setDelete(__fs, Set((recInv((getreceiverM(__r): Receiver[Ref]),
+          n.north): Ref))): Set[Ref])): Int) ==
+          (hreduceApply1M(3, __r, (setDelete(__fs, Set((recInv((getreceiverM(__r): Receiver[Ref]),
+          n.north): Ref))): Set[Ref])): Int))))
+      inhale (forall __r: ReduceM[Ref, Bool, Int] ::
+          { (getreceiverM(__r): Receiver[Ref]) }
+          (forall __ind: Ref ::
+            { (rHeapElemM(2, __r, __ind): Int) }
+            { (rHeapElemM(3, __r, __ind): Int) }
+            __ind !=
+            (recInv((getreceiverM(__r): Receiver[Ref]), n.north): Ref) &&
+            perm((recApply((getreceiverM(__r): Receiver[Ref]), __ind): Ref).marked) >
+            none ==>
+            __ind !=
+            (recInv((getreceiverM(__r): Receiver[Ref]), n.north): Ref) &&
+            ((rHeapElemM(2, __r, __ind): Int) ==
+            (mapApply((getmappingM(__r): Mapping[Bool, Int]), (recApply((getreceiverM(__r): Receiver[Ref]),
+            __ind): Ref).marked): Int) &&
+            (rHeapElemM(3, __r, __ind): Int) ==
+            (mapApply((getmappingM(__r): Mapping[Bool, Int]), (recApply((getreceiverM(__r): Receiver[Ref]),
+            __ind): Ref).marked): Int))))
+      inhale (forall __r: ReduceM[Ref, Bool, Int] ::
+          { (getreceiverM(__r): Receiver[Ref]) }
+          perm((recApply((getreceiverM(__r): Receiver[Ref]), (recInv((getreceiverM(__r): Receiver[Ref]),
+          n.north): Ref)): Ref).marked) >
+          none ==>
+          (rHeapElemM(2, __r, (recInv((getreceiverM(__r): Receiver[Ref]), n.north): Ref)): Int) ==
+          (mapApply((getmappingM(__r): Mapping[Bool, Int]), n.north.marked): Int) &&
+          (rHeapElemM(3, __r, (recInv((getreceiverM(__r): Receiver[Ref]), n.north): Ref)): Int) ==
+          (mapApply((getmappingM(__r): Mapping[Bool, Int]), true): Int))
+      n.north.marked := true
+      label _reduceLabell3
+      // 3
+      // 3
+      todo := todo ++ Seq(n.north)
+      // 3
+      // 3
+      assert !((n.north in seen))
+      // 3
+      // 3
+      seen := (seen union Set(n.north))
+      inhale (forall __r: ReduceM[Ref, Bool, Int], __fs: Set[Ref] ::
+          { (hreduceApplyM(3, __r, __fs): Int) }
+          (hreduceApplyM(3, __r, __fs): Int) ==
+          (hreduceApplyM(4, __r, __fs): Int))
+      inhale (forall __r: ReduceM[Ref, Bool, Int], __fs: Set[Ref] ::
+          { (hreduceApply1M(3, __r, __fs): Int) }
+          (hreduceApply1M(3, __r, __fs): Int) ==
+          (hreduceApply1M(4, __r, __fs): Int))
+      inhale (forall __r: ReduceM[Ref, Bool, Int], __i: Ref ::
+          { (rHeapElemM(3, __r, __i): Int) }
+          (rHeapElemM(3, __r, __i): Int) == (rHeapElemM(4, __r, __i): Int))
+    } else {
+      inhale (forall __r: ReduceM[Ref, Bool, Int], __fs: Set[Ref] ::
+          { (hreduceApplyM(2, __r, __fs): Int) }
+          (hreduceApplyM(2, __r, __fs): Int) ==
+          (hreduceApplyM(4, __r, __fs): Int))
+      inhale (forall __r: ReduceM[Ref, Bool, Int], __fs: Set[Ref] ::
+          { (hreduceApply1M(2, __r, __fs): Int) }
+          (hreduceApply1M(2, __r, __fs): Int) ==
+          (hreduceApply1M(4, __r, __fs): Int))
+      inhale (forall __r: ReduceM[Ref, Bool, Int], __i: Ref ::
+          { (rHeapElemM(2, __r, __i): Int) }
+          (rHeapElemM(2, __r, __i): Int) == (rHeapElemM(4, __r, __i): Int))
+    }
+    // 4
+    if (n.south != null && !n.south.marked) {
+      // 5
+      inhale (forall __r: ReduceM[Ref, Bool, Int], __fs: Set[Ref] ::
+          { (hreduceApplyM(4, __r, __fs): Int) }
+          ((filterReceiverGood(__fs, (getreceiverM(__r): Receiver[Ref])): Bool) ||
+          (forall __ind1: Ref, __ind2: Ref ::
+            { (__ind1 in __fs), (__ind2 in __fs) }
+            (__ind1 in __fs) && ((__ind2 in __fs) && __ind1 != __ind2) ==>
+            (recApply((getreceiverM(__r): Receiver[Ref]), __ind1): Ref) !=
+            (recApply((getreceiverM(__r): Receiver[Ref]), __ind2): Ref))) &&
+          (forall __ind: Ref ::
+            { (__ind in __fs) }
+            (__ind in __fs) ==>
+            perm((recApply((getreceiverM(__r): Receiver[Ref]), __ind): Ref).marked) >
+            none) ==>
+          (filterReceiverGood(__fs, (getreceiverM(__r): Receiver[Ref])): Bool) &&
+          ((triggerDeleteKey1M((hreduceApplyM(4, __r, __fs): Int), (recInv((getreceiverM(__r): Receiver[Ref]),
+          n.south): Ref)): Bool) &&
+          ((triggerDeleteKey1M((hreduceApplyM(5, __r, __fs): Int), (recInv((getreceiverM(__r): Receiver[Ref]),
+          n.south): Ref)): Bool) &&
+          (hreduceApply1M(4, __r, (setDelete(__fs, Set((recInv((getreceiverM(__r): Receiver[Ref]),
+          n.south): Ref))): Set[Ref])): Int) ==
+          (hreduceApply1M(5, __r, (setDelete(__fs, Set((recInv((getreceiverM(__r): Receiver[Ref]),
+          n.south): Ref))): Set[Ref])): Int))))
+      inhale (forall __r: ReduceM[Ref, Bool, Int] ::
+          { (getreceiverM(__r): Receiver[Ref]) }
+          (forall __ind: Ref ::
+            { (rHeapElemM(4, __r, __ind): Int) }
+            { (rHeapElemM(5, __r, __ind): Int) }
+            __ind !=
+            (recInv((getreceiverM(__r): Receiver[Ref]), n.south): Ref) &&
+            perm((recApply((getreceiverM(__r): Receiver[Ref]), __ind): Ref).marked) >
+            none ==>
+            __ind !=
+            (recInv((getreceiverM(__r): Receiver[Ref]), n.south): Ref) &&
+            ((rHeapElemM(4, __r, __ind): Int) ==
+            (mapApply((getmappingM(__r): Mapping[Bool, Int]), (recApply((getreceiverM(__r): Receiver[Ref]),
+            __ind): Ref).marked): Int) &&
+            (rHeapElemM(5, __r, __ind): Int) ==
+            (mapApply((getmappingM(__r): Mapping[Bool, Int]), (recApply((getreceiverM(__r): Receiver[Ref]),
+            __ind): Ref).marked): Int))))
+      inhale (forall __r: ReduceM[Ref, Bool, Int] ::
+          { (getreceiverM(__r): Receiver[Ref]) }
+          perm((recApply((getreceiverM(__r): Receiver[Ref]), (recInv((getreceiverM(__r): Receiver[Ref]),
+          n.south): Ref)): Ref).marked) >
+          none ==>
+          (rHeapElemM(4, __r, (recInv((getreceiverM(__r): Receiver[Ref]), n.south): Ref)): Int) ==
+          (mapApply((getmappingM(__r): Mapping[Bool, Int]), n.south.marked): Int) &&
+          (rHeapElemM(5, __r, (recInv((getreceiverM(__r): Receiver[Ref]), n.south): Ref)): Int) ==
+          (mapApply((getmappingM(__r): Mapping[Bool, Int]), true): Int))
+      n.south.marked := true
+      label _reduceLabell5
+      // 5
+      // 5
+      todo := todo ++ Seq(n.south)
+      // 5
+      // 5
+      seen := (seen union Set(n.south))
+      inhale (forall __r: ReduceM[Ref, Bool, Int], __fs: Set[Ref] ::
+          { (hreduceApplyM(5, __r, __fs): Int) }
+          (hreduceApplyM(5, __r, __fs): Int) ==
+          (hreduceApplyM(6, __r, __fs): Int))
+      inhale (forall __r: ReduceM[Ref, Bool, Int], __fs: Set[Ref] ::
+          { (hreduceApply1M(5, __r, __fs): Int) }
+          (hreduceApply1M(5, __r, __fs): Int) ==
+          (hreduceApply1M(6, __r, __fs): Int))
+      inhale (forall __r: ReduceM[Ref, Bool, Int], __i: Ref ::
+          { (rHeapElemM(5, __r, __i): Int) }
+          (rHeapElemM(5, __r, __i): Int) == (rHeapElemM(6, __r, __i): Int))
+    } else {
+      inhale (forall __r: ReduceM[Ref, Bool, Int], __fs: Set[Ref] ::
+          { (hreduceApplyM(4, __r, __fs): Int) }
+          (hreduceApplyM(4, __r, __fs): Int) ==
+          (hreduceApplyM(6, __r, __fs): Int))
+      inhale (forall __r: ReduceM[Ref, Bool, Int], __fs: Set[Ref] ::
+          { (hreduceApply1M(4, __r, __fs): Int) }
+          (hreduceApply1M(4, __r, __fs): Int) ==
+          (hreduceApply1M(6, __r, __fs): Int))
+      inhale (forall __r: ReduceM[Ref, Bool, Int], __i: Ref ::
+          { (rHeapElemM(4, __r, __i): Int) }
+          (rHeapElemM(4, __r, __i): Int) == (rHeapElemM(6, __r, __i): Int))
+    }
+    // 6
+    if (n.east != null && !n.east.marked) {
+      // 7
+      inhale (forall __r: ReduceM[Ref, Bool, Int], __fs: Set[Ref] ::
+          { (hreduceApplyM(6, __r, __fs): Int) }
+          ((filterReceiverGood(__fs, (getreceiverM(__r): Receiver[Ref])): Bool) ||
+          (forall __ind1: Ref, __ind2: Ref ::
+            { (__ind1 in __fs), (__ind2 in __fs) }
+            (__ind1 in __fs) && ((__ind2 in __fs) && __ind1 != __ind2) ==>
+            (recApply((getreceiverM(__r): Receiver[Ref]), __ind1): Ref) !=
+            (recApply((getreceiverM(__r): Receiver[Ref]), __ind2): Ref))) &&
+          (forall __ind: Ref ::
+            { (__ind in __fs) }
+            (__ind in __fs) ==>
+            perm((recApply((getreceiverM(__r): Receiver[Ref]), __ind): Ref).marked) >
+            none) ==>
+          (filterReceiverGood(__fs, (getreceiverM(__r): Receiver[Ref])): Bool) &&
+          ((triggerDeleteKey1M((hreduceApplyM(6, __r, __fs): Int), (recInv((getreceiverM(__r): Receiver[Ref]),
+          n.east): Ref)): Bool) &&
+          ((triggerDeleteKey1M((hreduceApplyM(7, __r, __fs): Int), (recInv((getreceiverM(__r): Receiver[Ref]),
+          n.east): Ref)): Bool) &&
+          (hreduceApply1M(6, __r, (setDelete(__fs, Set((recInv((getreceiverM(__r): Receiver[Ref]),
+          n.east): Ref))): Set[Ref])): Int) ==
+          (hreduceApply1M(7, __r, (setDelete(__fs, Set((recInv((getreceiverM(__r): Receiver[Ref]),
+          n.east): Ref))): Set[Ref])): Int))))
+      inhale (forall __r: ReduceM[Ref, Bool, Int] ::
+          { (getreceiverM(__r): Receiver[Ref]) }
+          (forall __ind: Ref ::
+            { (rHeapElemM(6, __r, __ind): Int) }
+            { (rHeapElemM(7, __r, __ind): Int) }
+            __ind !=
+            (recInv((getreceiverM(__r): Receiver[Ref]), n.east): Ref) &&
+            perm((recApply((getreceiverM(__r): Receiver[Ref]), __ind): Ref).marked) >
+            none ==>
+            __ind !=
+            (recInv((getreceiverM(__r): Receiver[Ref]), n.east): Ref) &&
+            ((rHeapElemM(6, __r, __ind): Int) ==
+            (mapApply((getmappingM(__r): Mapping[Bool, Int]), (recApply((getreceiverM(__r): Receiver[Ref]),
+            __ind): Ref).marked): Int) &&
+            (rHeapElemM(7, __r, __ind): Int) ==
+            (mapApply((getmappingM(__r): Mapping[Bool, Int]), (recApply((getreceiverM(__r): Receiver[Ref]),
+            __ind): Ref).marked): Int))))
+      inhale (forall __r: ReduceM[Ref, Bool, Int] ::
+          { (getreceiverM(__r): Receiver[Ref]) }
+          perm((recApply((getreceiverM(__r): Receiver[Ref]), (recInv((getreceiverM(__r): Receiver[Ref]),
+          n.east): Ref)): Ref).marked) >
+          none ==>
+          (rHeapElemM(6, __r, (recInv((getreceiverM(__r): Receiver[Ref]), n.east): Ref)): Int) ==
+          (mapApply((getmappingM(__r): Mapping[Bool, Int]), n.east.marked): Int) &&
+          (rHeapElemM(7, __r, (recInv((getreceiverM(__r): Receiver[Ref]), n.east): Ref)): Int) ==
+          (mapApply((getmappingM(__r): Mapping[Bool, Int]), true): Int))
+      n.east.marked := true
+      label _reduceLabell7
+      // 7
+      // 7
+      todo := todo ++ Seq(n.east)
+      // 7
+      // 7
+      seen := (seen union Set(n.east))
+      inhale (forall __r: ReduceM[Ref, Bool, Int], __fs: Set[Ref] ::
+          { (hreduceApplyM(7, __r, __fs): Int) }
+          (hreduceApplyM(7, __r, __fs): Int) ==
+          (hreduceApplyM(8, __r, __fs): Int))
+      inhale (forall __r: ReduceM[Ref, Bool, Int], __fs: Set[Ref] ::
+          { (hreduceApply1M(7, __r, __fs): Int) }
+          (hreduceApply1M(7, __r, __fs): Int) ==
+          (hreduceApply1M(8, __r, __fs): Int))
+      inhale (forall __r: ReduceM[Ref, Bool, Int], __i: Ref ::
+          { (rHeapElemM(7, __r, __i): Int) }
+          (rHeapElemM(7, __r, __i): Int) == (rHeapElemM(8, __r, __i): Int))
+    } else {
+      inhale (forall __r: ReduceM[Ref, Bool, Int], __fs: Set[Ref] ::
+          { (hreduceApplyM(6, __r, __fs): Int) }
+          (hreduceApplyM(6, __r, __fs): Int) ==
+          (hreduceApplyM(8, __r, __fs): Int))
+      inhale (forall __r: ReduceM[Ref, Bool, Int], __fs: Set[Ref] ::
+          { (hreduceApply1M(6, __r, __fs): Int) }
+          (hreduceApply1M(6, __r, __fs): Int) ==
+          (hreduceApply1M(8, __r, __fs): Int))
+      inhale (forall __r: ReduceM[Ref, Bool, Int], __i: Ref ::
+          { (rHeapElemM(6, __r, __i): Int) }
+          (rHeapElemM(6, __r, __i): Int) == (rHeapElemM(8, __r, __i): Int))
+    }
+    // 8
+    if (n.west != null && !n.west.marked) {
+      // 9
+      inhale (forall __r: ReduceM[Ref, Bool, Int], __fs: Set[Ref] ::
+          { (hreduceApplyM(8, __r, __fs): Int) }
+          ((filterReceiverGood(__fs, (getreceiverM(__r): Receiver[Ref])): Bool) ||
+          (forall __ind1: Ref, __ind2: Ref ::
+            { (__ind1 in __fs), (__ind2 in __fs) }
+            (__ind1 in __fs) && ((__ind2 in __fs) && __ind1 != __ind2) ==>
+            (recApply((getreceiverM(__r): Receiver[Ref]), __ind1): Ref) !=
+            (recApply((getreceiverM(__r): Receiver[Ref]), __ind2): Ref))) &&
+          (forall __ind: Ref ::
+            { (__ind in __fs) }
+            (__ind in __fs) ==>
+            perm((recApply((getreceiverM(__r): Receiver[Ref]), __ind): Ref).marked) >
+            none) ==>
+          (filterReceiverGood(__fs, (getreceiverM(__r): Receiver[Ref])): Bool) &&
+          ((triggerDeleteKey1M((hreduceApplyM(8, __r, __fs): Int), (recInv((getreceiverM(__r): Receiver[Ref]),
+          n.west): Ref)): Bool) &&
+          ((triggerDeleteKey1M((hreduceApplyM(9, __r, __fs): Int), (recInv((getreceiverM(__r): Receiver[Ref]),
+          n.west): Ref)): Bool) &&
+          (hreduceApply1M(8, __r, (setDelete(__fs, Set((recInv((getreceiverM(__r): Receiver[Ref]),
+          n.west): Ref))): Set[Ref])): Int) ==
+          (hreduceApply1M(9, __r, (setDelete(__fs, Set((recInv((getreceiverM(__r): Receiver[Ref]),
+          n.west): Ref))): Set[Ref])): Int))))
+      inhale (forall __r: ReduceM[Ref, Bool, Int] ::
+          { (getreceiverM(__r): Receiver[Ref]) }
+          (forall __ind: Ref ::
+            { (rHeapElemM(8, __r, __ind): Int) }
+            { (rHeapElemM(9, __r, __ind): Int) }
+            __ind !=
+            (recInv((getreceiverM(__r): Receiver[Ref]), n.west): Ref) &&
+            perm((recApply((getreceiverM(__r): Receiver[Ref]), __ind): Ref).marked) >
+            none ==>
+            __ind !=
+            (recInv((getreceiverM(__r): Receiver[Ref]), n.west): Ref) &&
+            ((rHeapElemM(8, __r, __ind): Int) ==
+            (mapApply((getmappingM(__r): Mapping[Bool, Int]), (recApply((getreceiverM(__r): Receiver[Ref]),
+            __ind): Ref).marked): Int) &&
+            (rHeapElemM(9, __r, __ind): Int) ==
+            (mapApply((getmappingM(__r): Mapping[Bool, Int]), (recApply((getreceiverM(__r): Receiver[Ref]),
+            __ind): Ref).marked): Int))))
+      inhale (forall __r: ReduceM[Ref, Bool, Int] ::
+          { (getreceiverM(__r): Receiver[Ref]) }
+          perm((recApply((getreceiverM(__r): Receiver[Ref]), (recInv((getreceiverM(__r): Receiver[Ref]),
+          n.west): Ref)): Ref).marked) >
+          none ==>
+          (rHeapElemM(8, __r, (recInv((getreceiverM(__r): Receiver[Ref]), n.west): Ref)): Int) ==
+          (mapApply((getmappingM(__r): Mapping[Bool, Int]), n.west.marked): Int) &&
+          (rHeapElemM(9, __r, (recInv((getreceiverM(__r): Receiver[Ref]), n.west): Ref)): Int) ==
+          (mapApply((getmappingM(__r): Mapping[Bool, Int]), true): Int))
+      n.west.marked := true
+      label _reduceLabell9
+      // 9
+      // 9
+      todo := todo ++ Seq(n.west)
+      // 9
+      // 9
+      seen := (seen union Set(n.west))
+      inhale (forall __r: ReduceM[Ref, Bool, Int], __fs: Set[Ref] ::
+          { (hreduceApplyM(9, __r, __fs): Int) }
+          (hreduceApplyM(9, __r, __fs): Int) ==
+          (hreduceApplyM(10, __r, __fs): Int))
+      inhale (forall __r: ReduceM[Ref, Bool, Int], __fs: Set[Ref] ::
+          { (hreduceApply1M(9, __r, __fs): Int) }
+          (hreduceApply1M(9, __r, __fs): Int) ==
+          (hreduceApply1M(10, __r, __fs): Int))
+      inhale (forall __r: ReduceM[Ref, Bool, Int], __i: Ref ::
+          { (rHeapElemM(9, __r, __i): Int) }
+          (rHeapElemM(9, __r, __i): Int) == (rHeapElemM(10, __r, __i): Int))
+    } else {
+      inhale (forall __r: ReduceM[Ref, Bool, Int], __fs: Set[Ref] ::
+          { (hreduceApplyM(8, __r, __fs): Int) }
+          (hreduceApplyM(8, __r, __fs): Int) ==
+          (hreduceApplyM(10, __r, __fs): Int))
+      inhale (forall __r: ReduceM[Ref, Bool, Int], __fs: Set[Ref] ::
+          { (hreduceApply1M(8, __r, __fs): Int) }
+          (hreduceApply1M(8, __r, __fs): Int) ==
+          (hreduceApply1M(10, __r, __fs): Int))
+      inhale (forall __r: ReduceM[Ref, Bool, Int], __i: Ref ::
+          { (rHeapElemM(8, __r, __i): Int) }
+          (rHeapElemM(8, __r, __i): Int) == (rHeapElemM(10, __r, __i): Int))
+    }
+    // 10
+    todo := todo[1..]
+    // 10
+    assert (hreduceApplyM(10, (hreduceM(idrec(), countNot(), add()): ReduceM[Ref, Bool, Int]),
+      s): Int) <
+      (hreduceApplyM(2, (hreduceM(idrec(), countNot(), add()): ReduceM[Ref, Bool, Int]),
+      s): Int) ||
+      (hreduceApplyM(10, (hreduceM(idrec(), countNot(), add()): ReduceM[Ref, Bool, Int]),
+      s): Int) ==
+      (hreduceApplyM(2, (hreduceM(idrec(), countNot(), add()): ReduceM[Ref, Bool, Int]),
+      s): Int) &&
+      |todo| < |old_todo|
+  }
+}

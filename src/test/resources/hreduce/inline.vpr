@@ -1,0 +1,20 @@
+assume (forall hr: Reduce[Int, Int, Multiset[Int]], fs: Set[Int] :: 
+    // trigger for reduce spec in symbolic state 0 or 1
+    { hreduceApply(0, hr, fs) } { hreduceApply(1, hr, fs) }
+
+    // receiver injectivity check for filter fs
+    (forall i1: Int, i2: Int :: { (i1 in fs), (i2 in fs) }
+        ((i1 in fs) && (i2 in fs) && i1 != i2) ==>
+        recApply(getRcv(hr), i1) != recApply(getRcv(r), i2))
+    
+    ==>
+
+    // Invoke decomp axioms for index footprint rcvInv(A[i]) == {i}
+    trigDecomp1(hreduceApply(0, hr, fs), recInv(getRcv(hr), loc(a, i)) &&
+    trigDecomp1(hreduceApply(1, hr, fs), recInv(getRcv(hr), loc(a, i)) &&
+
+    // Indexical framing: fs / {i} is unchanged, so equal
+    hreduceApply(0, hr, setMinus(fs, Set(recInv(getRcv(hr), loc(a, i))))) ==
+        hreduceApply(1, hr, setMinus(fs, Set(recInv(getRcv(hr), loc(a, i))))))))
+
+loc(a, i).val := loc(a, j).val

@@ -1,0 +1,91 @@
+field val: Int
+
+domain IntPair {
+  function fst(p: IntPair): Int
+  function snd(p: IntPair): Int
+  function pair(x: Int, y: Int): IntPair
+
+  axiom {
+    forall x: Int, y: Int :: {pair(x, y)}
+        fst(pair(x, y)) == x
+  }
+
+  axiom {
+    forall x: Int, y: Int :: {pair(x, y)}
+        snd(pair(x, y)) == y
+  }
+}
+
+domain Matrix {
+  function loc(a: Matrix, is: IntPair): Ref
+  function len(a: Matrix): Int
+  function inv1(r: Ref): Matrix
+  function inv2(r: Ref): IntPair
+
+  axiom all_diff {
+    forall a: Matrix, is: IntPair :: {loc(a,is)}
+      inv1(loc(a,is)) == a && inv2(loc(a,is)) == is
+  }
+
+  axiom len_nonneg {
+    forall a: Matrix :: { len(a) }
+      len(a) >= 0
+  }
+}
+
+function row(i: Int, col_sz: Int, is: IntPair): Bool {
+    fst(is) == i && 0 <= snd(is) < col_sz
+}
+
+function col(j: Int, row_sz: Int, is: IntPair): Bool {
+    snd(is) == j && 0 <= fst(is) < row_sz
+}
+
+function rect(sz: Int, is: IntPair): Bool {
+    0 <= fst(is) < sz && 0 <= snd(is) < sz
+}
+
+receiver matrixRcv(a: Matrix) (fun is: IntPair :: loc(a,is))
+filter matrixAll(sz: Int) (fun is: IntPair :: rect(sz, is))
+filter matrixRow(i: Int, sz: Int) (fun is: IntPair :: row(i, sz, is))
+filter matrixCol(j: Int, sz: Int) (fun is: IntPair :: col(j, sz, is))
+mapping msSingleton() (fun i: Int :: Multiset(i))
+operator msSum() ( Multiset[Int](), fun a: Multiset[Int], b: Multiset[Int] :: a union b )
+
+define access_matrix(a)
+    (forall is: IntPair :: {is in matrixAll(len(a))} is in matrixAll(len(a)) ==> acc(loc(a,is).val))
+define access_matrix_row(a, i)
+    (forall is: IntPair :: {is in matrixRow(i,len(a))} is in matrixRow(i,len(a)) ==> acc(loc(a,is).val))
+define access_matrix_col(a, j)
+    (forall is: IntPair :: {is in matrixCol(j,len(a))} is in matrixCol(j,len(a)) ==> acc(loc(a,is).val))
+define toMultiset(a, f) (hreduce[msSum()](msSingleton(matrixRcv(a).val) | f))
+define preservesMultiset(a, f) toMultiset(a, f) == old(toMultiset(a, f))
+
+// predicate increasing(a: Array, lo: Int, hi: Int) {
+//     lo >= 0 && hi <= len(a) && lo <= hi ==>
+//         forall i: Int, j: Int :: {loc(a,i), loc(a,j)}
+//             lo <= i && i <= hi &&
+//             lo <= j && j <= hi &&
+//             i < j ==> loc(a,i).val <= loc(a,j).val
+// }
+
+method sortCol(a: Matrix, j: Int)
+    requires access_matrix_col(a, j)
+    ensures  access_matrix_col(a, j)
+    ensures  preservesMultiset(a, matrixCol(j,len(a)))
+
+method sortRow(a: Matrix, i: Int)
+    requires access_matrix_row(a, i)
+    ensures  access_matrix_row(a, i)
+    ensures  preservesMultiset(a, matrixRow(i,len(a)))
+
+method shearsort(a: Matrix, lo: Int, hi: Int)
+	requires access_matrix(a)
+    ensures  access_matrix(a)
+	ensures  preservesMultiset(a, matrixAll(len(a)))
+{
+    assert matrixRow(0,len(a)) subset matrixAll(len(a))
+    assert disjUnionEq(matrixRow(0,len(a)), matrixAll(len(a)) setminus matrixRow(0,len(a)), matrixAll(len(a)))
+    // sortCol(a)
+    sortRow(a,0)
+}

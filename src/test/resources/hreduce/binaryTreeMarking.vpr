@@ -1,0 +1,28 @@
+field mark: Bool
+// field left: Ref
+// field right: Ref
+field parent: Ref
+
+adt Tree {
+    Leaf(valLeaf: Ref)
+    Node(left: Tree, valNode: Ref, right: Tree)
+}
+
+method markTree (root: Tree)
+{ 
+    var x: Tree := root
+    var y: Tree
+    while (x != null)
+    {
+        x.mark := true
+        if (x.left == null && x.right == null) {
+            y := x.parent
+        } else {
+            y := x.left
+            x.left := x.right
+            x.right := x.parent
+            x.parent := y
+        }
+        x := y
+    }
+}
