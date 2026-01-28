@@ -27,7 +27,7 @@ class HReducePlugin(@unused reporter: viper.silver.reporter.Reporter,
   import fp.{ParserExtension, funcApp, exp, argList, commaSeparated, formalArg, fieldAccess, foldPExp, idndef, idnref, lineCol, _file}
   import FastParserCompanion.{ExtendedParsing, PositionParsing, reservedKw, whitespace}
 
-  private val fuelIsTwo: Boolean = false
+  private val fuelIsTwo: Boolean = true
   private var setOperators: Set[PReduceOperator] = Set()
 
   /** Parser for reduce statements. */

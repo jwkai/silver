@@ -17,20 +17,27 @@ domain Array {
   }
 }
 
+function max(a: Int, b: Int): Int
+  ensures (a <= b ==> result == b) && (a > b ==> result == a)
+
 receiver arrayRec(a: Array) (fun i: Int :: loc(a,i))
 filter intRange(start: Int, end: Int) (fun i: Int :: i >= start && i < end )
 mapping msSingleton() (fun i: Int :: Multiset(i))
 operator msSum() (Multiset[Int](), fun a: Multiset[Int], b: Multiset[Int] :: a union b )
+operator maxOp() (fun a: Int, b: Int :: max(a,b))
 
 define access_array(a, i, j) (forall k: Int :: {k in intRange(i,j)} k in intRange(i,j) ==> acc(loc(a,k).val))
 define asMultiset(a, f) (hreduce[msSum()](msSingleton(arrayRec(a).val) | f))
 define preservesMultiset(a, f) asMultiset(a, f) == old(asMultiset(a, f))
+define maxArray(a, f)   (hreduce[maxOp()](arrayRec(a).val | f))
+define preservesMax(a, f) maxArray(a, f) == old(maxArray(a, f))
 
 method swap(a: Array, i: Int, j: Int)
     requires access_array(a, 0, len(a))
     requires i in intRange(0, len(a)) && j in intRange(0, len(a))
     ensures access_array(a, 0, len(a))
     ensures preservesMultiset(a, intRange(0, len(a)))
+    ensures preservesMax(a, intRange(0, len(a)))
 {
     var temp: Int := loc(a,i).val
     loc(a,i).val := loc(a,j).val
@@ -43,6 +50,7 @@ method partition(a: Array, lo: Int, hi: Int) returns (p: Int)
     ensures access_array(a, 0, len(a))
     ensures lo <= p <= hi
     ensures preservesMultiset(a, intRange(0, len(a)))
+    ensures preservesMax(a, intRange(0, len(a)))
 {
     // Choose the last element as the pivot
     var pivot: Int := loc(a, hi).val
@@ -56,6 +64,7 @@ method partition(a: Array, lo: Int, hi: Int) returns (p: Int)
         invariant lo <= j <= hi
         invariant access_array(a, 0, len(a))
         invariant preservesMultiset(a, intRange(0, len(a)))
+        invariant preservesMax(a, intRange(0, len(a)))
     {
         // If the current element is less than or equal to the pivot
         if (loc(a, j).val <= pivot) {
@@ -75,6 +84,7 @@ method quicksort(a: Array, lo: Int, hi: Int)
 	requires access_array(a, 0, len(a))
     ensures  access_array(a, 0, len(a))
     ensures preservesMultiset(a, intRange(0, len(a)))
+    ensures preservesMax(a, intRange(0, len(a)))
 {
     if (0 <= lo < hi < len(a)) {
 		var p: Int := partition(a, lo, hi)

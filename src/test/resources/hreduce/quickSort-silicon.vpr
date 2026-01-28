@@ -44,6 +44,8 @@ method partition(a: Array, lo: Int, hi: Int) returns (p: Int)
     ensures lo <= p <= hi
     ensures preservesMultiset(a, intRange(0, len(a)))
 {
+    assert hi in intRange(0, len(a))
+
     // Choose the last element as the pivot
     var pivot: Int := loc(a, hi).val
 
