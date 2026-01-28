@@ -1,27 +1,18 @@
 
 define graph(root,nodes) root in nodes && forall r:Ref :: 
-{r in nodes, r.north}{r in nodes, r.south}{r in nodes, r.east} {r in nodes, r.west} 
-  r in nodes ==> 
-    acc(r.north) && acc(r.south) && acc(r.east) && acc(r.west) && acc(r.marked) && acc(r.col) &&
+{r in nodes, r.north}{r in nodes, r.south}{r in nodes, r.east}{r in nodes, r.west}{r in nodes, r.marked}
+  r in nodes ==>
+    acc(r.north) && acc(r.south) && acc(r.east) && acc(r.west) && acc(r.marked) &&
     (r.north != null ==> r.north in nodes) &&
     (r.south != null ==> r.south in nodes) &&
     (r.east != null ==>  r.east  in nodes) &&
     (r.west != null ==>  r.west  in nodes)
-
-domain Colour {
-  function white() : Colour
-  function black() : Colour
-  function colour(r:Int,g:Int,b:Int) : Colour
-
-  axiom { white() != black() }
-}
 
 field north: Ref
 field south: Ref
 field east : Ref
 field west : Ref
 field marked : Bool
-field col : Colour
 
 function boolNegToInt(b: Bool): Int
   ensures (b ==> result == 0) && (!b ==> result == 1)
@@ -35,8 +26,8 @@ define unmarkedCount(f)
 
 method bfs(x:Ref, s:Set[Ref])
   requires graph(x,s) && forall m : Ref :: {m.marked} m in s ==> !m.marked
-  ensures graph(x,s) && x.marked && forall m : Ref :: {m in s, m.north}{m in s, m.south}//{m in s, m.east}{m in s, m.west}
-      m in s && m.marked ==> (m.north != null ==> m.north.marked) && (m.south != null ==> m.south.marked) // && (m.east != null ==> m.east.marked) && (m.west != null ==> m.west.marked)
+  ensures graph(x,s) && x.marked && forall m : Ref :: {m in s, m.north}{m in s, m.south}{m in s, m.east}{m in s, m.west}
+      m in s && m.marked ==> (m.north != null ==> m.north.marked) && (m.south != null ==> m.south.marked) && (m.east != null ==> m.east.marked) && (m.west != null ==> m.west.marked)
 {
   var seen : Set[Ref] := Set(x)
   var todo : Seq[Ref] := Seq(x)
@@ -86,67 +77,9 @@ method bfs(x:Ref, s:Set[Ref])
         n.west.marked := true
         todo := todo ++ Seq(n.west)
         seen := seen union Set(n.west)
-    }    
+    }
     todo := todo[1..]
-    assert (unmarkedCount(s) < old(unmarkedCount(s))) || 
-            ((unmarkedCount(s) == old(unmarkedCount(s))) && (|todo| < |old_todo|))
+    // decreases |s setminus seen|, |todo|
+    assert (unmarkedCount(s) < old(unmarkedCount(s))) || ((unmarkedCount(s) == old(unmarkedCount(s))) && (|todo| < |old_todo|))
   }
 }
-
-// method flash_fill(x:Ref, s:Set[Ref])
-//   requires graph(x,s) && x.col == white() && forall m : Ref :: {m.marked}{m.col} m in s ==> !m.marked && (m.col == white() || m.col == black())
-//   ensures graph(x,s) && x.marked && forall m : Ref :: {m in s, m.north}{m in s, m.south}{m in s, m.east}{m in s, m.west}
-//       m in s && m.marked ==> m.col == black() && (old(m.col) == white() ==> (m.north != null ==> m.north.marked) && (m.south != null ==> m.south.marked) && (m.east != null ==> m.east.marked) && (m.west != null ==> m.west.marked))
-// {
-//   var seen : Set[Ref] := Set(x)
-//   var todo : Seq[Ref] := Seq(x)
-
-//   x.marked := true
-
-//   while(|todo| > 0)
-//     invariant graph(x,s)
-//     invariant x in seen && seen subset s
-//     invariant forall m : Ref :: {m.col}{old(m.col)} m in s ==> (m.col == white() || m.col == black()) && ((!m.marked || m.col == white()) ==> old(m.col) == m.col)
-//     invariant forall m : Ref :: {m.marked}{m in seen} m in seen ==> m.marked
-
-//     invariant forall m : Ref :: {m.col}{old(m.col)} m in s && m.col == black() && old(m.col == white()) ==> m in seen
-//     invariant forall m : Ref :: {m in seen, m.col}{m in seen, m.north}{m in seen, m.south}{m in seen, m.east}{m in seen, m.west}
-//       m in seen && old(m.col) == white() && (!(m in todo) || m.col == black()) ==> (m.north != null ==> m.north.marked) && (m.south != null ==> m.south.marked) && (m.east != null ==> m.east.marked) && (m.west != null ==> m.west.marked)
-//     invariant forall m : Ref :: {m.marked} m in s && !(m in seen) ==> !m.marked
-//     invariant forall m : Ref :: {m.marked} m in s && m.marked && !(m in todo) ==> m.col == black()  
-//     invariant forall i : Int:: {todo[i]} 0 <= i < |todo| ==> todo[i] in seen //&& forall j : Int :: {todo[j]} 0 <= j < |todo| && i != j ==> todo[j] != todo[i]
-//     decreases |s setminus seen|, |todo|
-//   {
-//     var n : Ref := todo[0]
-//    // assert n in s
-//    // assert (n.col == white() || n.col == black())
-//    // assert ((!n.marked || n.col == white()) ==> old(n.col) == n.col)
-//     if(n.col != white()) {
-//       assert n.col == black()
-//     } else {
-//       n.col := black()
-//     if(n.north != null && !n.north.marked) {
-//         n.north.marked := true
-//         todo := todo ++ Seq(n.north)
-//         seen := seen union Set(n.north)
-//     }
-//     if(n.south != null && !n.south.marked) {
-//         n.south.marked := true
-//         todo := todo ++ Seq(n.south)
-//         seen := seen union Set(n.south)
-//     }
-//     assert (n.south != null ==> n.south.marked)
-//     if(n.east != null && !n.east.marked) {
-//         n.east.marked := true
-//         todo := todo ++ Seq(n.east)
-//         seen := seen union Set(n.east)
-//     }
-//     if(n.west != null && !n.west.marked) {
-//         n.west.marked := true
-//         todo := todo ++ Seq(n.west)
-//         seen := seen union Set(n.west)
-//     }    
-//     }
-//     todo := todo[1..]
-//   }
-// }
