@@ -23,7 +23,7 @@ sealed trait PReduceOperator extends PExtender with PSingleMember with PReduceCo
                       outerArgs: Seq[LocalVarDecl]): Seq[Stmt]
 
   def generatedOpWelldefinednessCheck(program: Program): Method = {
-    helper = new AxiomHelper(program)
+    helper = new AxiomHelper(program, false)
     // Find the domain function of the operator
     val domainFuncAST = program.findDomainFunction(idndef.name)
 

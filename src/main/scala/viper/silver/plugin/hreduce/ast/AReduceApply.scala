@@ -16,6 +16,7 @@ case class AReduceApply(reduction: AReduction3Tuple, filter: Exp, fieldName: Str
     AReduceDecl(domainKey, receiverType, fieldName)
   }
 
+  var fuelExp: Option[Exp] = None
   var rHeap: Option[ARHeap] = None
 
   def toViper(input: Program): Exp = {
@@ -24,11 +25,16 @@ case class AReduceApply(reduction: AReduction3Tuple, filter: Exp, fieldName: Str
 
     rHeap match {
       case Some(fh) =>
-        DomainFuncApp(
-          reduceEvalFunc,
-          Seq(fh.toExp, reduceConstructed, filter),
-          reduceConstructed.typVarMap
-        )(this.pos, this.info, this.errT + NodeTrafo(this))
+        fuelExp match {
+          case Some(fuel) =>
+            DomainFuncApp(
+              reduceEvalFunc,
+              Seq(fuel, fh.toExp, reduceConstructed, filter),
+              reduceConstructed.typVarMap
+            )(this.pos, this.info, this.errT + NodeTrafo(this))
+          case None =>
+            throw new Exception("Reduce to Viper undefined with fuel = None")
+        }
       case None =>
         throw new Exception("Reduce to Viper undefined with rHeap = None")
     }

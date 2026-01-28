@@ -27,6 +27,7 @@ class HReducePlugin(@unused reporter: viper.silver.reporter.Reporter,
   import fp.{ParserExtension, funcApp, exp, argList, commaSeparated, formalArg, fieldAccess, foldPExp, idndef, idnref, lineCol, _file}
   import FastParserCompanion.{ExtendedParsing, PositionParsing, reservedKw, whitespace}
 
+  private val fuelIsTwo: Boolean = false
   private var setOperators: Set[PReduceOperator] = Set()
 
   /** Parser for reduce statements. */
@@ -189,6 +190,7 @@ class HReducePlugin(@unused reporter: viper.silver.reporter.Reporter,
         else
           Seq(reduceDomainString())
       val domainsToAdd = (reduceDomains ++ Seq(
+        fuelDomainString(),
         receiverDomainString(),
         opDomainString(),
         mappingDomainString(),
@@ -233,7 +235,7 @@ class HReducePlugin(@unused reporter: viper.silver.reporter.Reporter,
     * @return Modified AST
     */
   override def beforeVerify(input: Program) : Program = {
-    var newInput = addInlinedAxioms(input)
+    var newInput = addInlinedAxioms(input, fuelIsTwo)
     newInput = newInput.transform({
       case e@Assume(a) => Inhale(a)(e.pos, e.info, e.errT)
     })
@@ -331,9 +333,9 @@ object HReducePlugin {
 //    }
 //  }
 
-  def addInlinedAxioms(p: Program) : Program = {
+  def addInlinedAxioms(p: Program, fuelIsTwo: Boolean) : Program = {
     def modifyMethod(m: Method) : Method = {
-      val axiomGenerator = new InlineAxiomGenerator(p, m.name)
+      val axiomGenerator = new InlineAxiomGenerator(p, m.name, fuelIsTwo)
 
       // If no reduction is used in a method, keep the method the same
       if (axiomGenerator.reduceDeclsUsed.isEmpty) { return m }
@@ -384,14 +386,16 @@ object HReducePlugin {
                 (n, rh)
               case (lo@LabelledOld(exp, labelName), rh) =>
                 exp match {
-                  case ra: AReduceApply =>
-                    val rap = ra.copy()(lo.pos, lo.info, lo.errT)
-                    rap.rHeap = Some(axiomGenerator.getARHeapFromUserLabel(labelName))
-                    (rap.toViper(p), rh)
+                  case rap: AReduceApply =>
+                    val ra = rap.copy()(lo.pos, lo.info, lo.errT)
+                    ra.fuelExp = Some(axiomGenerator.getFuelExp)
+                    ra.rHeap = Some(axiomGenerator.getARHeapFromUserLabel(labelName))
+                    (ra.toViper(p), rh)
                   case _ =>
                     val newLO = LabelledOld(
                       exp.transform({
                         case ra: AReduceApply =>
+                          ra.fuelExp = Some(axiomGenerator.getFuelExp)
                           ra.rHeap = Some(axiomGenerator.getARHeapFromUserLabel(labelName))
                           ra.toViper(p)
                       }),
@@ -402,6 +406,7 @@ object HReducePlugin {
               case (o@Old(exp), rh) =>
                 exp match {
                   case ra: AReduceApply =>
+                    ra.fuelExp = Some(axiomGenerator.getFuelExp)
                     if (ra.rHeap.isEmpty) {
                       ra.rHeap = Some(axiomGenerator.getOldRHeap)
                     }
@@ -410,6 +415,7 @@ object HReducePlugin {
                     val newO = Old(
                       exp.transform({
                         case ra: AReduceApply =>
+                          ra.fuelExp = Some(axiomGenerator.getFuelExp)
                           if (ra.rHeap.isEmpty) {
                             ra.rHeap = Some(axiomGenerator.getOldRHeap)
                           }
@@ -419,6 +425,7 @@ object HReducePlugin {
                     (newO, rh)
                 }
               case (ra: AReduceApply, rh) =>
+                ra.fuelExp = Some(axiomGenerator.getFuelExp)
                 ra.rHeap = Some(rh)
                 (ra.toViper(p), rh)
             }, initialContext = axiomGenerator.getOldRHeap))
@@ -445,20 +452,23 @@ object HReducePlugin {
       val setRHeapApply: ARHeap => PartialFunction[Node, Node] = (rh: ARHeap) => {
         case lo@Old(exp) =>
           exp match {
-            case ra: AReduceApply =>
-              val c = ra.copy()(lo.pos, lo.info, lo.errT)
-              c.rHeap = Some(axiomGenerator.getOldRHeap)
-              c.toViper(p)
+            case rap: AReduceApply =>
+              val ra = rap.copy()(lo.pos, lo.info, lo.errT)
+              ra.fuelExp = Some(axiomGenerator.getFuelExp)
+              ra.rHeap = Some(axiomGenerator.getOldRHeap)
+              ra.toViper(p)
             case _ =>
               Old(
                 exp.transform({
                   case ra: AReduceApply =>
+                    ra.fuelExp = Some(axiomGenerator.getFuelExp)
                     ra.rHeap = Some(axiomGenerator.getOldRHeap)
                     ra.toViper(p)
                 })
               )(lo.pos, lo.info, lo.errT)
           }
         case ra: AReduceApply =>
+          ra.fuelExp = Some(axiomGenerator.getFuelExp)
           ra.rHeap = Some(rh)
           ra.toViper(p)
       }

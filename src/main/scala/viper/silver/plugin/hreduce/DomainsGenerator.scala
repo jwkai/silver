@@ -9,13 +9,13 @@ case class ParseException(msg: String, pos: (Position, Position)) extends Except
 object DomainsGenerator {
   final val intKey = "Int"
   final val reduceDKeyM = "ReduceM"
-  final val reduceDTV0 = "A"
+  final val reduceDTV0 = "I"
   final val reduceDTV1 = "V"
-  final val reduceDTV2 = "B"
+  final val reduceDTV2 = "S"
   final val prefix = "__reduce_"
 
   final val emptyReduceAxiomM = "_emptyReduceM"
-  final val applyReduce1EqAxiomM = "applyReduce1EqM"
+  final val applyReduceFuelEqAxiomM = "applyReduceFuelEqM"
   final val invAxReduceAxiomM = "_invAxReduceM"
   final val singletonAxiomM = "_singletonM"
   final val dropOne1AxiomM = "_dropOne1M"
@@ -26,7 +26,6 @@ object DomainsGenerator {
   final val extensionalityAxiomM = "_extensionalityM"
   final val reduceConstructKeyM = "hreduceM"
   final val reduceApplyKeyM = "hreduceApplyM"
-  final val reduceApplyPrimeKeyM = "hreduceApply1M"
   final val reduceApplyDummyKeyM = "hreduceApplyDummyM"
   final val setEqDummyKeyM = "setEqDummyM"
   final val reduceGetRecvKeyM = "getreceiverM"
@@ -35,12 +34,12 @@ object DomainsGenerator {
   final val rHeapElemKeyM = "rHeapElemM"
   final val trigDelKey1KeyM = "triggerDeleteKey1M"
   final val trigDelBlockKeyM = "triggerDeleteBlockM"
-  final val exhaleReduceSetKeyM = "exhaleReduceSetM"
+//  final val exhaleReduceSetKeyM = "exhaleReduceSetM"
   final val getFieldIDKeyM = "getFieldIDM"
   final val skExtKeyM = "skExtM"
   final val trigExtKeyM = "triggerExtM"
 
-  final val applyReduce1EqAxiomS = "applyReduce1EqS"
+  final val applyReduceFuelEqAxiomS = "applyReduceFuelEqS"
   final val invAxReduceAxiomS = "_invAxReduceS"
   final val singletonAxiomS = "_singletonS"
   final val dropOne1AxiomS = "_dropOne1S"
@@ -52,7 +51,6 @@ object DomainsGenerator {
   final val reduceDKeyS = "ReduceS"
   final val reduceConstructKeyS = "hreduceS"
   final val reduceApplyKeyS = "hreduceApplyS"
-  final val reduceApplyPrimeKeyS = "hreduceApply1S"
   final val reduceApplyDummyKeyS = "hreduceApplyDummyS"
   final val setEqDummyKeyS = "setEqDummyS"
   final val reduceGetRecvKeyS = "getreceiverS"
@@ -61,7 +59,7 @@ object DomainsGenerator {
   final val rHeapElemKeyS = "rHeapElemS"
   final val trigDelKey1KeyS = "triggerDeleteKey1S"
   final val trigDelBlockKeyS = "triggerDeleteBlockS"
-  final val exhaleReduceSetKeyS = "exhaleReduceSetS"
+//  final val exhaleReduceSetKeyS = "exhaleReduceSetS"
   final val getFieldIDKeyS = "getFieldIDS"
   final val skExtKeyS = "skExtS"
   final val trigExtKeyS = "triggerExtS"
@@ -79,9 +77,24 @@ object DomainsGenerator {
   final val idxNotInRefsKey = "idxNotInRefs"
   final val setDeleteKey = "setDelete"
 
+  final val fuelDKey = "Fuel"
+  final val fuelSKey = "succ"
+  final val fuelZKey = "zero"
+
   final val recDKey = "Receiver"
   final val mapDKey = "Mapping"
   final val opDKey = "Operator"
+
+  def fuelDomainString(): String = {
+    val fuelOut =
+      s"""domain $fuelDKey {
+         |
+         |    function $fuelSKey(f: $fuelDKey): $fuelDKey
+         |    function $fuelZKey(): $fuelDKey
+         |
+         |}\n """.stripMargin
+    fuelOut
+  }
 
   def receiverDomainString(): String = {
     val receiverOut =
@@ -192,13 +205,13 @@ object DomainsGenerator {
   private def emptyReduceAxiom(): String = {
     s"""
     axiom $emptyReduceAxiomM {
-      forall ${prefix}rh: $intKey,
+      forall ${prefix}f: $fuelDKey, ${prefix}rh: $intKey,
       ${prefix}c: $reduceDKeyM[$reduceDTV0,$reduceDTV1,$reduceDTV2],
       ${prefix}fs: Set[$reduceDTV0] ::
-        { ($reduceApplyKeyM(${prefix}rh, ${prefix}c, ${prefix}fs): $reduceDTV2) }
+        { ($reduceApplyKeyM(${prefix}f, ${prefix}rh, ${prefix}c, ${prefix}fs): $reduceDTV2) }
       ${prefix}fs == Set[$reduceDTV0]() ==>
         ${prefix}fs == Set[$reduceDTV0]() &&
-        $reduceApplyKeyM(${prefix}rh, ${prefix}c, ${prefix}fs) == $opIdenKey($reduceGetOperKeyM(${prefix}c))
+        $reduceApplyKeyM(${prefix}f, ${prefix}rh, ${prefix}c, ${prefix}fs) == $opIdenKey($reduceGetOperKeyM(${prefix}c))
     }
 
     """
@@ -206,145 +219,166 @@ object DomainsGenerator {
 
   private def dropOneAxiomWithoutId(): String = {
     s"""axiom $dropOne1AxiomS {
-        forall ${prefix}rh: $intKey,
+        forall ${prefix}f: $fuelDKey,
+               ${prefix}rh: $intKey,
                ${prefix}c: $reduceDKeyS[$reduceDTV0,$reduceDTV1,$reduceDTV2],
                ${prefix}fs: Set[$reduceDTV0],
                ${prefix}key: $reduceDTV0 ::
-        { ($trigDelKey1KeyS($reduceApplyKeyS(${prefix}rh, ${prefix}c, ${prefix}fs), ${prefix}key): Bool),
+        { ($trigDelKey1KeyS($reduceApplyKeyS($fuelSKey(${prefix}f), ${prefix}rh, ${prefix}c, ${prefix}fs), ${prefix}key): Bool),
           ($rHeapElemKeyS(${prefix}rh, ${prefix}c, ${prefix}key): $reduceDTV2) }
         (${prefix}key in ${prefix}fs && (${prefix}fs != Set(${prefix}key))) ==>
         (${prefix}key in ${prefix}fs && (${prefix}fs != Set(${prefix}key))) &&
-        $reduceApplyKeyS(${prefix}rh, ${prefix}c, ${prefix}fs) ==
+        $reduceApplyKeyS($fuelSKey(${prefix}f), ${prefix}rh, ${prefix}c, ${prefix}fs) ==
         $opApplyKey($reduceGetOperKeyS(${prefix}c),
-          $reduceApplyPrimeKeyS(${prefix}rh, ${prefix}c, $setDeleteKey(${prefix}fs, Set(${prefix}key))),
+          $reduceApplyKeyS(${prefix}f, ${prefix}rh, ${prefix}c, $setDeleteKey(${prefix}fs, Set(${prefix}key))),
           $rHeapElemKeyS(${prefix}rh, ${prefix}c, ${prefix}key))
     }"""
   }
 
   private def dropOneAxiom(): String = {
     s"""axiom $dropOne1AxiomM {
-        forall ${prefix}rh: $intKey,
+        forall ${prefix}f: $fuelDKey,
+               ${prefix}rh: $intKey,
                ${prefix}c: $reduceDKeyM[$reduceDTV0,$reduceDTV1,$reduceDTV2],
                ${prefix}fs: Set[$reduceDTV0],
                ${prefix}key: $reduceDTV0 ::
-        { ($trigDelKey1KeyM($reduceApplyKeyM(${prefix}rh, ${prefix}c, ${prefix}fs), ${prefix}key): Bool),
+        { ($trigDelKey1KeyM($reduceApplyKeyM($fuelSKey(${prefix}f), ${prefix}rh, ${prefix}c, ${prefix}fs), ${prefix}key): Bool),
           ($rHeapElemKeyM(${prefix}rh, ${prefix}c, ${prefix}key): $reduceDTV2) }
         (${prefix}key in ${prefix}fs) ==>
         (${prefix}key in ${prefix}fs) &&
-        $reduceApplyKeyM(${prefix}rh, ${prefix}c, ${prefix}fs) ==
+        $reduceApplyKeyM($fuelSKey(${prefix}f), ${prefix}rh, ${prefix}c, ${prefix}fs) ==
         $opApplyKey($reduceGetOperKeyM(${prefix}c),
-          $reduceApplyPrimeKeyM(${prefix}rh, ${prefix}c, $setDeleteKey(${prefix}fs, Set(${prefix}key))),
+          $reduceApplyKeyM(${prefix}f, ${prefix}rh, ${prefix}c, $setDeleteKey(${prefix}fs, Set(${prefix}key))),
           $rHeapElemKeyM(${prefix}rh, ${prefix}c, ${prefix}key))
     }"""
   }
 
   private def loseManyAxiomWithoutId(): String = {
     s"""axiom $loseManyAxiomS {
-        forall ${prefix}rh: $intKey,
+        forall ${prefix}f: $fuelDKey,
+               ${prefix}rh: $intKey,
                ${prefix}c: $reduceDKeyS[$reduceDTV0,$reduceDTV1,$reduceDTV2],
                ${prefix}fs: Set[$reduceDTV0],
                ${prefix}keys: Set[$reduceDTV0] ::
-        { $trigDelBlockKeyS($reduceApplyKeyS(${prefix}rh, ${prefix}c, ${prefix}fs), ${prefix}keys) }
+        { $trigDelBlockKeyS($reduceApplyKeyS($fuelSKey(${prefix}f), ${prefix}rh, ${prefix}c, ${prefix}fs), ${prefix}keys) }
         (${prefix}keys subset ${prefix}fs && (${prefix}keys != ${prefix}fs)) ==>
         (${prefix}keys subset ${prefix}fs && (${prefix}keys != ${prefix}fs)) &&
-        $reduceApplyKeyS(${prefix}rh, ${prefix}c, ${prefix}fs) ==
+        $reduceApplyKeyS($fuelSKey(${prefix}f), ${prefix}rh, ${prefix}c, ${prefix}fs) ==
         $opApplyKey($reduceGetOperKeyS(${prefix}c),
-          $reduceApplyPrimeKeyS(${prefix}rh, ${prefix}c, $setDeleteKey(${prefix}fs, ${prefix}keys)),
-          $reduceApplyPrimeKeyS(${prefix}rh, ${prefix}c, ${prefix}keys))
+          $reduceApplyKeyS(${prefix}f, ${prefix}rh, ${prefix}c, $setDeleteKey(${prefix}fs, ${prefix}keys)),
+          $reduceApplyKeyS(${prefix}f, ${prefix}rh, ${prefix}c, ${prefix}keys))
     }"""
   }
 
   private def loseManyAxiom(): String = {
     s"""axiom $loseManyAxiomM {
-        forall ${prefix}rh: $intKey,
+        forall ${prefix}f: $fuelDKey,
+               ${prefix}rh: $intKey,
                ${prefix}c: $reduceDKeyM[$reduceDTV0,$reduceDTV1,$reduceDTV2],
                ${prefix}fs: Set[$reduceDTV0],
                ${prefix}keys: Set[$reduceDTV0] ::
-        { $trigDelBlockKeyM($reduceApplyKeyM(${prefix}rh, ${prefix}c, ${prefix}fs), ${prefix}keys) }
+        { $trigDelBlockKeyM($reduceApplyKeyM($fuelSKey(${prefix}f), ${prefix}rh, ${prefix}c, ${prefix}fs), ${prefix}keys) }
         (${prefix}keys subset ${prefix}fs) ==>
         (${prefix}keys subset ${prefix}fs) &&
-        $reduceApplyKeyM(${prefix}rh, ${prefix}c, ${prefix}fs) ==
+        $reduceApplyKeyM($fuelSKey(${prefix}f), ${prefix}rh, ${prefix}c, ${prefix}fs) ==
         $opApplyKey($reduceGetOperKeyM(${prefix}c),
-          $reduceApplyPrimeKeyM(${prefix}rh, ${prefix}c, $setDeleteKey(${prefix}fs, ${prefix}keys)),
-          $reduceApplyPrimeKeyM(${prefix}rh, ${prefix}c, ${prefix}keys))
+          $reduceApplyKeyM(${prefix}f, ${prefix}rh, ${prefix}c, $setDeleteKey(${prefix}fs, ${prefix}keys)),
+          $reduceApplyKeyM(${prefix}f, ${prefix}rh, ${prefix}c, ${prefix}keys))
     }"""
   }
 
   private def disjUnionAxiomWithoutId(): String = {
     s"""axiom $disjUnionAxiomS {
-        forall ${prefix}rh: $intKey,
+        forall ${prefix}f1: $fuelDKey,
+               ${prefix}f2: $fuelDKey,
+               ${prefix}rh: $intKey,
                ${prefix}c: $reduceDKeyS[$reduceDTV0,$reduceDTV1,$reduceDTV2],
                ${prefix}fs1: Set[$reduceDTV0],
                ${prefix}fs2: Set[$reduceDTV0],
                ${prefix}dus: Set[$reduceDTV0] ::
-        { ($reduceApplyKeyS(${prefix}rh, ${prefix}c, ${prefix}fs1): $reduceDTV2),
-          ($reduceApplyKeyS(${prefix}rh, ${prefix}c, ${prefix}fs2): $reduceDTV2),
+        { ($reduceApplyKeyS(${prefix}f1, ${prefix}rh, ${prefix}c, ${prefix}fs1): $reduceDTV2),
+          ($reduceApplyKeyS(${prefix}f2, ${prefix}rh, ${prefix}c, ${prefix}fs2): $reduceDTV2),
           ($disjUnionKey(${prefix}fs1, ${prefix}fs2, ${prefix}dus): Bool) }
         (($disjUnionKey(${prefix}fs1, ${prefix}fs2, ${prefix}dus): Bool) &&
          (${prefix}fs1 != Set()) && (${prefix}fs2 != Set())) ==>
-          ($reduceApplyKeyS(${prefix}rh, ${prefix}c, ${prefix}dus): $reduceDTV2) ==
+          (($reduceApplyKeyS(${prefix}f1, ${prefix}rh, ${prefix}c, ${prefix}dus): $reduceDTV2) ==
           ($opApplyKey($reduceGetOperKeyS(${prefix}c),
-            ($reduceApplyKeyS(${prefix}rh, ${prefix}c, ${prefix}fs1): $reduceDTV2),
-            ($reduceApplyKeyS(${prefix}rh, ${prefix}c, ${prefix}fs2): $reduceDTV2)): $reduceDTV2)
+            ($reduceApplyKeyS(${prefix}f1, ${prefix}rh, ${prefix}c, ${prefix}fs1): $reduceDTV2),
+            ($reduceApplyKeyS(${prefix}f2, ${prefix}rh, ${prefix}c, ${prefix}fs2): $reduceDTV2)): $reduceDTV2)) &&
+          (($reduceApplyKeyS(${prefix}f2, ${prefix}rh, ${prefix}c, ${prefix}dus): $reduceDTV2) ==
+          ($opApplyKey($reduceGetOperKeyS(${prefix}c),
+            ($reduceApplyKeyS(${prefix}f1, ${prefix}rh, ${prefix}c, ${prefix}fs1): $reduceDTV2),
+            ($reduceApplyKeyS(${prefix}f2, ${prefix}rh, ${prefix}c, ${prefix}fs2): $reduceDTV2)): $reduceDTV2))
     }"""
   }
 
   private def disjUnionAxiom(): String = {
     s"""axiom $disjUnionAxiomM {
-        forall ${prefix}rh: $intKey,
+        forall ${prefix}f1: $fuelDKey,
+               ${prefix}f2: $fuelDKey,
+               ${prefix}rh: $intKey,
                ${prefix}c: $reduceDKeyM[$reduceDTV0,$reduceDTV1,$reduceDTV2],
                ${prefix}fs1: Set[$reduceDTV0],
                ${prefix}fs2: Set[$reduceDTV0],
                ${prefix}dus: Set[$reduceDTV0] ::
-        { ($reduceApplyKeyM(${prefix}rh, ${prefix}c, ${prefix}fs1): $reduceDTV2),
-          ($reduceApplyKeyM(${prefix}rh, ${prefix}c, ${prefix}fs2): $reduceDTV2),
+        { ($reduceApplyKeyM(${prefix}f1, ${prefix}rh, ${prefix}c, ${prefix}fs1): $reduceDTV2),
+          ($reduceApplyKeyM(${prefix}f2, ${prefix}rh, ${prefix}c, ${prefix}fs2): $reduceDTV2),
           ($disjUnionKey(${prefix}fs1, ${prefix}fs2, ${prefix}dus): Bool) }
         ($disjUnionKey(${prefix}fs1, ${prefix}fs2, ${prefix}dus): Bool) ==>
-          ($reduceApplyKeyM(${prefix}rh, ${prefix}c, ${prefix}dus): $reduceDTV2) ==
+          (($reduceApplyKeyM(${prefix}f1, ${prefix}rh, ${prefix}c, ${prefix}dus): $reduceDTV2) ==
           ($opApplyKey($reduceGetOperKeyM(${prefix}c),
-            ($reduceApplyKeyM(${prefix}rh, ${prefix}c, ${prefix}fs1): $reduceDTV2),
-            ($reduceApplyKeyM(${prefix}rh, ${prefix}c, ${prefix}fs2): $reduceDTV2)): $reduceDTV2)
+            ($reduceApplyKeyM(${prefix}f1, ${prefix}rh, ${prefix}c, ${prefix}fs1): $reduceDTV2),
+            ($reduceApplyKeyM(${prefix}f2, ${prefix}rh, ${prefix}c, ${prefix}fs2): $reduceDTV2)): $reduceDTV2)) &&
+          (($reduceApplyKeyM(${prefix}f2, ${prefix}rh, ${prefix}c, ${prefix}dus): $reduceDTV2) ==
+          ($opApplyKey($reduceGetOperKeyM(${prefix}c),
+            ($reduceApplyKeyM(${prefix}f1, ${prefix}rh, ${prefix}c, ${prefix}fs1): $reduceDTV2),
+            ($reduceApplyKeyM(${prefix}f2, ${prefix}rh, ${prefix}c, ${prefix}fs2): $reduceDTV2)): $reduceDTV2))
     }"""
   }
 
   private def extensionalityAxiomWithoutId(): String = {
     s"""axiom $extensionalityAxiomS {
-        forall ${prefix}rh_old: $intKey,
+        forall ${prefix}f1: $fuelDKey,
+               ${prefix}f2: $fuelDKey,
+               ${prefix}rh_old: $intKey,
                ${prefix}rh_new: $intKey,
                ${prefix}c: $reduceDKeyS[$reduceDTV0,$reduceDTV1,$reduceDTV2],
                ${prefix}fs: Set[$reduceDTV0] ::
-        { ($trigExtKeyS(($reduceApplyPrimeKeyS(${prefix}rh_old, ${prefix}c, ${prefix}fs): $reduceDTV2),
-                       ($reduceApplyPrimeKeyS(${prefix}rh_new, ${prefix}c, ${prefix}fs): $reduceDTV2)): Bool) }
-        ($reduceApplyKeyS(${prefix}rh_old, ${prefix}c, ${prefix}fs) == $reduceApplyKeyS(${prefix}rh_new, ${prefix}c, ${prefix}fs)) ||
-        (((${prefix}fs != Set()) && ($skExtKeyS(${prefix}c, $reduceApplyPrimeKeyS(${prefix}rh_old, ${prefix}c, ${prefix}fs), $reduceApplyPrimeKeyS(${prefix}rh_new, ${prefix}c, ${prefix}fs)) in ${prefix}fs ==>
-            (($rHeapElemKeyS(${prefix}rh_old, ${prefix}c, $skExtKeyS(${prefix}c, $reduceApplyPrimeKeyS(${prefix}rh_old, ${prefix}c, ${prefix}fs), $reduceApplyPrimeKeyS(${prefix}rh_new, ${prefix}c, ${prefix}fs))): $reduceDTV2)) ==
-            (($rHeapElemKeyS(${prefix}rh_new, ${prefix}c, $skExtKeyS(${prefix}c, $reduceApplyPrimeKeyS(${prefix}rh_old, ${prefix}c, ${prefix}fs), $reduceApplyPrimeKeyS(${prefix}rh_new, ${prefix}c, ${prefix}fs))): $reduceDTV2))))
+        { ($trigExtKeyS(($reduceApplyKeyS(${prefix}f1, ${prefix}rh_old, ${prefix}c, ${prefix}fs): $reduceDTV2),
+                       ($reduceApplyKeyS(${prefix}f2, ${prefix}rh_new, ${prefix}c, ${prefix}fs): $reduceDTV2)): Bool) }
+        (${prefix}rh_old < ${prefix}rh_new) ==>
+        (($reduceApplyKeyS(${prefix}f1, ${prefix}rh_old, ${prefix}c, ${prefix}fs) == $reduceApplyKeyS(${prefix}f2, ${prefix}rh_new, ${prefix}c, ${prefix}fs)) ||
+        (((${prefix}fs != Set()) && ($skExtKeyS(${prefix}c, $reduceApplyKeyS(${prefix}f1, ${prefix}rh_old, ${prefix}c, ${prefix}fs), $reduceApplyKeyS(${prefix}f2, ${prefix}rh_new, ${prefix}c, ${prefix}fs)) in ${prefix}fs ==>
+            (($rHeapElemKeyS(${prefix}rh_old, ${prefix}c, $skExtKeyS(${prefix}c, $reduceApplyKeyS(${prefix}f1, ${prefix}rh_old, ${prefix}c, ${prefix}fs), $reduceApplyKeyS(${prefix}f2, ${prefix}rh_new, ${prefix}c, ${prefix}fs))): $reduceDTV2)) ==
+            (($rHeapElemKeyS(${prefix}rh_new, ${prefix}c, $skExtKeyS(${prefix}c, $reduceApplyKeyS(${prefix}f1, ${prefix}rh_old, ${prefix}c, ${prefix}fs), $reduceApplyKeyS(${prefix}f2, ${prefix}rh_new, ${prefix}c, ${prefix}fs))): $reduceDTV2))))
         ==>
-        ($reduceApplyPrimeKeyS(${prefix}rh_old, ${prefix}c, ${prefix}fs) == $reduceApplyPrimeKeyS(${prefix}rh_new, ${prefix}c, ${prefix}fs)))
+        ($reduceApplyKeyS(${prefix}f1, ${prefix}rh_old, ${prefix}c, ${prefix}fs) == $reduceApplyKeyS(${prefix}f2, ${prefix}rh_new, ${prefix}c, ${prefix}fs))))
     }"""
   }
 
   private def extensionalityAxiom(): String = {
     s"""axiom $extensionalityAxiomM {
-        forall ${prefix}rh_old: $intKey,
+        forall ${prefix}f1: $fuelDKey,
+               ${prefix}f2: $fuelDKey,
+               ${prefix}rh_old: $intKey,
                ${prefix}rh_new: $intKey,
                ${prefix}c: $reduceDKeyM[$reduceDTV0,$reduceDTV1,$reduceDTV2],
                ${prefix}fs: Set[$reduceDTV0] ::
-        { ($trigExtKeyM(($reduceApplyPrimeKeyM(${prefix}rh_old, ${prefix}c, ${prefix}fs): $reduceDTV2),
-                       ($reduceApplyPrimeKeyM(${prefix}rh_new, ${prefix}c, ${prefix}fs): $reduceDTV2)): Bool) }
-        ($reduceApplyKeyM(${prefix}rh_old, ${prefix}c, ${prefix}fs) == $reduceApplyKeyM(${prefix}rh_new, ${prefix}c, ${prefix}fs)) ||
-        (($skExtKeyM(${prefix}c, $reduceApplyPrimeKeyM(${prefix}rh_old, ${prefix}c, ${prefix}fs), $reduceApplyPrimeKeyM(${prefix}rh_new, ${prefix}c, ${prefix}fs)) in ${prefix}fs ==>
-            (($rHeapElemKeyM(${prefix}rh_old, ${prefix}c, $skExtKeyM(${prefix}c, $reduceApplyPrimeKeyM(${prefix}rh_old, ${prefix}c, ${prefix}fs), $reduceApplyPrimeKeyM(${prefix}rh_new, ${prefix}c, ${prefix}fs))): $reduceDTV2)) ==
-            (($rHeapElemKeyM(${prefix}rh_new, ${prefix}c, $skExtKeyM(${prefix}c, $reduceApplyPrimeKeyM(${prefix}rh_old, ${prefix}c, ${prefix}fs), $reduceApplyPrimeKeyM(${prefix}rh_new, ${prefix}c, ${prefix}fs))): $reduceDTV2)))
+        { ($trigExtKeyM(($reduceApplyKeyM(${prefix}f1, ${prefix}rh_old, ${prefix}c, ${prefix}fs): $reduceDTV2),
+                       ($reduceApplyKeyM(${prefix}f2, ${prefix}rh_new, ${prefix}c, ${prefix}fs): $reduceDTV2)): Bool) }
+        (${prefix}rh_old < ${prefix}rh_new) ==>
+        (($reduceApplyKeyM(${prefix}f1, ${prefix}rh_old, ${prefix}c, ${prefix}fs) == $reduceApplyKeyM(${prefix}f2, ${prefix}rh_new, ${prefix}c, ${prefix}fs)) ||
+        (($skExtKeyM(${prefix}c, $reduceApplyKeyM(${prefix}f1, ${prefix}rh_old, ${prefix}c, ${prefix}fs), $reduceApplyKeyM(${prefix}f2, ${prefix}rh_new, ${prefix}c, ${prefix}fs)) in ${prefix}fs ==>
+            (($rHeapElemKeyM(${prefix}rh_old, ${prefix}c, $skExtKeyM(${prefix}c, $reduceApplyKeyM(${prefix}f1, ${prefix}rh_old, ${prefix}c, ${prefix}fs), $reduceApplyKeyM(${prefix}f2, ${prefix}rh_new, ${prefix}c, ${prefix}fs))): $reduceDTV2)) ==
+            (($rHeapElemKeyM(${prefix}rh_new, ${prefix}c, $skExtKeyM(${prefix}c, $reduceApplyKeyM(${prefix}f1, ${prefix}rh_old, ${prefix}c, ${prefix}fs), $reduceApplyKeyM(${prefix}f2, ${prefix}rh_new, ${prefix}c, ${prefix}fs))): $reduceDTV2)))
         ==>
-        ($reduceApplyPrimeKeyM(${prefix}rh_old, ${prefix}c, ${prefix}fs) == $reduceApplyPrimeKeyM(${prefix}rh_new, ${prefix}c, ${prefix}fs)))
+        ($reduceApplyKeyM(${prefix}f1, ${prefix}rh_old, ${prefix}c, ${prefix}fs) == $reduceApplyKeyM(${prefix}f2, ${prefix}rh_new, ${prefix}c, ${prefix}fs))))
     }"""
   }
 
   private def reduceDomainStringSorM(domainName: String,
                                      reduceConstructKey: String,
                                      reduceApplyKey: String,
-                                     reduceApplyPrimeKey: String,
                                      reduceApplyDummyKey: String,
                                      setEqDummyKey: String,
                                      reduceGetRecvKey: String,
@@ -353,7 +387,6 @@ object DomainsGenerator {
                                      rHeapElemKey: String,
                                      trigDelKey1Key: String,
                                      trigDelBlockKey: String,
-                                     exhaleReduceSetKey: String,
                                      getFieldIDKey: String,
                                      skExtKey: String,
                                      trigExtKey: String,
@@ -362,7 +395,7 @@ object DomainsGenerator {
                                      loseAxiom: String,
                                      disjAxiom: String,
                                      extAxiom: String,
-                                     applyReduce1EqAxiom: String,
+                                     applyReduceFuelEqAxiom: String,
                                      invAxReduceAxiom: String,
                                      singletonAxiom: String,
                                      setExtEqAxiom: String,
@@ -371,15 +404,14 @@ object DomainsGenerator {
       s"""domain $domainName[$reduceDTV0,$reduceDTV1,$reduceDTV2] {
          |
          |    function $reduceConstructKey(r: $recDKey[$reduceDTV0], m: $mapDKey[$reduceDTV1,$reduceDTV2], op: $opDKey[$reduceDTV2]): $domainName[$reduceDTV0,$reduceDTV1,$reduceDTV2]
-         |    function $reduceApplyKey(rh: $intKey, c: $domainName[$reduceDTV0,$reduceDTV1,$reduceDTV2], fs: Set[$reduceDTV0]): $reduceDTV2
-         |    function $reduceApplyPrimeKey(rh: $intKey, c: $domainName[$reduceDTV0,$reduceDTV1,$reduceDTV2], fs: Set[$reduceDTV0]): $reduceDTV2
+         |    function $reduceApplyKey(f: $fuelDKey, rh: $intKey, c: $domainName[$reduceDTV0,$reduceDTV1,$reduceDTV2], fs: Set[$reduceDTV0]): $reduceDTV2
          |    function $reduceApplyDummyKey(a: $reduceDTV2): Bool
          |    function $setEqDummyKey(b: Bool): Bool
          |
-         |    axiom $applyReduce1EqAxiom {
-         |        forall ${prefix}rh: $intKey, ${prefix}c: $domainName[$reduceDTV0,$reduceDTV1,$reduceDTV2], ${prefix}fs: Set[$reduceDTV0] ::
-         |            { ($reduceApplyKey(${prefix}rh, ${prefix}c, ${prefix}fs): $reduceDTV2) }
-         |        $reduceApplyKey(${prefix}rh, ${prefix}c, ${prefix}fs) == $reduceApplyPrimeKey(${prefix}rh, ${prefix}c, ${prefix}fs)
+         |    axiom $applyReduceFuelEqAxiom {
+         |        forall ${prefix}f: $fuelDKey, ${prefix}rh: $intKey, ${prefix}c: $domainName[$reduceDTV0,$reduceDTV1,$reduceDTV2], ${prefix}fs: Set[$reduceDTV0] ::
+         |            { ($reduceApplyKey($fuelSKey(${prefix}f), ${prefix}rh, ${prefix}c, ${prefix}fs): $reduceDTV2) }
+         |        $reduceApplyKey($fuelSKey(${prefix}f), ${prefix}rh, ${prefix}c, ${prefix}fs) == $reduceApplyKey(${prefix}f, ${prefix}rh, ${prefix}c, ${prefix}fs)
          |    }
          |
          |    function $reduceGetRecvKey(c: $domainName[$reduceDTV0,$reduceDTV1,$reduceDTV2]): $recDKey[$reduceDTV0]
@@ -390,11 +422,6 @@ object DomainsGenerator {
          |
          |    function $trigDelBlockKey(applyC: $reduceDTV2, block: Set[$reduceDTV0]): Bool
          |    function $trigDelKey1Key(applyC: $reduceDTV2, key: $reduceDTV0): Bool
-         |
-         |    function $exhaleReduceSetKey(rh: $intKey,
-         |                           c: $domainName[$reduceDTV0,$reduceDTV1,$reduceDTV2],
-         |                           fs: Set[$reduceDTV0],
-         |                           fieldID: Int): Bool
          |
          |    function $getFieldIDKey(c: $domainName[$reduceDTV0,$reduceDTV1,$reduceDTV2]): Int
          |
@@ -409,12 +436,13 @@ object DomainsGenerator {
          |    }
          |    $emptyAxiom
          |    axiom $singletonAxiom {
-         |        forall ${prefix}rh: $intKey,
+         |        forall ${prefix}f: $fuelDKey,
+         |               ${prefix}rh: $intKey,
          |               ${prefix}c: $domainName[$reduceDTV0,$reduceDTV1,$reduceDTV2],
          |               ${prefix}elem: $reduceDTV0 ::
-         |        { ($reduceApplyKey(${prefix}rh, ${prefix}c, Set(${prefix}elem)): $reduceDTV2),
+         |        { ($reduceApplyKey(${prefix}f, ${prefix}rh, ${prefix}c, Set(${prefix}elem)): $reduceDTV2),
          |          ($rHeapElemKey(${prefix}rh, ${prefix}c, ${prefix}elem): $reduceDTV2) }
-         |        $reduceApplyKey(${prefix}rh, ${prefix}c, Set(${prefix}elem)) == $rHeapElemKey(${prefix}rh, ${prefix}c, ${prefix}elem)
+         |        $reduceApplyKey(${prefix}f, ${prefix}rh, ${prefix}c, Set(${prefix}elem)) == $rHeapElemKey(${prefix}rh, ${prefix}c, ${prefix}elem)
          |    }
          |
          |    $dropAxiom
@@ -422,12 +450,14 @@ object DomainsGenerator {
          |    $loseAxiom
          |
          |    axiom $setExtEqAxiom {
-         |        forall ${prefix}rh: $intKey,
+         |        forall ${prefix}f1: $fuelDKey,
+         |               ${prefix}f2: $fuelDKey,
+         |               ${prefix}rh: $intKey,
          |               ${prefix}c: $domainName[$reduceDTV0,$reduceDTV1,$reduceDTV2],
          |               ${prefix}fs1: Set[$reduceDTV0],
          |               ${prefix}fs2: Set[$reduceDTV0] ::
-         |        { ($reduceApplyPrimeKey(${prefix}rh, ${prefix}c, ${prefix}fs1): $reduceDTV2),
-         |          ($reduceApplyPrimeKey(${prefix}rh, ${prefix}c, ${prefix}fs2): $reduceDTV2) }
+         |        { ($reduceApplyKey(${prefix}f1, ${prefix}rh, ${prefix}c, ${prefix}fs1): $reduceDTV2),
+         |          ($reduceApplyKey(${prefix}f2, ${prefix}rh, ${prefix}c, ${prefix}fs2): $reduceDTV2) }
          |        $setEqDummyKey(${prefix}fs1 == ${prefix}fs2)
          |    }
          |
@@ -437,14 +467,16 @@ object DomainsGenerator {
          |    function $trigExtKey(hfA1: $reduceDTV2, hfA2: $reduceDTV2): Bool
          |
          |    axiom $trigExtensionalityAxiom {
-         |        forall ${prefix}rh_old: $intKey,
+         |        forall ${prefix}f1: $fuelDKey,
+         |               ${prefix}f2: $fuelDKey,
+         |               ${prefix}rh_old: $intKey,
          |               ${prefix}rh_new: $intKey,
          |               ${prefix}c: $domainName[$reduceDTV0,$reduceDTV1,$reduceDTV2],
          |               ${prefix}fs: Set[$reduceDTV0] ::
-         |        { ($reduceApplyKey(${prefix}rh_old, ${prefix}c, ${prefix}fs): $reduceDTV2),
-         |          ($reduceApplyKey(${prefix}rh_new, ${prefix}c, ${prefix}fs): $reduceDTV2) }
-         |        ($trigExtKey(($reduceApplyPrimeKey(${prefix}rh_old, ${prefix}c, ${prefix}fs): $reduceDTV2),
-         |                  ($reduceApplyPrimeKey(${prefix}rh_new, ${prefix}c, ${prefix}fs): $reduceDTV2)))
+         |        { ($reduceApplyKey(${prefix}f1, ${prefix}rh_old, ${prefix}c, ${prefix}fs): $reduceDTV2),
+         |          ($reduceApplyKey(${prefix}f2, ${prefix}rh_new, ${prefix}c, ${prefix}fs): $reduceDTV2) }
+         |        ($trigExtKey(($reduceApplyKey(${prefix}f1, ${prefix}rh_old, ${prefix}c, ${prefix}fs): $reduceDTV2),
+         |                     ($reduceApplyKey(${prefix}f2, ${prefix}rh_new, ${prefix}c, ${prefix}fs): $reduceDTV2)))
          |    }
          |
          |    $extAxiom
@@ -457,7 +489,6 @@ object DomainsGenerator {
       reduceDKeyS,
       reduceConstructKeyS,
       reduceApplyKeyS,
-      reduceApplyPrimeKeyS,
       reduceApplyDummyKeyS,
       setEqDummyKeyS,
       reduceGetRecvKeyS,
@@ -466,7 +497,6 @@ object DomainsGenerator {
       rHeapElemKeyS,
       trigDelKey1KeyS,
       trigDelBlockKeyS,
-      exhaleReduceSetKeyS,
       getFieldIDKeyS,
       skExtKeyS,
       trigExtKeyS,
@@ -475,7 +505,7 @@ object DomainsGenerator {
       loseManyAxiomWithoutId(),
       disjUnionAxiomWithoutId(),
       extensionalityAxiomWithoutId(),
-      applyReduce1EqAxiomS,
+      applyReduceFuelEqAxiomS,
       invAxReduceAxiomS,
       singletonAxiomS,
       setExtEqAxiomS,
@@ -487,7 +517,6 @@ object DomainsGenerator {
       reduceDKeyM,
       reduceConstructKeyM,
       reduceApplyKeyM,
-      reduceApplyPrimeKeyM,
       reduceApplyDummyKeyM,
       setEqDummyKeyM,
       reduceGetRecvKeyM,
@@ -496,7 +525,6 @@ object DomainsGenerator {
       rHeapElemKeyM,
       trigDelKey1KeyM,
       trigDelBlockKeyM,
-      exhaleReduceSetKeyM,
       getFieldIDKeyM,
       skExtKeyM,
       trigExtKeyM,
@@ -505,7 +533,7 @@ object DomainsGenerator {
       loseManyAxiom(),
       disjUnionAxiom(),
       extensionalityAxiom(),
-      applyReduce1EqAxiomM,
+      applyReduceFuelEqAxiomM,
       invAxReduceAxiomM,
       singletonAxiomM,
       setExtEqAxiomM,

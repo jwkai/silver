@@ -4,11 +4,34 @@ import viper.silver.ast._
 import viper.silver.ast.utility.Expressions
 import viper.silver.plugin.hreduce.DomainsGenerator
 
-class AxiomHelper(program: Program) {
+class AxiomHelper(program: Program, fuelIsTwo: Boolean) {
 
   //  def getStartLabel: Label = {
   //    Label(s"${labelPrefix}l0", Seq())()
   //  }
+
+  val fuelDomainType: DomainType = {
+    val fuelDomain = program.findDomain(DomainsGenerator.fuelDKey)
+    DomainType.apply(fuelDomain, Map())
+  }
+
+  var fuelDefaultExp: Exp = {
+    val sFuel = if (fuelIsTwo) {
+      applyDomainFunc(
+        DomainsGenerator.fuelSKey,
+        Seq(applyDomainFunc(
+          DomainsGenerator.fuelSKey,
+          Seq(applyDomainFunc(DomainsGenerator.fuelZKey, Seq(), fuelDomainType.typVarsMap)),
+          fuelDomainType.typVarsMap)),
+        fuelDomainType.typVarsMap)
+    } else { // fuel is one
+      applyDomainFunc(
+        DomainsGenerator.fuelSKey,
+        Seq(applyDomainFunc(DomainsGenerator.fuelZKey, Seq(), fuelDomainType.typVarsMap)),
+        fuelDomainType.typVarsMap)
+    }
+    sFuel
+  }
 
   def labelPrefix: String = {
     "_reduceLabel"
@@ -73,47 +96,47 @@ class AxiomHelper(program: Program) {
     DomainFuncApp(domainFunc, applyTo, typMap)()
   }
 
-  def reduceApply(rHeap: Exp, reduce: Exp, filter: Exp)(hasID: Boolean): DomainFuncApp = {
+  def reduceApply(fuel: Exp, rHeap: Exp, reduce: Exp, filter: Exp)(hasID: Boolean): DomainFuncApp = {
     val reduceApply = if (hasID) DomainsGenerator.reduceApplyKeyM else DomainsGenerator.reduceApplyKeyS
     applyDomainFunc(
       reduceApply,
-      Seq(rHeap, reduce, filter),
+      Seq(fuel, rHeap, reduce, filter),
       reduce.typ.asInstanceOf[DomainType].typVarsMap
     )
   }
 
-  def reducePrimeApply(rHeap: Exp, reduce: Exp, filter: Exp)(hasID: Boolean): DomainFuncApp = {
-    val reduceApplyPrime = if (hasID) DomainsGenerator.reduceApplyPrimeKeyM else DomainsGenerator.reduceApplyPrimeKeyS
-    applyDomainFunc(
-      reduceApplyPrime,
-      Seq(rHeap, reduce, filter),
-      reduce.typ.asInstanceOf[DomainType].typVarsMap
-    )
-  }
+//  def reducePrimeApply(rHeap: Exp, reduce: Exp, filter: Exp)(hasID: Boolean): DomainFuncApp = {
+//    val reduceApplyPrime = if (hasID) DomainsGenerator.reduceApplyPrimeKeyM else DomainsGenerator.reduceApplyPrimeKeyS
+//    applyDomainFunc(
+//      reduceApplyPrime,
+//      Seq(rHeap, reduce, filter),
+//      reduce.typ.asInstanceOf[DomainType].typVarsMap
+//    )
+//  }
 
-  def reduceDummyApply(rHeap: Exp, reduce: Exp, filter: Exp)(hasID: Boolean): DomainFuncApp = {
+  def reduceDummyApply(fuel: Exp, rHeap: Exp, reduce: Exp, filter: Exp)(hasID: Boolean): DomainFuncApp = {
     val reduceApplyDummyKey = if (hasID) DomainsGenerator.reduceApplyDummyKeyM else DomainsGenerator.reduceApplyDummyKeyS
     applyDomainFunc(
       reduceApplyDummyKey,
-      Seq(reduceApply(rHeap, reduce, filter)(hasID)),
+      Seq(reduceApply(fuel, rHeap, reduce, filter)(hasID)),
       reduce.typ.asInstanceOf[DomainType].typVarsMap
     )
   }
 
-  def exhaleReduceSetApply(rHeap: Exp, reduce: Exp, filter: Exp, fieldId: Exp)(hasID: Boolean): DomainFuncApp = {
-    val exhaleReduceSetKey = if (hasID) DomainsGenerator.exhaleReduceSetKeyM else DomainsGenerator.exhaleReduceSetKeyS
-    applyDomainFunc(
-      exhaleReduceSetKey,
-      Seq(rHeap, reduce, filter, fieldId),
-      reduce.typ.asInstanceOf[DomainType].typVarsMap
-    )
-  }
+//  def exhaleReduceSetApply(rHeap: Exp, reduce: Exp, filter: Exp, fieldId: Exp)(hasID: Boolean): DomainFuncApp = {
+//    val exhaleReduceSetKey = if (hasID) DomainsGenerator.exhaleReduceSetKeyM else DomainsGenerator.exhaleReduceSetKeyS
+//    applyDomainFunc(
+//      exhaleReduceSetKey,
+//      Seq(rHeap, reduce, filter, fieldId),
+//      reduce.typ.asInstanceOf[DomainType].typVarsMap
+//    )
+//  }
 
-  def trigExtApply(rHeap1: Exp, rHeap2: Exp, reduce: Exp, filter: Exp)(hasID: Boolean): DomainFuncApp = {
+  def trigExtApply(fuel1: Exp, rHeap1: Exp, fuel2: Exp, rHeap2: Exp, reduce: Exp, filter: Exp)(hasID: Boolean): DomainFuncApp = {
     val trigExtKey = if (hasID) DomainsGenerator.trigExtKeyM else DomainsGenerator.trigExtKeyS
     applyDomainFunc(
       trigExtKey,
-      Seq(reducePrimeApply(rHeap1, reduce, filter)(hasID), reducePrimeApply(rHeap2, reduce, filter)(hasID)),
+      Seq(reduceApply(fuel1, rHeap1, reduce, filter)(hasID), reduceApply(fuel2, rHeap2, reduce, filter)(hasID)),
       reduce.typ.asInstanceOf[DomainType].typVarsMap
     )
   }
@@ -136,9 +159,9 @@ class AxiomHelper(program: Program) {
     )
   }
 
-  def trigDelKeyApply(rHeap: Exp, reduce: Exp, filter: Exp, key: Exp)(hasID: Boolean): DomainFuncApp = {
+  def trigDelKeyApply(fuel: Exp, rHeap: Exp, reduce: Exp, filter: Exp, key: Exp)(hasID: Boolean): DomainFuncApp = {
     val trigDelKey1Key = if (hasID) DomainsGenerator.trigDelKey1KeyM else DomainsGenerator.trigDelKey1KeyS
-    val reduceApplyApp = reduceApply(rHeap, reduce, filter)(hasID)
+    val reduceApplyApp = reduceApply(fuel, rHeap, reduce, filter)(hasID)
     applyDomainFunc(
       trigDelKey1Key,
       Seq(reduceApplyApp, key),
@@ -146,9 +169,9 @@ class AxiomHelper(program: Program) {
     )
   }
 
-  def trigDelBlockApply(rHeap: Exp, reduce: Exp, filter: Exp, keySet: Exp)(hasID: Boolean): DomainFuncApp = {
+  def trigDelBlockApply(fuel: Exp, rHeap: Exp, reduce: Exp, filter: Exp, keySet: Exp)(hasID: Boolean): DomainFuncApp = {
     val trigDelBlockKey = if (hasID) DomainsGenerator.trigDelBlockKeyM else DomainsGenerator.trigDelBlockKeyS
-    val reduceApplyApp = reduceApply(rHeap, reduce, filter)(hasID)
+    val reduceApplyApp = reduceApply(fuel, rHeap, reduce, filter)(hasID)
     applyDomainFunc(
       trigDelBlockKey,
       Seq(reduceApplyApp, keySet),
@@ -156,16 +179,17 @@ class AxiomHelper(program: Program) {
     )
   }
 
-  def foldedConjImplies(lhsExps: Seq[Exp], rhsExps: Seq[Exp]): Exp = {
-    def foldConj(exps: Seq[Exp]): Exp = {
-      if (exps.length == 1) {
-        exps.head
-      } else if (exps.length == 2) {
-        And(exps(0), exps(1))()
-      } else {
-        And(exps.head, foldConj(exps.tail))()
-      }
+  def foldConj(exps: Seq[Exp]): Exp = {
+    if (exps.length == 1) {
+      exps.head
+    } else if (exps.length == 2) {
+      And(exps(0), exps(1))()
+    } else {
+      And(exps.head, foldConj(exps.tail))()
     }
+  }
+
+  def foldedConjImplies(lhsExps: Seq[Exp], rhsExps: Seq[Exp]): Exp = {
     Implies(foldConj(lhsExps), foldConj(rhsExps))()
   }
 
@@ -439,7 +463,7 @@ class AxiomHelper(program: Program) {
 //      reduceType.typVarsMap
 //    )
 //    val dummyApplied = applyDomainFunc(
-//      DomainsGenerator.reduceApplyDummyKey,
+//      DomainsGenerator.reduceApplyreduceApplyDummyKey,
 //      Seq(EqCmp(forallVarSet.localVar, filter)()),
 //      reduceType.typVarsMap
 //    )
