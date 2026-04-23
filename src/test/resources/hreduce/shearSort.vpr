@@ -27,9 +27,9 @@ domain Matrix {
       inv1(loc(a,is)) == a && inv2(loc(a,is)) == is
   }
 
-  axiom len_nonneg {
+  axiom len_pos {
     forall a: Matrix :: { len(a) }
-      len(a) >= 0
+      len(a) > 0
   }
 }
 
@@ -46,18 +46,18 @@ function rect(sz: Int, is: IntPair): Bool {
 }
 
 receiver matrixRcv(a: Matrix) (fun is: IntPair :: loc(a,is))
-filter matrixAll(sz: Int) (fun is: IntPair :: rect(sz, is))
-filter matrixRow(i: Int, sz: Int) (fun is: IntPair :: row(i, sz, is))
-filter matrixCol(j: Int, sz: Int) (fun is: IntPair :: col(j, sz, is))
+filter matrixIdxAll(sz: Int) (fun is: IntPair :: rect(sz, is))
+filter matrixIdxRow(i: Int, sz: Int) (fun is: IntPair :: row(i, sz, is))
+filter matrixIdxCol(j: Int, sz: Int) (fun is: IntPair :: col(j, sz, is))
 mapping msSingleton() (fun i: Int :: Multiset(i))
 operator msSum() ( Multiset[Int](), fun a: Multiset[Int], b: Multiset[Int] :: a union b )
 
 define access_matrix(a)
-    (forall is: IntPair :: {is in matrixAll(len(a))} is in matrixAll(len(a)) ==> acc(loc(a,is).val))
+    (forall is: IntPair :: {is in matrixIdxAll(len(a))} is in matrixIdxAll(len(a)) ==> acc(loc(a,is).val))
 define access_matrix_row(a, i)
-    (forall is: IntPair :: {is in matrixRow(i,len(a))} is in matrixRow(i,len(a)) ==> acc(loc(a,is).val))
+    (forall is: IntPair :: {is in matrixIdxRow(i,len(a))} is in matrixIdxRow(i,len(a)) ==> acc(loc(a,is).val))
 define access_matrix_col(a, j)
-    (forall is: IntPair :: {is in matrixCol(j,len(a))} is in matrixCol(j,len(a)) ==> acc(loc(a,is).val))
+    (forall is: IntPair :: {is in matrixIdxCol(j,len(a))} is in matrixIdxCol(j,len(a)) ==> acc(loc(a,is).val))
 define toMultiset(a, f) (hreduce[msSum()](msSingleton(matrixRcv(a).val) | f))
 define preservesMultiset(a, f) toMultiset(a, f) == old(toMultiset(a, f))
 
@@ -72,20 +72,43 @@ define preservesMultiset(a, f) toMultiset(a, f) == old(toMultiset(a, f))
 method sortCol(a: Matrix, j: Int)
     requires access_matrix_col(a, j)
     ensures  access_matrix_col(a, j)
-    ensures  preservesMultiset(a, matrixCol(j,len(a)))
+    ensures  preservesMultiset(a, matrixIdxCol(j,len(a)))
 
-method sortRow(a: Matrix, i: Int)
+method sortRow(a: Matrix, i: Int, rev: Bool)
     requires access_matrix_row(a, i)
     ensures  access_matrix_row(a, i)
-    ensures  preservesMultiset(a, matrixRow(i,len(a)))
+    ensures  preservesMultiset(a, matrixIdxRow(i,len(a)))
 
 method shearsort(a: Matrix, lo: Int, hi: Int)
 	requires access_matrix(a)
     ensures  access_matrix(a)
-	ensures  preservesMultiset(a, matrixAll(len(a)))
+	ensures  preservesMultiset(a, matrixIdxAll(len(a)))
 {
-    assert matrixRow(0,len(a)) subset matrixAll(len(a))
-    assert disjUnionEq(matrixRow(0,len(a)), matrixAll(len(a)) setminus matrixRow(0,len(a)), matrixAll(len(a)))
-    // sortCol(a)
-    sortRow(a,0)
+    var loglena: Int
+    assume loglena < len(a)
+    var k: Int := 0
+    while (k < loglena)
+        invariant access_matrix(a)
+        invariant 0 <= k <= loglena
+        invariant preservesMultiset(a, matrixIdxAll(len(a)))
+    {
+        var i: Int := 0
+        while (i < len(a))
+            invariant access_matrix(a)
+            invariant 0 <= i <= len(a)
+            invariant preservesMultiset(a, matrixIdxAll(len(a)))
+        {
+            assert matrixIdxRow(i,len(a)) subset matrixIdxAll(len(a))
+            sortRow(a,i, i % 2 == 0)
+        }
+        var j: Int := 0
+        while (j < len(a))
+            invariant access_matrix(a)
+            invariant 0 <= j <= len(a)
+            invariant preservesMultiset(a, matrixIdxAll(len(a)))
+        {
+            assert matrixIdxCol(j,len(a)) subset matrixIdxAll(len(a))
+            sortCol(a,j)
+        }
+    }
 }
