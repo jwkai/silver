@@ -1,0 +1,143 @@
+domain ReduceS[I, V, S]  {
+
+  function hreduceS(r: Receiver[I], m: Mapping[V, S], op: Operator[S]): ReduceS[I, V, S]
+
+  function hreduceApplyS(f: Fuel, rh: Int, c: ReduceS[I, V, S], fs: Set[I]): S
+
+  function hreduceApplyDummyS(a: S): Bool
+
+  function setEqDummyS(b: Bool): Bool
+
+  function getreceiverS(c: ReduceS[I, V, S]): Receiver[I]
+
+  function getoperatorS(c: ReduceS[I, V, S]): Operator[S]
+
+  function getmappingS(c: ReduceS[I, V, S]): Mapping[V, S]
+
+  function rHeapElemS(rh: Int, c: ReduceS[I, V, S], a: I): S
+
+  function triggerDeleteBlockS(applyC: S, block: Set[I]): Bool
+
+  function triggerDeleteKey1S(applyC: S, key: I): Bool
+
+  function getFieldIDS(c: ReduceS[I, V, S]): Int
+
+  function skExtS(c: ReduceS[I, V, S], hfA1: S, hfA2: S): I
+
+  function triggerExtS(hfA1: S, hfA2: S): Bool
+
+  axiom applyReduceFuelEqS {
+    (forall __reduce_f: Fuel, __reduce_rh: Int, __reduce_c: ReduceS[I, V, S],
+    __reduce_fs: Set[I] ::
+      { (hreduceApplyS(succ(__reduce_f), __reduce_rh, __reduce_c, __reduce_fs): S) }
+      (hreduceApplyS(succ(__reduce_f), __reduce_rh, __reduce_c, __reduce_fs): S) ==
+      (hreduceApplyS(__reduce_f, __reduce_rh, __reduce_c, __reduce_fs): S))
+  }
+
+  axiom _invAxReduceS {
+    (forall __reduce_r: Receiver[I], __reduce_m: Mapping[V, S], __reduce_o: Operator[S] ::
+      { (hreduceS(__reduce_r, __reduce_m, __reduce_o): ReduceS[I, V, S]) }
+      (getreceiverS((hreduceS(__reduce_r, __reduce_m, __reduce_o): ReduceS[I, V, S])): Receiver[I]) ==
+      __reduce_r &&
+      ((getmappingS((hreduceS(__reduce_r, __reduce_m, __reduce_o): ReduceS[I, V, S])): Mapping[V, S]) ==
+      __reduce_m &&
+      (getoperatorS((hreduceS(__reduce_r, __reduce_m, __reduce_o): ReduceS[I, V, S])): Operator[S]) ==
+      __reduce_o))
+  }
+
+  axiom _singletonS {
+    (forall __reduce_f: Fuel, __reduce_rh: Int, __reduce_c: ReduceS[I, V, S],
+    __reduce_elem: I ::
+      { (hreduceApplyS(__reduce_f, __reduce_rh, __reduce_c, Set(__reduce_elem)): S),
+      (rHeapElemS(__reduce_rh, __reduce_c, __reduce_elem): S) }
+      (hreduceApplyS(__reduce_f, __reduce_rh, __reduce_c, Set(__reduce_elem)): S) ==
+      (rHeapElemS(__reduce_rh, __reduce_c, __reduce_elem): S))
+  }
+
+  axiom _dropOne1S {
+    (forall __reduce_f: Fuel, __reduce_rh: Int, __reduce_c: ReduceS[I, V, S],
+    __reduce_fs: Set[I], __reduce_key: I ::
+      { (triggerDeleteKey1S((hreduceApplyS(succ(__reduce_f), __reduce_rh, __reduce_c,
+      __reduce_fs): S), __reduce_key): Bool), (rHeapElemS(__reduce_rh, __reduce_c,
+      __reduce_key): S) }
+      (__reduce_key in __reduce_fs) && __reduce_fs != Set(__reduce_key) ==>
+      (__reduce_key in __reduce_fs) && __reduce_fs != Set(__reduce_key) &&
+      (hreduceApplyS(succ(__reduce_f), __reduce_rh, __reduce_c, __reduce_fs): S) ==
+      (opApply((getoperatorS(__reduce_c): Operator[S]), (hreduceApplyS(__reduce_f,
+      __reduce_rh, __reduce_c, (setDelete(__reduce_fs, Set(__reduce_key)): Set[I])): S),
+      (rHeapElemS(__reduce_rh, __reduce_c, __reduce_key): S)): S))
+  }
+
+  axiom _loseManyS {
+    (forall __reduce_f: Fuel, __reduce_rh: Int, __reduce_c: ReduceS[I, V, S],
+    __reduce_fs: Set[I], __reduce_keys: Set[I] ::
+      { (triggerDeleteBlockS((hreduceApplyS(succ(__reduce_f), __reduce_rh, __reduce_c,
+      __reduce_fs): S), __reduce_keys): Bool) }
+      (__reduce_keys subset __reduce_fs) && __reduce_keys != __reduce_fs ==>
+      (__reduce_keys subset __reduce_fs) && __reduce_keys != __reduce_fs &&
+      (hreduceApplyS(succ(__reduce_f), __reduce_rh, __reduce_c, __reduce_fs): S) ==
+      (opApply((getoperatorS(__reduce_c): Operator[S]), (hreduceApplyS(__reduce_f,
+      __reduce_rh, __reduce_c, (setDelete(__reduce_fs, __reduce_keys): Set[I])): S),
+      (hreduceApplyS(__reduce_f, __reduce_rh, __reduce_c, __reduce_keys): S)): S))
+  }
+
+  axiom _setExtEqS {
+    (forall __reduce_f1: Fuel, __reduce_f2: Fuel, __reduce_rh: Int, __reduce_c: ReduceS[I, V, S],
+    __reduce_fs1: Set[I], __reduce_fs2: Set[I] ::
+      { (hreduceApplyS(__reduce_f1, __reduce_rh, __reduce_c, __reduce_fs1): S),
+      (hreduceApplyS(__reduce_f2, __reduce_rh, __reduce_c, __reduce_fs2): S) }
+      (setEqDummyS(__reduce_fs1 == __reduce_fs2): Bool))
+  }
+
+  axiom _disjUnionS {
+    (forall __reduce_f1: Fuel, __reduce_f2: Fuel, __reduce_rh: Int, __reduce_c: ReduceS[I, V, S],
+    __reduce_fs1: Set[I], __reduce_fs2: Set[I], __reduce_dus: Set[I] ::
+      { (hreduceApplyS(__reduce_f1, __reduce_rh, __reduce_c, __reduce_fs1): S),
+      (hreduceApplyS(__reduce_f2, __reduce_rh, __reduce_c, __reduce_fs2): S),
+      (disjUnionEq(__reduce_fs1, __reduce_fs2, __reduce_dus): Bool) }
+      (disjUnionEq(__reduce_fs1, __reduce_fs2, __reduce_dus): Bool) &&
+      (__reduce_fs1 != Set[I]() && __reduce_fs2 != Set[I]()) ==>
+      (hreduceApplyS(__reduce_f1, __reduce_rh, __reduce_c, __reduce_dus): S) ==
+      (opApply((getoperatorS(__reduce_c): Operator[S]), (hreduceApplyS(__reduce_f1,
+      __reduce_rh, __reduce_c, __reduce_fs1): S), (hreduceApplyS(__reduce_f2,
+      __reduce_rh, __reduce_c, __reduce_fs2): S)): S) &&
+      (hreduceApplyS(__reduce_f2, __reduce_rh, __reduce_c, __reduce_dus): S) ==
+      (opApply((getoperatorS(__reduce_c): Operator[S]), (hreduceApplyS(__reduce_f1,
+      __reduce_rh, __reduce_c, __reduce_fs1): S), (hreduceApplyS(__reduce_f2,
+      __reduce_rh, __reduce_c, __reduce_fs2): S)): S))
+  }
+
+  axiom _trigExtensionalityS {
+    (forall __reduce_f1: Fuel, __reduce_f2: Fuel, __reduce_rh_old: Int, __reduce_rh_new: Int,
+    __reduce_c: ReduceS[I, V, S], __reduce_fs: Set[I] ::
+      { (hreduceApplyS(__reduce_f1, __reduce_rh_old, __reduce_c, __reduce_fs): S),
+      (hreduceApplyS(__reduce_f2, __reduce_rh_new, __reduce_c, __reduce_fs): S) }
+      (triggerExtS((hreduceApplyS(__reduce_f1, __reduce_rh_old, __reduce_c,
+      __reduce_fs): S), (hreduceApplyS(__reduce_f2, __reduce_rh_new, __reduce_c,
+      __reduce_fs): S)): Bool))
+  }
+
+  axiom _extensionalityS {
+    (forall __reduce_f1: Fuel, __reduce_f2: Fuel, __reduce_rh_old: Int, __reduce_rh_new: Int,
+    __reduce_c: ReduceS[I, V, S], __reduce_fs: Set[I] ::
+      { (triggerExtS((hreduceApplyS(__reduce_f1, __reduce_rh_old, __reduce_c,
+      __reduce_fs): S), (hreduceApplyS(__reduce_f2, __reduce_rh_new, __reduce_c,
+      __reduce_fs): S)): Bool) }
+      __reduce_rh_old < __reduce_rh_new ==>
+      (hreduceApplyS(__reduce_f1, __reduce_rh_old, __reduce_c, __reduce_fs): S) ==
+      (hreduceApplyS(__reduce_f2, __reduce_rh_new, __reduce_c, __reduce_fs): S) ||
+      (__reduce_fs != Set[I]() &&
+      (((skExtS(__reduce_c, (hreduceApplyS(__reduce_f1, __reduce_rh_old, __reduce_c,
+      __reduce_fs): S), (hreduceApplyS(__reduce_f2, __reduce_rh_new, __reduce_c,
+      __reduce_fs): S)): I) in
+      __reduce_fs) ==>
+      (rHeapElemS(__reduce_rh_old, __reduce_c, (skExtS(__reduce_c, (hreduceApplyS(__reduce_f1,
+      __reduce_rh_old, __reduce_c, __reduce_fs): S), (hreduceApplyS(__reduce_f2,
+      __reduce_rh_new, __reduce_c, __reduce_fs): S)): I)): S) ==
+      (rHeapElemS(__reduce_rh_new, __reduce_c, (skExtS(__reduce_c, (hreduceApplyS(__reduce_f1,
+      __reduce_rh_old, __reduce_c, __reduce_fs): S), (hreduceApplyS(__reduce_f2,
+      __reduce_rh_new, __reduce_c, __reduce_fs): S)): I)): S)) ==>
+      (hreduceApplyS(__reduce_f1, __reduce_rh_old, __reduce_c, __reduce_fs): S) ==
+      (hreduceApplyS(__reduce_f2, __reduce_rh_new, __reduce_c, __reduce_fs): S)))
+  }
+}

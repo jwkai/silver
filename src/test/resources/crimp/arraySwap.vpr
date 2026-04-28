@@ -1,0 +1,44 @@
+field val: Int
+
+domain Array {
+  function loc(a: Array, i: Int): Ref
+  function len(a: Array): Int
+  function first(r: Ref): Array
+  function second(r: Ref): Int
+
+  axiom all_diff {
+    forall a: Array, i: Int :: {loc(a,i)}
+      first(loc(a,i)) == a && second(loc(a,i)) == i
+  }
+
+  axiom len_nonneg {
+    forall a: Array :: { len(a) }
+      len(a) >= 0
+  }
+}
+
+function arrayRange(start: Int, end: Int): Set[Int]
+  ensures (forall i: Int :: { i in result } (i in result) == (i >= start && i < end))
+
+receiver arrayRec(a: Array) (fun (i: Int) : Ref :: loc(a,i))
+// filter arrayRange(start: Int, end: Int) (fun (i: Int) :: i >= start && i < end )
+mapping msSingleton() (fun (i: Int) : Multiset[Int] :: Multiset(i))
+operator msSum() (fun (a: Multiset[Int], b: Multiset[Int]) : Multiset[Int] :: a union b, Multiset[Int]())
+
+define access_array(a, i, j)
+    (forall k: Int :: {k in arrayRange(i,j)} k in arrayRange(i,j) ==> acc(loc(a,k).val))
+define toMultiset(d, f)
+    crimp[msSum()][msSingleton(arrayRec(d).val)](f)
+define preservesMultiset(d, f)
+    toMultiset(d, f) == old(toMultiset(d, f))
+
+method swap(a: Array, i: Int, j: Int)
+    requires access_array(a,0,len(a))
+    requires i in arrayRange(0, len(a)) && j in arrayRange(0, len(a))
+    ensures access_array(a,0,len(a))
+    ensures preservesMultiset(a, arrayRange(0, len(a)))
+{
+    var temp: Int := loc(a,i).val
+    loc(a,i).val := loc(a,j).val
+    loc(a,j).val := temp
+}

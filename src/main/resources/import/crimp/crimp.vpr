@@ -1,0 +1,147 @@
+domain Fuel  {
+
+  function succ(f: Fuel): Fuel
+
+  function zero(): Fuel
+}
+
+domain Receiver[I]  {
+
+  function recApply(r: Receiver[I], a: I): Ref
+
+  function recInv(rec: Receiver[I], ref: Ref): I
+
+  function filterReceiverGood(f: Set[I], r: Receiver[I]): Bool
+
+  function subsetNotInRefs(f1: Set[I], r: Receiver[I], lostR: Set[Ref]): Set[I]
+
+  function idxNotInRefs(a: I, r: Receiver[I], domR: Set[Ref]): Bool
+
+  axiom _inverse_receiver {
+    (forall __reduce_a: I, __reduce_f: Set[I], __reduce_r: Receiver[I] ::
+      { (recApply(__reduce_r, __reduce_a): Ref), (filterReceiverGood(__reduce_f,
+      __reduce_r): Bool) }
+      { (filterReceiverGood(__reduce_f, __reduce_r): Bool), (__reduce_a in
+      __reduce_f) }
+      (filterReceiverGood(__reduce_f, __reduce_r): Bool) &&
+      (__reduce_a in __reduce_f) ==>
+      (filterReceiverGood(__reduce_f, __reduce_r): Bool) &&
+      ((__reduce_a in __reduce_f) &&
+      (recInv(__reduce_r, (recApply(__reduce_r, __reduce_a): Ref)): I) ==
+      __reduce_a))
+  }
+
+  axiom _inverse_receiver1 {
+    (forall __reduce_ref: Ref, __reduce_f: Set[I], __reduce_r: Receiver[I] ::
+      { (filterReceiverGood(__reduce_f, __reduce_r): Bool), (recInv(__reduce_r,
+      __reduce_ref): I) }
+      (filterReceiverGood(__reduce_f, __reduce_r): Bool) &&
+      ((recInv(__reduce_r, __reduce_ref): I) in __reduce_f) ==>
+      (filterReceiverGood(__reduce_f, __reduce_r): Bool) &&
+      (((recInv(__reduce_r, __reduce_ref): I) in __reduce_f) &&
+      (recApply(__reduce_r, (recInv(__reduce_r, __reduce_ref): I)): Ref) ==
+      __reduce_ref))
+  }
+
+  axiom _smallerF {
+    (forall __reduce_f1: Set[I], __reduce_f2: Set[I], __reduce_r: Receiver[I] ::
+      { (__reduce_f2 subset __reduce_f1), (filterReceiverGood(__reduce_f1, __reduce_r): Bool) }
+      (filterReceiverGood(__reduce_f1, __reduce_r): Bool) &&
+      (__reduce_f2 subset __reduce_f1) ==>
+      (filterReceiverGood(__reduce_f1, __reduce_r): Bool) &&
+      ((__reduce_f2 subset __reduce_f1) &&
+      (filterReceiverGood(__reduce_f2, __reduce_r): Bool)))
+  }
+
+  axiom _smallerFDelete {
+    (forall __reduce_f1: Set[I], __reduce_f2: Set[I], __reduce_r: Receiver[I] ::
+      { (filterReceiverGood(__reduce_f1, __reduce_r): Bool), (__reduce_f1 setminus
+      __reduce_f2) }
+      (filterReceiverGood(__reduce_f1, __reduce_r): Bool) ==>
+      (filterReceiverGood(__reduce_f1, __reduce_r): Bool) &&
+      (filterReceiverGood((__reduce_f1 setminus __reduce_f2), __reduce_r): Bool))
+  }
+
+  axiom _unionF {
+    (forall __reduce_f1: Set[I], __reduce_f2: Set[I], __reduce_r: Receiver[I] ::
+      { (filterReceiverGood((__reduce_f1 union __reduce_f2), __reduce_r): Bool) }
+      (filterReceiverGood((__reduce_f1 union __reduce_f2), __reduce_r): Bool) ==>
+      (filterReceiverGood((__reduce_f1 union __reduce_f2), __reduce_r): Bool) &&
+      ((filterReceiverGood(__reduce_f1, __reduce_r): Bool) &&
+      (filterReceiverGood(__reduce_f2, __reduce_r): Bool)))
+  }
+
+  axiom _subsetNotInRefsAxiom {
+    (forall __reduce_a: I, __reduce_fs: Set[I], __reduce_r: Receiver[I], __reduce_lostR: Set[Ref] ::
+      { (__reduce_a in
+      (subsetNotInRefs(__reduce_fs, __reduce_r, __reduce_lostR): Set[I])) }
+      (__reduce_a in
+      (subsetNotInRefs(__reduce_fs, __reduce_r, __reduce_lostR): Set[I])) ==
+      ((__reduce_a in __reduce_fs) &&
+      !(((recApply(__reduce_r, __reduce_a): Ref) in __reduce_lostR))))
+  }
+
+  axiom _subsetNotInRefsSubset {
+    (forall __reduce_fs: Set[I], __reduce_r: Receiver[I], __reduce_lostR: Set[Ref] ::
+      { (subsetNotInRefs(__reduce_fs, __reduce_r, __reduce_lostR): Set[I]) }
+      ((subsetNotInRefs(__reduce_fs, __reduce_r, __reduce_lostR): Set[I]) subset
+      __reduce_fs))
+  }
+
+  axiom _idxNotInRefSetAxiom {
+    (forall __reduce_a: I, __reduce_recv: Receiver[I], __reduce_domR: Set[Ref] ::
+      { (idxNotInRefs(__reduce_a, __reduce_recv, __reduce_domR): Bool) }
+      !(((recApply(__reduce_recv, __reduce_a): Ref) in __reduce_domR)) ==>
+      (idxNotInRefs(__reduce_a, __reduce_recv, __reduce_domR): Bool))
+  }
+}
+
+domain Operator[S]  {
+
+  function _noTrigOp(out: S): Bool
+
+  function opApply(op: Operator[S], val1: S, val2: S): S
+
+  function opGetIden(op: Operator[S]): S
+}
+
+domain Mapping[V, S]  {
+
+  function mapApply(m: Mapping[V, S], _mInput: V): S
+
+  function mapIdentity(): Mapping[V, V]
+
+  axiom {
+    (forall __v: V ::
+      { (mapApply((mapIdentity(): Mapping[V, V]), __v): V) }
+      (mapApply((mapIdentity(): Mapping[V, V]), __v): V) == __v)
+  }
+}
+
+domain SetEdit[I]  {
+
+  function setDelete(m: Set[I], e: Set[I]): Set[I]
+
+  function disjUnionEq(s1: Set[I], s2: Set[I], s3: Set[I]): Bool
+
+  axiom _disjUnionEqDef {
+    (forall __reduce_s1: Set[I], __reduce_s2: Set[I], __reduce_s3: Set[I] ::
+      { (disjUnionEq(__reduce_s1, __reduce_s2, __reduce_s3): Bool) }
+      (disjUnionEq(__reduce_s1, __reduce_s2, __reduce_s3): Bool) ==
+      ((__reduce_s1 intersection __reduce_s2) == Set[I]() &&
+      (__reduce_s1 union __reduce_s2) == __reduce_s3))
+  }
+
+  axiom _setDeleteAxiom {
+    (forall __reduce_s: Set[I], __reduce_e: Set[I] ::
+      { (setDelete(__reduce_s, __reduce_e): Set[I]) }
+      (setDelete(__reduce_s, __reduce_e): Set[I]) ==
+      (__reduce_s setminus __reduce_e))
+  }
+
+  axiom _setDeleteSubset {
+    (forall __reduce_s: Set[I], __reduce_e: Set[I] ::
+      { (setDelete(__reduce_s, __reduce_e): Set[I]) }
+      ((setDelete(__reduce_s, __reduce_e): Set[I]) subset __reduce_s))
+  }
+}
