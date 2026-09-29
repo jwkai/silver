@@ -5,9 +5,10 @@ import viper.silver.parser._
 
 case object PFunInlineKeyword extends PKw("fun") with PKeywordLang
 
-case class PFunInline(keyword: PReserved[PFunInlineKeyword.type], args: Seq[PFormalArgDecl], body: PExp)(val pos : (Position, Position)) extends PExtender with PPrettySubnodes {
+case class PFunInline(keyword: PReserved[PFunInlineKeyword.type], args: Seq[PFormalArgDecl], body: PExp)(val pos : (Position, Position))
+  extends PExtender {
   
-  override def subnodes: Seq[PNode] = getArgs ++ Seq(body)
+  override def subnodes: Iterator[PNode] = (getArgs ++ Seq(body)).iterator
 
   def getArgs: Seq[PFormalArgDecl] = args
 

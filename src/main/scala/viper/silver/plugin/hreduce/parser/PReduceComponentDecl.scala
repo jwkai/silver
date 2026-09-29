@@ -7,19 +7,19 @@ import viper.silver.parser.{PAnyFunction, PGlobalCallableNamedArgs, Translator, 
 
 // Defines a component declaration. This is a PExtender node (extended as a plugin) and acts as a Function declaration,
 // hence the PAnyFunction.
-trait PReduceComponentDecl extends PExtender with PAnyFunction with PSingleMember with PGlobalCallableNamedArgs with PPrettySubnodes {
+trait PReduceComponentDecl extends PExtender with PAnyFunction with PSingleMember with PGlobalCallableNamedArgs {
 
   var typToInfer: PType = null
   override def resultType: PType = typToInfer
   override def body: Some[PFunInline]
   override def annotations: Seq[PAnnotation] = Seq()
 
-  override val subnodes: Seq[PNode] = Seq(idndef) ++ formalArgs ++ {
+  override val subnodes: Iterator[PNode] = (Seq(idndef) ++ formalArgs ++ {
     body match {
       case Some(p) => Seq(p)
       case _ => Seq()
     }
-  }
+  }).iterator
 
   val componentName: String
 
@@ -113,9 +113,9 @@ trait PReduceComponentDecl extends PExtender with PAnyFunction with PSingleMembe
 
 //  override def keyword: PReserved[PKeywordLang] = super.keyword
 
-  override def pres: PDelimited[PSpecification[PKw.PreSpec], Option[Semi]] = PDelimited.empty
+  override def pres: PSpecs[PKw.PreSpec] = PSpecs.empty
 
-  override def posts: PDelimited[PSpecification[PKw.PostSpec], Option[Semi]] = PDelimited.empty
+  override def posts: PSpecs[PKw.PostSpec] = PSpecs.empty
 
 //  override def pretty: String = super.pretty
 }

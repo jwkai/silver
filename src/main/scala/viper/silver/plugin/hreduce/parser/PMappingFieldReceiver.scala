@@ -5,9 +5,9 @@ import viper.silver.parser._
 import viper.silver.plugin.hreduce.HReducePlugin
 
 case class PMappingFieldReceiver(mapping: PCall, fieldID: PIdnUse, receiver: PCall)(val pos: (Position, Position))
-  extends PExtender with PPrettySubnodes {
+  extends PExtender {
 
-  override val subnodes: Seq[PNode] = Seq(mapping, fieldID, receiver)
+  override val subnodes: Iterator[PNode] = Iterator(mapping, fieldID, receiver)
 
   def typecheckComp(t: TypeChecker, n: NameAnalyser, typeUnit: PType, typeFilter: PType): Seq[String] = {
     val errorSeq: Seq[String] = Seq()

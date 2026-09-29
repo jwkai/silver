@@ -225,6 +225,7 @@ class CrimpPlugin(@unused reporter: viper.silver.reporter.Reporter,
       val importOnlyProgram = importStmts.mkString("\n")
       val importPProgram = PAstProvider.generateViperPAst(importOnlyProgram).get.filterMembers(_.isInstanceOf[PDomain])
       val mergedProgram = PProgram(input.imported :+ importPProgram, input.members)(input.pos, input.localErrors, input.offsets, input.rawProgram)
+      mergedProgram.initProperties()
       val output = super.beforeTranslate(mergedProgram)
       output
 //      def transformStrategy[T <: PNode](input: T): T = StrategyBuilder.Slim[PNode]({
@@ -252,13 +253,19 @@ class CrimpPlugin(@unused reporter: viper.silver.reporter.Reporter,
 //  }
 
   object PAstProvider extends ViperPAstProvider(NoopReporter, SilentLogger().get) {
+
+    override val phases: Seq[Phase] = Seq(Parsing)
+    override def result: VerificationResult = if (_errors.isEmpty) viper.silver.verifier.Success else viper.silver.verifier.Failure(_errors)
+
     def generateViperPAst(code: String): Option[PProgram] = {
       val code_id = code.hashCode.asInstanceOf[Short].toString
       _input = Some(code)
       execute(Seq("--ignoreFile", code_id))
 
+      // we do not want the semantic analysis to be run here,
+      // as we are adding domains to the program that must be resolved together with the original code
       if (errors.isEmpty) {
-        Some(semanticAnalysisResult)
+        Some(parsingResult)
       } else {
         None
       }

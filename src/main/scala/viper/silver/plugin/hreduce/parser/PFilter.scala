@@ -27,9 +27,9 @@ case class PFilter(keyword: PReserved[PFilterKeyword.type], idndef: PIdnDef, ove
   }
 
   def pViperTranslation(posTuple: (Position, Position)): PBinExp = {
-    val elem = PIdnUseExp(body.get.args.head.idndef.name)(posTuple)
+    val elem = PIdnUseExp(PIdnRef(body.get.args.head.idndef.name)(posTuple))
     val set = PCall(PIdnRef(idndef.name)(posTuple),
-      PDelimited.impliedParenComma(formalArgs.map(a => PIdnUseExp(a.idndef.name)(posTuple))),
+      PDelimited.impliedParenComma(formalArgs.map(a => PIdnUseExp(PIdnRef(a.idndef.name)(posTuple)))),
       Some(PReserved.implied(PSym.Colon), TypeHelper.Bool))(posTuple)
 
     val lhs = PBinExp(elem, PReserved.implied(PKwOp.In), set)(posTuple)

@@ -10,9 +10,10 @@ import viper.silver.verifier.errors
 case object PReduceKeyword extends PKw("hreduce") with PKeywordLang
 
 // First representation, the user input of reduction gets turned into this PAst Node
-case class PReduce(keyword: PReserved[PReduceKeyword.type], opUnit: PCall, mappingFieldReceiver: PMappingFieldReceiver, filter: PExp)(val pos: (Position, Position)) extends PExtender with PExp {
+case class PReduce(keyword: PReserved[PReduceKeyword.type], opUnit: PCall, mappingFieldReceiver: PMappingFieldReceiver, filter: PExp)(val pos: (Position, Position))
+  extends PExtender with PExp {
 
-  override val subnodes: Seq[PNode] = Seq(opUnit, mappingFieldReceiver, filter)
+  override val subnodes: Iterator[PNode] = Iterator(opUnit, mappingFieldReceiver, filter)
 
   override def typecheck(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] = {
     var messagesOut : Seq[String] = Seq()

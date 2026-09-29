@@ -26,9 +26,9 @@ case class PMapping(keyword: PReserved[PMappingKeyword.type], idndef: PIdnDef, o
 
   def pViperTranslation(posTuple: (Position, Position)): PBinExp = {
     val args1 = Seq(PCall(PIdnRef(idndef.name)(posTuple),
-      PDelimited.impliedParenComma(formalArgs.map(a => PIdnUseExp(a.idndef.name)(posTuple))),
+      PDelimited.impliedParenComma(formalArgs.map(a => PIdnUseExp(PIdnRef(a.idndef.name)(posTuple)))),
       Some(PReserved.implied(PSym.Colon), TypeHelper.Ref))(posTuple))
-    val args2 = body.get.args.map(a => PIdnUseExp(a.idndef.name)(posTuple))
+    val args2 = body.get.args.map(a => PIdnUseExp(PIdnRef(a.idndef.name)(posTuple)))
     val lhs = PCall(PIdnRef(DomainsGenerator.mapApplyKey)(posTuple),
       PDelimited.impliedParenComma(args1 ++ args2),
       Some(PReserved.implied(PSym.Colon), TypeHelper.Ref))(posTuple)

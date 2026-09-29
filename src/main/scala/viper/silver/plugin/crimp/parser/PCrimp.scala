@@ -1,10 +1,9 @@
 package viper.silver.plugin.crimp.parser
 
-import viper.silver.ast.{ErrTrafo, Exp, NoPosition, Position}
-import viper.silver.parser.{NameAnalyser, PCall, PDomainType, PExp, PExtender, PFieldDecl, PGrouped, PIdnUse, PIntLit, PKeywordLang, PKw, PNode, POpApp, PReserved, PSetType, PType, PTypeRenaming, PTypeSubstitution, PTypeVar, PUnknown, Translator, TypeChecker, TypeHelper}
+import viper.silver.ast.{ErrTrafo, Exp, Position}
+import viper.silver.parser.{NameAnalyser, PCall, PDomainType, PExp, PExtender, PFieldDecl, PIdnUse, PKeywordLang, PKw, PNode, POpApp, PReserved, PSetType, PType, PTypeRenaming, PTypeSubstitution, PTypeVar, Translator, TypeChecker}
 import viper.silver.plugin.crimp.ast.{CrimpApp, CrimpTriple, CrimpTripleWithId, CrimpTripleWithoutId}
 import viper.silver.plugin.crimp.{CrimpPlugin, DomainsGenerator, ReduceErrors}
-import viper.silver.plugin.crimp.parser.PCrimp.getNewTypeVariable
 import viper.silver.verifier.errors
 
 case object PCrimpKeyword extends PKw("crimp") with PKeywordLang
@@ -13,7 +12,7 @@ case object PCrimpKeyword extends PKw("crimp") with PKeywordLang
 case class PCrimpInner(mapping: PCall, fieldID: PIdnUse, receiver: PCall)(val pos: (Position, Position))
   extends PExtender {
 
-  override val subnodes: Iterator[PNode] = Iterator(mapping, fieldID, receiver)
+  override def subnodes: Iterator[PNode] = Iterator(mapping, fieldID, receiver)
 
   def typeSubstitutions: Seq[PTypeSubstitution] =
     mapping.signatures ++ receiver.signatures
@@ -57,7 +56,7 @@ case class PCrimpInner(mapping: PCall, fieldID: PIdnUse, receiver: PCall)(val po
 case class PCrimp(keyword: PReserved[PCrimpKeyword.type], operator: PCall, mappingFieldReceiver: PCrimpInner, filter: PExp)(val pos: (Position, Position))
   extends PExtender with POpApp {
 
-  override val subnodes: Iterator[PNode] = Iterator(operator, mappingFieldReceiver, filter)
+  override def subnodes: Iterator[PNode] = Iterator(operator, mappingFieldReceiver, filter)
 
   override def args: Seq[PExp] = Seq(filter)
 
@@ -157,7 +156,6 @@ object PCrimp {
   }
 
   def typecheck(pc: PCrimp)(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] = {
-    //    var messagesOut : Seq[String] = Seq()
 
     def getFreshTypeSubstitution(tvs: Seq[PDomainType]): PTypeRenaming =
       PTypeVar.freshTypeSubstitutionPTVs(tvs)
@@ -169,68 +167,36 @@ object PCrimp {
       new PTypeSubstitution(ts map (kv => rts.rename(kv._1) -> kv._2.substitute(rts)))
     }
 
-    var extraReturnTypeConstraint: Option[PType] = None
+    var messagesOut : Seq[String] = Seq()
 
-    if (pc.typeSubstitutions.isEmpty) {
-      pc.args.foreach(t.checkTopTyped(_, None))
-      var nestedTypeError = !pc.args.forall(a => a.typ.isValidOrUndeclared)
-
-      if (!nestedTypeError && pc.signatures.nonEmpty && pc.args.forall(_.typeSubstitutions.nonEmpty)) {
-        val ltr = getFreshTypeSubstitution(pc.localScope.toList) //local type renaming - fresh versions
-        val rlts = pc.signatures map (ts => refreshWith(ts, ltr)) //local substitutions refreshed
-        assert(rlts.nonEmpty)
-        val rrt: PDomainType = POpApp.pRes.substitute(ltr).asInstanceOf[PDomainType] // return type (which is a dummy type variable) replaced with fresh type
-        val flat = pc.args.indices map (i => POpApp.pArg(i).substitute(ltr)) //fresh local argument types
-        // the tuples below are: (fresh argument type, argument type as used in domain of substitutions, substitutions, the argument itself)
-        pc.typeSubstitutions ++= t.unifySequenceWithSubstitutions(rlts, flat.indices.map(i => (pc.args(i).typ, flat(i), pc.args(i).typeSubsDistinct.toSeq, pc.args(i))) ++
-          (
-            extraReturnTypeConstraint match {
-              case None => Nil
-              case Some(t) => Seq((t, rrt, List(PTypeSubstitution.id), pc))
-            }
-            )
-        ).getOrElse(Seq())
-        val ts = pc.typeSubsDistinct
-        if (ts.isEmpty)
-          t.typeError(pc)
-        pc.typ = if (ts.size == 1) rrt.substitute(ts.head) else rrt
-      } else {
-        pc.typeSubstitutions.clear()
-        pc.typ = PUnknown()
-      }
+    // Check type of filter, must be a Set. Extract it out
+    t.checkTopTyped(pc.filter, Some(CrimpPlugin.makeSetType(getNewTypeVariable("CrimpSet"))))
+    val setType: PType = pc.filter.typ match {
+      case PSetType(_, bTyp) => bTyp.inner
+      case _ =>
+        messagesOut = messagesOut :+ "Filter should of Set[...] type."
+        return Some(messagesOut)
     }
 
-    //    t.checkTopTyped(filter, Some(PSetType(PReserved.implied(PKw.Set),
-    //      PGrouped.impliedBracket(getNewTypeVariable("CrimpSet")))(NoPosition, NoPosition)))
-    //    val setType: PType = filter.typ match {
-    //      case PSetType(_, bTyp) => bTyp.inner
-    //      case _ =>
-    //        messagesOut = messagesOut :+ "Filter should be of Set[_] type."
-    //        return Some(messagesOut)
-    //    }
-
-    // Check type of unit
-    //    t.checkTopTyped(unit, None)
-
-    // Check type of op, must be an Operator with unit as argument
-    //    val correctOpType = ComprehensionPlugin.makeDomainType("Operator", Seq(unit.typ))
-    //    t.checkTopTyped(operator, Some(CrimpPlugin.makeDomainType("Operator", Seq(getNewTypeVariable("CompOp")))))
+    // Check type of operator, must be an Operator with unit as argument
+    t.checkTopTyped(pc.operator, Some(CrimpPlugin.makeDomainType(DomainsGenerator.opDKey,
+      Seq(getNewTypeVariable("CrimpOp")))))
 
     // Look inside the operator type
-    //    operator.typ match {
-    //      case pd: PDomainType if pd.domain.name == DomainsGenerator.opDKey =>
-    //        // Set the type of this PComprehension to the Operator unit's type
-    //        typ = pd.typeArguments.head
-    //      case _ =>
-    //        messagesOut = messagesOut :+ "Operator should be of Operator[_] type."
-    //        return Some(messagesOut)
-    //    }
+    pc.operator.typ match {
+      case pd: PDomainType if pd.domain.name == DomainsGenerator.opDKey =>
+        // Set the type of this PCrimp to the Operator unit's type
+        pc.typ = pd.typeArguments.head
+      case _ =>
+        messagesOut = messagesOut :+ "Operator should of Operator[_] type."
+        return Some(messagesOut)
+    }
 
     // Check type of mappingFieldReceiver. Receiver must take the element in the set
     // Mapping must be from type of field to type of the operator (typ).
-    //    mappingFieldReceiver.typecheckComp(t, n, typ, setType)
+    messagesOut ++= pc.mappingFieldReceiver.typecheckComp(t, n, pc.typ, setType)
 
     // Set type of this node
-    None
+    if (messagesOut.isEmpty) None else Some(messagesOut)
   }
 }

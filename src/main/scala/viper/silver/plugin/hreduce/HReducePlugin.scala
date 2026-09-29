@@ -199,7 +199,7 @@ class HReducePlugin(@unused reporter: viper.silver.reporter.Reporter,
 
       val newInput = input.copy(
         members = input.members ++ domainsToAdd
-      )(input.pos, input.localErrors)
+      )(input.pos, input.localErrors, input.offsets, input.rawProgram)
       newInput
     }
   }
@@ -240,6 +240,7 @@ class HReducePlugin(@unused reporter: viper.silver.reporter.Reporter,
       case e@Assume(a) => Inhale(a)(e.pos, e.info, e.errT)
     })
     print(pretty(newInput) + "\n\n")
+    newInput.initProperties()
     newInput
   }
 
