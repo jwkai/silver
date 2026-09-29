@@ -68,20 +68,10 @@ case class PCrimp(keyword: PReserved[PCrimpKeyword.type], operator: PCall, mappi
   override def extraLocalTypeVariables: Set[PDomainType] = _extraLocalTypeVariables
 
   override def forceSubstitution(ots: PTypeSubstitution): Unit = {
-    val ts = crimpTypeRenaming match {
-      case Some(ctr) =>
-        val s3 = PTypeSubstitution(ctr.mm.map(kv => kv._1 -> (ots.get(kv._2) match {
-          case Some(pt) => pt
-          case None => PTypeSubstitution.defaultType
-        })))
-        assert(s3.m.keySet == ctr.mm.keySet)
-        assert(s3.m.forall(_._2.isGround))
-        crimpSubstitution = Some(s3)
-        ctr.mm.values.foldLeft(ots)(
-          (tss, s) => if (tss.contains(s)) tss else tss.add(s, PTypeSubstitution.defaultType).toOption.get)
-      case _ => ots
-    }
-    super.forceSubstitution(ts)
+    // fresh type variables should have been generated for components by PCrimp.typecheck
+    typeSubstitutions.clear()
+    typeSubstitutions += ots
+    typ = typ.substitute(ots)
   }
   
   override def signatures: List[PTypeSubstitution] = {
@@ -116,7 +106,7 @@ case class PCrimp(keyword: PReserved[PCrimpKeyword.type], operator: PCall, mappi
     }.members.headOption
     val opHasID = opMember match {
       case Some(opm) => opm match {
-        case _: POperator => true
+        case p: POperator => p.opUnit.isDefined
         case _ => throw new Exception(s"User-declared operator ${operator.toString} has unexpected type.")
       }
       case None => throw new Exception(s"User-declared operator ${operator.toString} not found.")
@@ -167,6 +157,8 @@ object PCrimp {
       new PTypeSubstitution(ts map (kv => rts.rename(kv._1) -> kv._2.substitute(rts)))
     }
 
+    if (pc.typeSubstitutions.nonEmpty) return None // already checked
+
     var messagesOut : Seq[String] = Seq()
 
     // Check type of filter, must be a Set. Extract it out
@@ -196,7 +188,8 @@ object PCrimp {
     // Mapping must be from type of field to type of the operator (typ).
     messagesOut ++= pc.mappingFieldReceiver.typecheckComp(t, n, pc.typ, setType)
 
-    // Set type of this node
+    // Set type of this node, and pass ground type to expression context via identity substitution
+    if (messagesOut.isEmpty && pc.typ.isGround) pc.typeSubstitutions += PTypeSubstitution.id
     if (messagesOut.isEmpty) None else Some(messagesOut)
   }
 }
