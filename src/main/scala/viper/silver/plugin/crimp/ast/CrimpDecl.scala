@@ -6,7 +6,6 @@ import viper.silver.ast.pretty.PrettyPrintPrimitives
 import viper.silver.plugin.crimp.DomainsGenerator
 import viper.silver.plugin.crimp.util.AxiomHelper.tupleFieldToString
 
-// Constructor should not be called directly, use getOrMakeNewReduceDecl
 case class CrimpDecl private(domainKey: String, crimpType: (Type, Type, Type), fieldName: String)(val pos : Position = NoPosition)
   extends ExtensionMember
 {
@@ -60,31 +59,29 @@ case class CrimpDecl private(domainKey: String, crimpType: (Type, Type, Type), f
 
 
 object CrimpDecl {
-
-  private val crimpDecls: scala.collection.mutable.Map[String, CrimpDecl] = scala.collection.mutable.Map()
-
-  private var uniqueFieldInt = 0
-
-  private val fieldIDMap: scala.collection.mutable.Map[String, Int] = scala.collection.mutable.Map()
-
-  private def getOrMakeNewReduceDecl(domainKey: String, crimpType: (Type, Type, Type), fieldID: String): CrimpDecl = {
-    val key = tupleFieldToString(crimpType, fieldID)
-    addFieldtoMap(fieldID)
-    crimpDecls.getOrElseUpdate(key, new CrimpDecl(domainKey, crimpType, fieldID)(NoPosition))
-  }
-
-  def apply(domainKey: String, crimpType: (Type, Type, Type), fieldID: String): CrimpDecl = {
-    getOrMakeNewReduceDecl(domainKey, crimpType, fieldID)
-  }
-
-  def addFieldtoMap(fieldName: String): Unit = {
-    if (!fieldIDMap.contains(fieldName)) {
-      fieldIDMap(fieldName) = uniqueFieldInt
-      uniqueFieldInt += 1
-    }
-  }
-
-  def getFieldInt(field: String): Int = {
-    fieldIDMap(field)
-  }
+//  private val crimpDecls: scala.collection.mutable.Map[String, CrimpDecl] = scala.collection.mutable.Map()
+//
+//  private var uniqueFieldInt = 0
+//
+//  private val fieldIDMap: scala.collection.mutable.Map[String, Int] = scala.collection.mutable.Map()
+//
+//  private def getOrMakeNewReduceDecl(domainKey: String, crimpType: (Type, Type, Type), fieldID: String): CrimpDecl = {
+//    val key = tupleFieldToString(crimpType, fieldID)
+//    addFieldtoMap(fieldID)
+//    crimpDecls.getOrElseUpdate(key, new CrimpDecl(domainKey, crimpType, fieldID)(NoPosition))
+//  }
+//
+  def apply(domainKey: String, crimpType: (Type, Type, Type), fieldID: String): CrimpDecl =
+    new CrimpDecl(domainKey, crimpType, fieldID)(NoPosition)
+//
+//  def addFieldtoMap(fieldName: String): Unit = {
+//    if (!fieldIDMap.contains(fieldName)) {
+//      fieldIDMap(fieldName) = uniqueFieldInt
+//      uniqueFieldInt += 1
+//    }
+//  }
+//
+//  def getFieldInt(field: String): Int = {
+//    fieldIDMap(field)
+//  }
 }

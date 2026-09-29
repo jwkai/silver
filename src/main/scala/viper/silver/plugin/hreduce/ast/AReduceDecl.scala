@@ -6,7 +6,6 @@ import viper.silver.ast.pretty.PrettyPrintPrimitives
 import viper.silver.plugin.hreduce.DomainsGenerator
 import viper.silver.plugin.hreduce.util.AxiomHelper.tupleFieldToString
 
-// Constructor should not be called directly, use getOrMakeNewReduceDecl
 case class AReduceDecl private(domainKey: String, reduceType: (Type, Type, Type), fieldName: String)(val pos : Position = NoPosition)
   extends ExtensionMember
 {
@@ -61,30 +60,29 @@ case class AReduceDecl private(domainKey: String, reduceType: (Type, Type, Type)
 
 object AReduceDecl {
 
-  private val reduceDecls: scala.collection.mutable.Map[String, AReduceDecl] = scala.collection.mutable.Map()
+//  private val reduceDecls: scala.collection.mutable.Map[String, AReduceDecl] = scala.collection.mutable.Map()
+//
+//  private var uniqueFieldInt = 0
+//
+//  private val fieldIDMap: scala.collection.mutable.Map[String, Int] = scala.collection.mutable.Map()
+//
+//  private def getOrMakeNewReduceDecl(domainKey: String, reduceType: (Type, Type, Type), fieldID: String): AReduceDecl = {
+//    val key = tupleFieldToString(reduceType, fieldID)
+//    addFieldtoMap(fieldID)
+//    reduceDecls.getOrElseUpdate(key, new AReduceDecl(domainKey, reduceType, fieldID)(NoPosition))
+//  }
 
-  private var uniqueFieldInt = 0
+  def apply(domainKey: String, reduceType: (Type, Type, Type), fieldID: String): AReduceDecl =
+    new AReduceDecl(domainKey, reduceType, fieldID)(NoPosition)
 
-  private val fieldIDMap: scala.collection.mutable.Map[String, Int] = scala.collection.mutable.Map()
-
-  private def getOrMakeNewReduceDecl(domainKey: String, reduceType: (Type, Type, Type), fieldID: String): AReduceDecl = {
-    val key = tupleFieldToString(reduceType, fieldID)
-    addFieldtoMap(fieldID)
-    reduceDecls.getOrElseUpdate(key, new AReduceDecl(domainKey, reduceType, fieldID)(NoPosition))
-  }
-
-  def apply(domainKey: String, reduceType: (Type, Type, Type), fieldID: String): AReduceDecl = {
-    getOrMakeNewReduceDecl(domainKey, reduceType, fieldID)
-  }
-
-  def addFieldtoMap(fieldName: String): Unit = {
-    if (!fieldIDMap.contains(fieldName)) {
-      fieldIDMap(fieldName) = uniqueFieldInt
-      uniqueFieldInt += 1
-    }
-  }
-
-  def getFieldInt(field: String): Int = {
-    fieldIDMap(field)
-  }
+//  def addFieldtoMap(fieldName: String): Unit = {
+//    if (!fieldIDMap.contains(fieldName)) {
+//      fieldIDMap(fieldName) = uniqueFieldInt
+//      uniqueFieldInt += 1
+//    }
+//  }
+//
+//  def getFieldInt(field: String): Int = {
+//    fieldIDMap(field)
+//  }
 }
