@@ -17,7 +17,7 @@ case class CrimpApp(reduction: CrimpTriple, filter: Exp, fieldName: String)
   }
 
   var fuelExp: Option[Exp] = None
-  var cHeap: Option[CHeap] = None
+  var cHeap: Option[CrHeap] = None
 
   def toViper(input: Program): Exp = {
     val crimpEvalFunc = input.findDomainFunction(reduction.crimpEvalFuncName())

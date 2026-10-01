@@ -1,0 +1,43 @@
+field val: Int
+
+domain Array {
+  function loc(a: Array, i: Int): Ref
+  function len(a: Array): Int
+  function first(r: Ref): Array
+  function second(r: Ref): Int
+
+  axiom all_diff {
+    forall a: Array, i: Int :: {loc(a,i)}
+      first(loc(a,i)) == a && second(loc(a,i)) == i
+  }
+
+  axiom len_nonneg {
+    forall a: Array :: { len(a) }
+      len(a) >= 0
+  }
+}
+
+function allInt(start: Int, end: Int): Set[Int]
+  ensures (forall i: Int :: { i in result } (i in result) == (i >= start && i < end))
+
+receiver arrayRec(a: Array) (fun (i: Int) : Ref :: loc(a, i))
+operator add() (fun (a: Int, b: Int) : Int :: a + b, 0)
+
+define access_array(a, i1, i2)
+    (forall j: Int :: {loc(a, j)} j in allInt(i1, i2) ==> acc(loc(a, j).val))
+
+method arraySum(a: Array) returns (res: Int)
+  requires access_array(a, 0, len(a))
+  ensures  access_array(a, 0, len(a))
+  ensures  res == crimp[add()][arrayRec(a).val](allInt(0, len(a)))
+{
+  var n: Int := 0; res := 0
+  while (n < len(a))
+    invariant access_array(a, 0, len(a))
+    invariant 0 <= n && n <= len(a)
+    invariant res == crimp[add()][arrayRec(a).val](allInt(0, n)) /* I1 */
+  {
+    res := res + loc(a, n).val
+    n := n + 1
+  }
+}

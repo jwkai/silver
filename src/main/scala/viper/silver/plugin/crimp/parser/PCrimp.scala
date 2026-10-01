@@ -1,9 +1,10 @@
 package viper.silver.plugin.crimp.parser
 
 import viper.silver.ast.{ErrTrafo, Exp, Position}
-import viper.silver.parser.{NameAnalyser, PCall, PDomainType, PExp, PExtender, PFieldDecl, PIdnUse, PKeywordLang, PKw, PNode, POpApp, PReserved, PSetType, PType, PTypeRenaming, PTypeSubstitution, PTypeVar, Translator, TypeChecker}
+import viper.silver.parser.{NameAnalyser, PCall, PDomainType, PExp, PExtender, PFieldDecl, PIdnUse, PKeywordLang, PKw, PMagicWandExp, PMethod, PNode, POpApp, PPackageWand, PProgram, PReserved, PSetType, PType, PTypeRenaming, PTypeSubstitution, PTypeVar, Translator, TypeChecker}
 import viper.silver.plugin.crimp.ast.{CrimpApp, CrimpTriple, CrimpTripleWithId, CrimpTripleWithoutId}
 import viper.silver.plugin.crimp.{CrimpPlugin, DomainsGenerator, ReduceErrors}
+import viper.silver.plugin.standard.termination.PDecreasesClause
 import viper.silver.verifier.errors
 
 case object PCrimpKeyword extends PKw("crimp") with PKeywordLang
@@ -100,10 +101,9 @@ case class PCrimp(keyword: PReserved[PCrimpKeyword.type], operator: PCall, mappi
     val opTranslated = t.exp(operator)
     val (mappingOut, fieldString, receiverTranslated) = mappingFieldReceiver.translateTo(t)
     val filterTranslated = t.exp(filter)
-    val opMember = t.program.filterMembers {
-      case p: POperator if p.idndef.name == operator.idnref.name => true
-      case _ => false
-    }.members.headOption
+    val opMember = t.program.extensions.collectFirst {
+      case p: POperator if p.idndef.name == operator.idnref.name => p
+    }
     val opHasID = opMember match {
       case Some(opm) => opm match {
         case p: POperator => p.opUnit.isDefined
@@ -158,6 +158,7 @@ object PCrimp {
     }
 
     if (pc.typeSubstitutions.nonEmpty) return None // already checked
+    unsupportedPosition(pc).foreach(msg => return Some(Seq(msg)))
 
     var messagesOut : Seq[String] = Seq()
 
@@ -165,6 +166,7 @@ object PCrimp {
     t.checkTopTyped(pc.filter, Some(CrimpPlugin.makeSetType(getNewTypeVariable("CrimpSet"))))
     val setType: PType = pc.filter.typ match {
       case PSetType(_, bTyp) => bTyp.inner
+      case ft if !ft.isValidOrUndeclared => return Some(messagesOut)
       case _ =>
         messagesOut = messagesOut :+ "Filter should of Set[...] type."
         return Some(messagesOut)
@@ -179,11 +181,12 @@ object PCrimp {
       case pd: PDomainType if pd.domain.name == DomainsGenerator.opDKey =>
         // Set the type of this PCrimp to the Operator unit's type
         pc.typ = pd.typeArguments.head
+      case ot if !ot.isValidOrUndeclared => return Some(messagesOut)
       case _ =>
         messagesOut = messagesOut :+ "Operator should of Operator[_] type."
         return Some(messagesOut)
     }
-
+    
     // Check type of mappingFieldReceiver. Receiver must take the element in the set
     // Mapping must be from type of field to type of the operator (typ).
     messagesOut ++= pc.mappingFieldReceiver.typecheckComp(t, n, pc.typ, setType)
@@ -191,5 +194,28 @@ object PCrimp {
     // Set type of this node, and pass ground type to expression context via identity substitution
     if (messagesOut.isEmpty && pc.typ.isGround) pc.typeSubstitutions += PTypeSubstitution.id
     if (messagesOut.isEmpty) None else Some(messagesOut)
+  }
+
+  /** The error for a crimp in a position that is not supported.
+   * A crimp is only supported in a method's body or pre- and post-conditions (including loop invariants),
+   * and cannot be nested or occur in crimp component (receiver, mapping, operator) bodies, function bodies or domains.
+   * Magic wands are also rejected: Viper evaluates a wand's LHS and RHS relative to the state where it is applied,
+   * and the hypothetical state of a package proof script; we do not determine crimp heap indices for these states.
+   * A decreases clause (of a method, loop or function) of a termination measure is rejected; this is a standard plugin.
+   * TODO: some of embeddings may be supported in future work, but this requires care. */
+  private def unsupportedPosition(pc: PCrimp): Option[String] = {
+    val ancestors = Iterator.iterate(pc.getParent)(_.flatMap(_.getParent)).takeWhile(_.isDefined).map(_.get).toSeq
+    if (!ancestors.lastOption.exists(_.isInstanceOf[PProgram])) None // no parent links: position unknown
+    else if (ancestors.exists(_.isInstanceOf[PCrimp]))
+      Some("Crimp inside another crimp is not supported.")
+    else if (ancestors.exists(_.isInstanceOf[PMagicWandExp]))
+      Some("Crimp inside a magic wand is not supported.")
+    else if (ancestors.exists(_.isInstanceOf[PPackageWand]))
+      Some("Crimp in a package proof script is not supported.")
+    else if (ancestors.exists(_.isInstanceOf[PDecreasesClause]))
+      Some("Crimp in a decreases clause is not supported.")
+    else if (!ancestors.exists(_.isInstanceOf[PMethod]))
+      Some("Crimp outside a method is not supported.")
+    else None
   }
 }

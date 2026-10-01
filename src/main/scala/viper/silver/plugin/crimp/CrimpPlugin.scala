@@ -144,38 +144,33 @@ class CrimpPlugin(@unused reporter: viper.silver.reporter.Reporter,
    * @return Modified Parse AST
    */
   override def beforeResolve(input: PProgram) : PProgram = {
-    if (input.filterMembers {
-      case _: PCrimp | _: PReceiver | _: PMapping | _: POperator => true
+    if (!input.extensions.exists {
+      case _: PReceiver | _: PMapping | _: POperator => true
       case _ => false
-    }.members.isEmpty) {
+    }) {
       input
     } else {
       setOperators = input.deepCollect({
-        case op: POperator =>
-          op
+        case op: POperator => op
       }).toSet
 
-      val importCrimpM = if (input.filterMembers {
-        case op: POperator => op.opUnit match {
-          case None => false
-          case Some(_) => true
-        }
+      val importCrimpM = if (input.extensions.exists {
+        case op: POperator => op.opUnit.isDefined
         case _ => false
-      }.members.nonEmpty) {
+      }) {
         Set("import <crimp/crimpM.vpr>")
       } else { Set() }
 
-      val importCrimpS = if (input.filterMembers {
-        case op: POperator => op.opUnit match {
-          case None => true
-          case Some(_) => false
-        }
+      val importCrimpS = if (input.extensions.exists {
+        case op: POperator => op.opUnit.isEmpty
         case _ => false
-      }.members.nonEmpty) {
+      }) {
         Set("import <crimp/crimpS.vpr>")
       } else { Set() }
 
-      val importStmts = Set("import <crimp/crimp.vpr>") ++ importCrimpM ++ importCrimpS
+      // A program may import crimp's domains itself. Only the files the program does not import are added.
+      val importedByProgram = input.imports.filterNot(_.local).map(i => s"import <${i.file.str}>").toSet
+      val importStmts = (Set("import <crimp/crimp.vpr>") ++ importCrimpM ++ importCrimpS) -- importedByProgram
 
 //      val opDomains = (input.filterMembers {
 //        case _: POperator => true
@@ -223,8 +218,10 @@ class CrimpPlugin(@unused reporter: viper.silver.reporter.Reporter,
 //      }).mkString("\n")
 
       val importOnlyProgram = importStmts.mkString("\n")
-      val importPProgram = PAstProvider.generateViperPAst(importOnlyProgram).get.filterMembers(_.isInstanceOf[PDomain])
-      val mergedProgram = PProgram(input.imported :+ importPProgram, input.members)(input.pos, input.localErrors, input.offsets, input.rawProgram)
+      val mergedProgram = if (importStmts.isEmpty) input else {
+        val importPProgram = PAstProvider.generateViperPAst(importOnlyProgram).get.filterMembers(_.isInstanceOf[PDomain])
+        PProgram(input.imported :+ importPProgram, input.members)(input.pos, input.localErrors, input.offsets, input.rawProgram)
+      }
       mergedProgram.initProperties()
       val output = super.beforeTranslate(mergedProgram)
       output
