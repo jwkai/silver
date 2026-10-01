@@ -8,7 +8,7 @@ import viper.silver.frontend.{DefaultStates, ViperPAstProvider}
 import viper.silver.logger.SilentLogger
 import viper.silver.parser.FastParserCompanion.{ExtendedParsing, LeadingWhitespace, PositionParsing, reservedKw, reservedSym}
 import viper.silver.parser.PDelimited.Comma
-import viper.silver.parser.{FastParser, FastParserCompanion, PAnnotationsPosition, PAssign, PCall, PCallable, PDelimited, PDomain, PDomainType, PDomainTypeKinds, PExp, PFieldAccess, PFormalArgDecl, PGrouped, PIdnDef, PIdnRef, PKw, PNode, PProgram, PReserved, PSetType, PSym, PType}
+import viper.silver.parser.{FastParser, FastParserCompanion, PAccPred, PAnnotationsPosition, PAssign, PCall, PCallable, PDelimited, PDomain, PDomainType, PDomainTypeKinds, PExp, PFieldAccess, PFormalArgDecl, PGrouped, PIdnDef, PIdnRef, PKw, PKwOp, PLocationAccess, PMaybePairArgument, PNode, PProgram, PReserved, PSetType, PSym, PType, PUnfolding}
 import viper.silver.plugin.crimp.CrimpPlugin.defaultMappingIden
 import viper.silver.plugin.crimp.DomainsGenerator.{crimpDomainString, crimpDomainStringNoId, fuelDomainString, mapDKey, mapIdenKey, mappingDomainString, opDKey, opDomainString, parseDomainString, recDKey, receiverDomainString, setEditDomainString}
 import viper.silver.plugin.crimp.parser._
@@ -127,14 +127,6 @@ class CrimpPlugin(@unused reporter: viper.silver.reporter.Reporter,
     ParserExtension.addNewDeclAtStart(mappingDef(_))
     ParserExtension.addNewDeclAtStart(receiverDef(_))
     ParserExtension.addNewExpAtStart(crimp(_))
-//    ParserExtension.addNewDeclAtStart(filterDef(_))
-//    crimpDomainString() ++
-//    crimpDomainStringNoId() ++
-//    fuelDomainString() ++
-//    receiverDomainString() ++
-//    opDomainString() ++
-//    mappingDomainString() ++
-//    setEditDomainString() ++
     input
   }
 
@@ -172,82 +164,35 @@ class CrimpPlugin(@unused reporter: viper.silver.reporter.Reporter,
       val importedByProgram = input.imports.filterNot(_.local).map(i => s"import <${i.file.str}>").toSet
       val importStmts = (Set("import <crimp/crimp.vpr>") ++ importCrimpM ++ importCrimpS) -- importedByProgram
 
-//      val opDomains = (input.filterMembers {
-//        case _: POperator => true
-//        case _ => false
-//      }.members map {
-//        case op@POperator(_, idndef, args, _, returnType, _) =>
-//          val arglist = if (args.inner.isEmpty) {""} else
-//          {args.inner.toSeq.map(a => s"""${a.idndef.name}: ${a.typ.toString()}""").mkString(", ")}
-//          s"""
-//             |domain ${op.genDomainName} {
-//             |
-//             |  function ${idndef.name}$arglist: $opDKey[${returnType.toString()}]
-//             |
-//             |}""".stripMargin
-//      }).mkString("\n")
-//
-//      val mapDomains = (input.filterMembers {
-//        case _: PMapping => true
-//        case _ => false
-//      }.members map {
-//        case map@PMapping(_, idndef, args, _, returnType) =>
-//          val arglist = if (args.inner.isEmpty) {""} else
-//          {args.inner.toSeq.map(a => s"""${a.idndef.name}: ${a.typ.toString()}""").mkString(", ")}
-//          s"""
-//             |domain ${map.genDomainName} {
-//             |
-//             |  function ${idndef.name}$arglist: $mapDKey[${map.inputType.toString()},${returnType.toString()}]
-//             |
-//             |}""".stripMargin
-//      }).mkString("\n")
-//
-//      val recvDomains = (input.filterMembers {
-//        case _: PReceiver => true
-//        case _ => false
-//      }.members map {
-//        case recv@PReceiver(_, idndef, args, _) =>
-//          val arglist = if (args.inner.isEmpty) {""} else
-//          {args.inner.toSeq.map(a => s"""${a.idndef.name}: ${a.typ.toString()}""").mkString(", ")}
-//          s"""
-//             |domain ${recv.genDomainName} {
-//             |
-//             |  function ${idndef.name}($arglist): $recDKey[${recv.indexType.toString()}]
-//             |
-//             |}""".stripMargin
-//      }).mkString("\n")
-
       val importOnlyProgram = importStmts.mkString("\n")
       val mergedProgram = if (importStmts.isEmpty) input else {
         val importPProgram = PAstProvider.generateViperPAst(importOnlyProgram).get.filterMembers(_.isInstanceOf[PDomain])
         PProgram(input.imported :+ importPProgram, input.members)(input.pos, input.localErrors, input.offsets, input.rawProgram)
       }
-      mergedProgram.initProperties()
-      val output = super.beforeTranslate(mergedProgram)
+      val mergedProgramCCs = transformComponentCalls(mergedProgram)
+      mergedProgramCCs.initProperties()
+      val output = super.beforeTranslate(mergedProgramCCs)
       output
-//      def transformStrategy[T <: PNode](input: T): T = StrategyBuilder.Slim[PNode]({
-//        case op@POperator(_, idndef, args, _, returnType, _) =>
-//          genOpPDomain(op, idndef, args, returnType)
-//      }).execute(input)
-//
-//      val newOutput = transformStrategy(output)
-//      newOutput
     }
   }
 
-//  private def genOpPDomain[T <: PNode](op: POperator, idndef: PIdnDef, args: Comma[PSym.Paren, PFormalArgDecl], returnType: PType) = {
-//    val arglist = if (args.inner.isEmpty) {"()"} else {args.inner.toSeq.toString()}
-//    val dom = PAstProvider.generateViperPAst(
-//      s"""
-//         |import <crimp/crimp.vpr>
-//         |
-//         |domain ${op.genDomainName} {
-//         |
-//         |  function ${idndef.name}$arglist: $opDKey[${returnType.toString()}]
-//         |
-//         |}""".stripMargin)
-//    dom.get.filterMembers(_.isInstanceOf[PDomain])
-//  }
+  /** Replaces calls to crimp components (receiver, operator, mapping), which are read by the parser as PCall instances,
+   * with a PComponentCall to be typechecked and translated by the plugin.
+   * This mimics the approach of the ADT plugin (e.g. PDescriptorCall and PDiscriminatorCall).
+   * We handle `unfolding component(..) in e` manually, as the PComponentCall cannot extend this sealed trait*/
+  private def transformComponentCalls(input: PProgram): PProgram = {
+    val componentNames = input.extensions.collect { case c: PCrimpComponent => c.idndef.name }.toSet
+    if (componentNames.isEmpty) input
+    else StrategyBuilder.Slim[PNode]({
+      case pu@PUnfolding(unfolding, pc@PCall(idnref, _, _), in, exp) if componentNames.contains(idnref.name) =>
+        PUnfolding(unfolding, PAccPred(PReserved.implied(PKwOp.Acc), PGrouped.impliedParen(
+          PMaybePairArgument[PLocationAccess, PExp](pc, None)(pc.pos)))(pc.pos), in, exp)(pu.pos)
+      case pc@PCall(idnref, callArgs, typeAnnotated) if componentNames.contains(idnref.name) =>
+        PComponentCall(idnref.retype(), callArgs, typeAnnotated)(pc.pos)
+    }).recurseFunc({
+      case n: PNode => n.children collect {case ar: AnyRef => ar}
+    }).execute(input)
+  }
 
   object PAstProvider extends ViperPAstProvider(NoopReporter, SilentLogger().get) {
 

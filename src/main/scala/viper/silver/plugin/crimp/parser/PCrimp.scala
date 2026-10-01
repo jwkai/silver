@@ -1,7 +1,8 @@
 package viper.silver.plugin.crimp.parser
 
+import viper.silver.FastMessaging
 import viper.silver.ast.{ErrTrafo, Exp, Position}
-import viper.silver.parser.{NameAnalyser, PCall, PDomainType, PExp, PExtender, PFieldDecl, PIdnUse, PKeywordLang, PKw, PMagicWandExp, PMethod, PNode, POpApp, PPackageWand, PProgram, PReserved, PSetType, PType, PTypeRenaming, PTypeSubstitution, PTypeVar, Translator, TypeChecker}
+import viper.silver.parser.{NameAnalyser, PCall, PDomainType, PExp, PExtender, PFieldDecl, PIdnUse, PKeywordLang, PKw, PMagicWandExp, PMethod, PNode, POpApp, PPackageWand, PProgram, PReserved, PSetType, PType, PTypeRenaming, PTypeSubstitution, PTypeVar, Translator, TypeChecker, TypeHelper}
 import viper.silver.plugin.crimp.ast.{CrimpApp, CrimpTriple, CrimpTripleWithId, CrimpTripleWithoutId}
 import viper.silver.plugin.crimp.{CrimpPlugin, DomainsGenerator, ReduceErrors}
 import viper.silver.plugin.standard.termination.PDecreasesClause
@@ -10,13 +11,13 @@ import viper.silver.verifier.errors
 case object PCrimpKeyword extends PKw("crimp") with PKeywordLang
 
 
-case class PCrimpInner(mapping: PCall, fieldID: PIdnUse, receiver: PCall)(val pos: (Position, Position))
+case class PCrimpInner(mapping: PCall, fieldID: PIdnUse, receiver: PExp)(val pos: (Position, Position))
   extends PExtender {
 
   override def subnodes: Iterator[PNode] = Iterator(mapping, fieldID, receiver)
 
-  def typeSubstitutions: Seq[PTypeSubstitution] =
-    mapping.signatures ++ receiver.signatures
+//  def typeSubstitutions: Seq[PTypeSubstitution] =
+//    mapping.signatures ++ receiver.signatures
 
   def typecheckComp(t: TypeChecker, n: NameAnalyser, typeUnit: PType, typeFilter: PType): Seq[String] = {
     val errorSeq: Seq[String] = Seq()
@@ -54,7 +55,7 @@ case class PCrimpInner(mapping: PCall, fieldID: PIdnUse, receiver: PCall)(val po
 }
 
 // First representation, the user input of reduction gets turned into this PAst Node
-case class PCrimp(keyword: PReserved[PCrimpKeyword.type], operator: PCall, mappingFieldReceiver: PCrimpInner, filter: PExp)(val pos: (Position, Position))
+case class PCrimp(keyword: PReserved[PCrimpKeyword.type], operator: PExp, mappingFieldReceiver: PCrimpInner, filter: PExp)(val pos: (Position, Position))
   extends PExtender with POpApp {
 
   override def subnodes: Iterator[PNode] = Iterator(operator, mappingFieldReceiver, filter)
@@ -101,8 +102,13 @@ case class PCrimp(keyword: PReserved[PCrimpKeyword.type], operator: PCall, mappi
     val opTranslated = t.exp(operator)
     val (mappingOut, fieldString, receiverTranslated) = mappingFieldReceiver.translateTo(t)
     val filterTranslated = t.exp(filter)
+    val opName = operator match {
+      case c: PComponentCall => c.idnref.name
+      case c: PCall => c.idnref.name
+      case _ => operator.pretty
+    }
     val opMember = t.program.extensions.collectFirst {
-      case p: POperator if p.idndef.name == operator.idnref.name => p
+      case p: POperator if p.idndef.name == opName => p
     }
     val opHasID = opMember match {
       case Some(opm) => opm match {
@@ -145,6 +151,28 @@ object PCrimp {
     PTypeVar(freeName)
   }
 
+  /** Same as TypeChecker.checkTopTyped(exp, Some(pattern)), but the expected type permits free type variables.
+   * Here, pattern can have unknown type; prevents "found incompatible type `Set[Int]`, expected `Set[CrimpSet#1]` "*/
+  def checkTopTypedPattern(t: TypeChecker, exp: PExp, pattern: PType): Unit = {
+    t.checkInternal(exp)
+    if (exp.typ.isValidOrUndeclared && exp.typeSubstitutions.nonEmpty) {
+      val etss = exp.typeSubstitutions.flatMap(_.add(exp.typ, pattern).toOption)
+      var error = true
+      if (etss.nonEmpty) {
+        val ts = t.selectAndGroundTypeSubstitution(exp, etss)
+        exp.forceSubstitution(ts)
+        error = !TypeHelper.isSubtype(exp.typ, pattern.substitute(ts))
+      }
+      if (error) {
+        val reportedActual =
+          if (exp.typ.isGround) exp.typ
+          else exp.typ.substitute(t.selectAndGroundTypeSubstitution(exp, exp.typeSubstitutions))
+        t.messages ++= FastMessaging.message(exp,
+          s"found incompatible type `${reportedActual.pretty}`, expected `${pattern.pretty}`")
+      }
+    }
+  }
+  
   def typecheck(pc: PCrimp)(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] = {
 
     def getFreshTypeSubstitution(tvs: Seq[PDomainType]): PTypeRenaming =
@@ -163,7 +191,7 @@ object PCrimp {
     var messagesOut : Seq[String] = Seq()
 
     // Check type of filter, must be a Set. Extract it out
-    t.checkTopTyped(pc.filter, Some(CrimpPlugin.makeSetType(getNewTypeVariable("CrimpSet"))))
+    checkTopTypedPattern(t, pc.filter, CrimpPlugin.makeSetType(getNewTypeVariable("CrimpSet")))
     val setType: PType = pc.filter.typ match {
       case PSetType(_, bTyp) => bTyp.inner
       case ft if !ft.isValidOrUndeclared => return Some(messagesOut)
@@ -173,8 +201,8 @@ object PCrimp {
     }
 
     // Check type of operator, must be an Operator with unit as argument
-    t.checkTopTyped(pc.operator, Some(CrimpPlugin.makeDomainType(DomainsGenerator.opDKey,
-      Seq(getNewTypeVariable("CrimpOp")))))
+    checkTopTypedPattern(t, pc.operator, CrimpPlugin.makeDomainType(DomainsGenerator.opDKey,
+      Seq(getNewTypeVariable("CrimpOp"))))
 
     // Look inside the operator type
     pc.operator.typ match {

@@ -1,5 +1,6 @@
 package viper.silver.plugin.crimp.parser
 
+import viper.silver.FastMessaging
 import viper.silver.ast._
 import viper.silver.parser.PDelimited.Comma
 import viper.silver.parser.PSym.{Colon, ColonColon}
@@ -70,31 +71,93 @@ case class PFunInline(keyword: PReserved[PFunInlineKeyword.type],
   }
 }
 
+/** The state of a component's own type check, see PCrimpComponent.ensureChecked. */
+sealed trait ComponentCheckState
+object ComponentCheckState {
+  /** Not type-checked yet. */
+  case object Unchecked extends ComponentCheckState
+  /** Its type check is running. A call to the component that is type-checked now is part of that check: it is in the
+   * component's own declaration, or in a component that the declaration calls, i.e. the component is recursive. */
+  case object InProgress extends ComponentCheckState
+  /** Type-checked without errors, and the body has a type: typToInfer is set. */
+  case object Ok extends ComponentCheckState
+  /** Type-checked with errors, which the check has reported, or without a type for the body (it calls a component
+   * that has no type, whose own error is reported elsewhere): typToInfer stays unset. */
+  case object Failed extends ComponentCheckState
+}
+
+
 // Defines a component declaration. This is a PExtender node (extended as a plugin) and acts as a Function declaration,
 // hence the PAnyFunction.
 trait PCrimpComponent extends PExtender with PNoSpecsFunction with PSingleMember with PGlobalCallableNamedArgs {
 
+  var checkState: ComponentCheckState = ComponentCheckState.Unchecked
+
   var typToInfer: PType = null
   def declType: PType
-  override def resultType: PType = if (typToInfer != null) typToInfer else declType
+  override def resultType: PType = if (typToInfer != null) typToInfer else PUnknown()
 
-  /** Resolves every type the declared component type is built from (idempotent, see checkAllDeclaredTypes below) */
-  def checkDeclaredTypes(t: TypeChecker): Unit = {
-    formalArgs.foreach(a => t.check(a.typ))
-    body.get.getArgs.foreach(a => t.check(a.typ))
-    t.check(body.get.returnType)
-  }
+//  /** Resolves every type the declared component type is built from (idempotent, see checkAllDeclaredTypes below) */
+//  def checkDeclaredTypes(t: TypeChecker): Unit = {
+//    formalArgs.foreach(a => t.check(a.typ))
+//    body.get.getArgs.foreach(a => t.check(a.typ))
+//    t.check(body.get.returnType)
+//  }
 
-  /** Resolves the declared types of all crimp components of the program.
-    * The type checker checks extensions in the order of declaration, so check all components immediately */
-  def checkAllDeclaredTypes(t: TypeChecker): Unit = {
-    val root = Iterator.iterate(getAncestor[PProgram])(_.flatMap(_.getAncestor[PProgram]))
-      .takeWhile(_.isDefined).flatten.toSeq.lastOption
-    root.map(_.extensions).getOrElse(Seq(this)).foreach {
-      case c: PCrimpComponent => c.checkDeclaredTypes(t)
-        case _ =>
+  protected def checkDeclaration(t: TypeChecker, n: NameAnalyser): Option[Seq[String]]
+
+  final override def typecheck(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] =
+    if (checkState == ComponentCheckState.Unchecked) runCheck(t, n) else None
+
+  def ensureChecked(t: TypeChecker, n: NameAnalyser): Unit =
+      if (checkState == ComponentCheckState.Unchecked)
+        runCheck(t, n).getOrElse(Nil).foreach(message => t.messages ++= FastMessaging.message(this, message))
+
+  private def runCheck(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] = {
+    checkState = ComponentCheckState.InProgress
+    // A check started by a call (ensureChecked) runs in the middle of the check of the calling declaration, which
+    // may have set these; a component body is checked outside of any function specification.
+    val (resultAllowed, permBan) = (t.resultAllowed, t.permBan)
+    t.resultAllowed = false
+    t.permBan = None
+    try checkDeclaration(t, n)
+    finally {
+      t.resultAllowed = resultAllowed
+      t.permBan = permBan
+      if (checkState == ComponentCheckState.InProgress) checkState = ComponentCheckState.Failed
     }
   }
+
+  /** Calls components own type check, returning any errors in its body, and sets its inferred type to declared type */
+  protected def checkComponent(t: TypeChecker)(check: => Option[Seq[String]]): Option[Seq[String]] = {
+    val errorsBefore = t.messages.count(_.error)
+    var out: Option[Seq[String]] = None
+    t.checkMember(this) {
+      formalArgs.foreach(a => t.check(a.typ))
+      out = check
+    }
+    lazy val inferredType = declType
+    if (out.forall(_.isEmpty) && t.messages.count(_.error) == errorsBefore &&
+        body.get.body.typ.isValidOrUndeclared && inferredType.isValidOrUndeclared &&
+        !PCrimpComponent.mentionsUndeclaredType(inferredType)) {
+      typToInfer = inferredType
+      checkState = ComponentCheckState.Ok
+    } else {
+      checkState = ComponentCheckState.Failed
+    }
+    out
+  }
+
+//  /** Resolves the declared types of all crimp components of the program.
+//    * The type checker checks extensions in the order of declaration, so check all components immediately */
+//  def checkAllDeclaredTypes(t: TypeChecker): Unit = {
+//    val root = Iterator.iterate(getAncestor[PProgram])(_.flatMap(_.getAncestor[PProgram]))
+//      .takeWhile(_.isDefined).flatten.toSeq.lastOption
+//    root.map(_.extensions).getOrElse(Seq(this)).foreach {
+//      case c: PCrimpComponent => c.checkDeclaredTypes(t)
+//        case _ =>
+//    }
+//  }
 
   override def body: Some[PFunInline]
 
@@ -195,6 +258,14 @@ trait PCrimpComponent extends PExtender with PNoSpecsFunction with PSingleMember
 
 }
 
+object PCrimpComponent {
+  /** Whether `typ` mentions an undeclared type (e.g. lacking a domain) */
+  private def mentionsUndeclaredType(typ: PType): Boolean = typ match {
+    case dt: PDomainType if dt.isUndeclared => true
+    case _ => typ.subNodes.exists(mentionsUndeclaredType)
+  }
+}
+
 case class PFilter(keyword: PReserved[PFilterKeyword.type], idndef: PIdnDef, override val args: PDelimited.Comma[PSym.Paren, PFormalArgDecl], body: Some[PFunInline])(val pos: (Position, Position))
   extends PExtender with PCrimpComponent {
 
@@ -202,17 +273,20 @@ case class PFilter(keyword: PReserved[PFilterKeyword.type], idndef: PIdnDef, ove
 
   override def declType: PType = CrimpPlugin.makeSetType(body.get.getArgs.head.typ)
 
-  override def typecheck(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] = {
-    t.checkMember(this) {
-      checkAllDeclaredTypes(t)
-      val s = body.get.typecheckFilter(t, n)
-      s match {
-        case out @ Some(_) => return out
-        case None => this.typToInfer = CrimpPlugin.makeSetType(body.get.getArgs.head.typ)
-      }
-    }
-    None
-  }
+//  override def typecheck(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] = {
+//    t.checkMember(this) {
+//      checkAllDeclaredTypes(t)
+//      val s = body.get.typecheckFilter(t, n)
+//      s match {
+//        case out @ Some(_) => return out
+//        case None => this.typToInfer = CrimpPlugin.makeSetType(body.get.getArgs.head.typ)
+//      }
+//    }
+//    None
+//  }
+
+  override protected def checkDeclaration(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] =
+    checkComponent(t)(body.get.typecheckFilter(t, n))
 
   override def translateMember(t: Translator): Member = {
     translateMemberWithName(t, None)
@@ -229,26 +303,36 @@ case class POperator(keyword: PReserved[POperatorKeyword.type], idndef: PIdnDef,
   var sourcePos : Position = null
   var helper : AxiomHelper = null
 
-  override def typecheck(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] = {
-    t.checkMember(this){
-      checkAllDeclaredTypes(t)
-      opUnit match {
-        case None =>
-          body.get.typecheckOp(t, n, None) match {
-            case out@Some(_) => return out
-            case None => typToInfer = CrimpPlugin.makeDomainType(DomainsGenerator.opDKey, Seq(returnType))
-          }
-        case Some(opExp) =>
-          t.check(returnType)
-          t.checkTopTyped(opExp, Some(returnType))
-          body.get.typecheckOp(t, n, Some(opExp.typ)) match {
-            case out@Some(_) => return out
-            case None => typToInfer = CrimpPlugin.makeDomainType(DomainsGenerator.opDKey, Seq(returnType))
-          }
-      }
-    }
-    None
-  }
+//  override def typecheck(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] = {
+//    t.checkMember(this){
+//      checkAllDeclaredTypes(t)
+//      opUnit match {
+//        case None =>
+//          body.get.typecheckOp(t, n, None) match {
+//            case out@Some(_) => return out
+//            case None => typToInfer = CrimpPlugin.makeDomainType(DomainsGenerator.opDKey, Seq(returnType))
+//          }
+//        case Some(opExp) =>
+//          t.check(returnType)
+//          t.checkTopTyped(opExp, Some(returnType))
+//          body.get.typecheckOp(t, n, Some(opExp.typ)) match {
+//            case out@Some(_) => return out
+//            case None => typToInfer = CrimpPlugin.makeDomainType(DomainsGenerator.opDKey, Seq(returnType))
+//          }
+//      }
+//    }
+//    None
+//  }
+
+  override protected def checkDeclaration(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] =
+    checkComponent(t)(opUnit match {
+      case Some(opExp) =>
+        // check that unit expression has the return type
+        t.check(returnType)
+        t.checkTopTyped(opExp, Some(returnType))
+        body.get.typecheckOp(t, n, Some(opExp.typ))
+      case None => body.get.typecheckOp(t, n, None)
+    })
 
   override def translateMember(t: Translator): Member = {
     translateMemberWithName(t, Some(DomainsGenerator.opApplyKey))
@@ -422,17 +506,20 @@ case class PMapping(keyword: PReserved[PMappingKeyword.type], idndef: PIdnDef, o
 
   val inputType: PType = body.get.args.inner.toSeq.head.typ
 
-  override def typecheck(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] = {
-    t.checkMember(this) {
-      checkAllDeclaredTypes(t)
-      body.get.typecheckMapping(t, n)  match {
-        case out @ Some(_) => return out
-        case None => typToInfer = CrimpPlugin.makeDomainType(DomainsGenerator.mapDKey,
-          Seq(body.get.getArgs.head.typ, returnType))
-      }
-    }
-    None
-  }
+//  override def typecheck(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] = {
+//    t.checkMember(this) {
+//      checkAllDeclaredTypes(t)
+//      body.get.typecheckMapping(t, n)  match {
+//        case out @ Some(_) => return out
+//        case None => typToInfer = CrimpPlugin.makeDomainType(DomainsGenerator.mapDKey,
+//          Seq(body.get.getArgs.head.typ, returnType))
+//      }
+//    }
+//    None
+//  }
+
+  override protected def checkDeclaration(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] =
+    checkComponent(t)(body.get.typecheckMapping(t, n))
 
   override def translateMember(t: Translator): Member = {
     translateMemberWithName(t, Some(DomainsGenerator.mapApplyKey))
@@ -448,17 +535,20 @@ case class PReceiver(keyword: PReserved[PReceiverKeyword.type], idndef: PIdnDef,
 
   override def declType: PType = CrimpPlugin.makeDomainType(DomainsGenerator.recDKey, Seq(indexType))
 
-  override def typecheck(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] = {
-    t.checkMember(this) {
-      checkAllDeclaredTypes(t)
-      body.get.typecheckReceiver(t, n) match {
-        case out @ Some(_) => return out
-        case None => typToInfer = CrimpPlugin.makeDomainType(DomainsGenerator.recDKey,
-          Seq(body.get.getArgs.head.typ))
-      }
-    }
-    None
-  }
+//  override def typecheck(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] = {
+//    t.checkMember(this) {
+//      checkAllDeclaredTypes(t)
+//      body.get.typecheckReceiver(t, n) match {
+//        case out @ Some(_) => return out
+//        case None => typToInfer = CrimpPlugin.makeDomainType(DomainsGenerator.recDKey,
+//          Seq(body.get.getArgs.head.typ))
+//      }
+//    }
+//    None
+//  }
+
+  override protected def checkDeclaration(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] =
+    checkComponent(t)(body.get.typecheckReceiver(t, n))
 
   override def typecheck(t: TypeChecker, n: NameAnalyser, expected: PType): Option[Seq[String]] = {
     // There is no expected type. This is a declaration.
