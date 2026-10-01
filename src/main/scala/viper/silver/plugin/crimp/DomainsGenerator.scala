@@ -24,14 +24,14 @@ object DomainsGenerator {
   final val disjUnionAxiomM = "_disjUnionM"
   final val trigExtensionalityAxiomM = "_trigExtensionalityM"
   final val extensionalityAxiomM = "_extensionalityM"
-  final val crimpConstructKeyM = "hcrimpM"
-  final val crimpApplyKeyM = "hcrimpApplyM"
-  final val crimpApplyDummyKeyM = "hcrimpApplyDummyM"
+  final val crimpConstructKeyM = "crimpM"
+  final val crimpApplyKeyM = "crimpApplyM"
+  final val crimpApplyDummyKeyM = "crimpApplyDummyM"
   final val setEqDummyKeyM = "setEqDummyM"
   final val crimpGetRecvKeyM = "getreceiverM"
   final val crimpGetOperKeyM = "getoperatorM"
   final val crimpGetMappingKeyM = "getmappingM"
-  final val cHeapElemKeyM = "cHeapElemM"
+  final val crHeapElemKeyM = "crHeapElemM"
   final val trigDelKey1KeyM = "triggerDeleteKey1M"
   final val trigDelBlockKeyM = "triggerDeleteBlockM"
 //  final val exhaleCrimpSetKeyM = "exhaleCrimpSetM"
@@ -49,14 +49,14 @@ object DomainsGenerator {
   final val trigExtensionalityAxiomS = "_trigExtensionalityS"
   final val extensionalityAxiomS = "_extensionalityS"
   final val crimpDKeyS = "CrimpS"
-  final val crimpConstructKeyS = "hcrimpS"
-  final val crimpApplyKeyS = "hcrimpApplyS"
-  final val crimpApplyDummyKeyS = "hcrimpApplyDummyS"
+  final val crimpConstructKeyS = "crimpS"
+  final val crimpApplyKeyS = "crimpApplyS"
+  final val crimpApplyDummyKeyS = "crimpApplyDummyS"
   final val setEqDummyKeyS = "setEqDummyS"
   final val crimpGetRecvKeyS = "getreceiverS"
   final val crimpGetOperKeyS = "getoperatorS"
   final val crimpGetMappingKeyS = "getmappingS"
-  final val cHeapElemKeyS = "cHeapElemS"
+  final val crHeapElemKeyS = "crHeapElemS"
   final val trigDelKey1KeyS = "triggerDeleteKey1S"
   final val trigDelBlockKeyS = "triggerDeleteBlockS"
 //  final val exhaleCrimpSetKeyS = "exhaleCrimpSetS"
@@ -205,13 +205,13 @@ object DomainsGenerator {
   private def emptyCrimpAxiom(): String = {
     s"""
     axiom $emptyCrimpAxiomM {
-      forall ${prefix}f: $fuelDKey, ${prefix}rh: $intKey,
+      forall ${prefix}f: $fuelDKey, ${prefix}crh: $intKey,
       ${prefix}c: $crimpDKeyM[$crimpDTV0,$crimpDTV1,$crimpDTV2],
       ${prefix}fs: Set[$crimpDTV0] ::
-        { ($crimpApplyKeyM(${prefix}f, ${prefix}rh, ${prefix}c, ${prefix}fs): $crimpDTV2) }
+        { ($crimpApplyKeyM(${prefix}f, ${prefix}crh, ${prefix}c, ${prefix}fs): $crimpDTV2) }
       ${prefix}fs == Set[$crimpDTV0]() ==>
         ${prefix}fs == Set[$crimpDTV0]() &&
-        $crimpApplyKeyM(${prefix}f, ${prefix}rh, ${prefix}c, ${prefix}fs) == $opIdenKey($crimpGetOperKeyM(${prefix}c))
+        $crimpApplyKeyM(${prefix}f, ${prefix}crh, ${prefix}c, ${prefix}fs) == $opIdenKey($crimpGetOperKeyM(${prefix}c))
     }
 
     """
@@ -220,70 +220,70 @@ object DomainsGenerator {
   private def dropOneAxiomWithoutId(): String = {
     s"""axiom $dropOne1AxiomS {
         forall ${prefix}f: $fuelDKey,
-               ${prefix}rh: $intKey,
+               ${prefix}crh: $intKey,
                ${prefix}c: $crimpDKeyS[$crimpDTV0,$crimpDTV1,$crimpDTV2],
                ${prefix}fs: Set[$crimpDTV0],
                ${prefix}key: $crimpDTV0 ::
-        { ($trigDelKey1KeyS($crimpApplyKeyS($fuelSKey(${prefix}f), ${prefix}rh, ${prefix}c, ${prefix}fs), ${prefix}key): Bool),
-          ($cHeapElemKeyS(${prefix}rh, ${prefix}c, ${prefix}key): $crimpDTV2) }
+        { ($trigDelKey1KeyS($crimpApplyKeyS($fuelSKey(${prefix}f), ${prefix}crh, ${prefix}c, ${prefix}fs), ${prefix}key): Bool),
+          ($crHeapElemKeyS(${prefix}crh, ${prefix}c, ${prefix}key): $crimpDTV2) }
         (${prefix}key in ${prefix}fs && (${prefix}fs != Set(${prefix}key))) ==>
         (${prefix}key in ${prefix}fs && (${prefix}fs != Set(${prefix}key))) &&
-        $crimpApplyKeyS($fuelSKey(${prefix}f), ${prefix}rh, ${prefix}c, ${prefix}fs) ==
+        $crimpApplyKeyS($fuelSKey(${prefix}f), ${prefix}crh, ${prefix}c, ${prefix}fs) ==
         $opApplyKey($crimpGetOperKeyS(${prefix}c),
-          $crimpApplyKeyS(${prefix}f, ${prefix}rh, ${prefix}c, $setDeleteKey(${prefix}fs, Set(${prefix}key))),
-          $cHeapElemKeyS(${prefix}rh, ${prefix}c, ${prefix}key))
+          $crimpApplyKeyS(${prefix}f, ${prefix}crh, ${prefix}c, $setDeleteKey(${prefix}fs, Set(${prefix}key))),
+          $crHeapElemKeyS(${prefix}crh, ${prefix}c, ${prefix}key))
     }"""
   }
 
   private def dropOneAxiom(): String = {
     s"""axiom $dropOne1AxiomM {
         forall ${prefix}f: $fuelDKey,
-               ${prefix}rh: $intKey,
+               ${prefix}crh: $intKey,
                ${prefix}c: $crimpDKeyM[$crimpDTV0,$crimpDTV1,$crimpDTV2],
                ${prefix}fs: Set[$crimpDTV0],
                ${prefix}key: $crimpDTV0 ::
-        { ($trigDelKey1KeyM($crimpApplyKeyM($fuelSKey(${prefix}f), ${prefix}rh, ${prefix}c, ${prefix}fs), ${prefix}key): Bool),
-          ($cHeapElemKeyM(${prefix}rh, ${prefix}c, ${prefix}key): $crimpDTV2) }
+        { ($trigDelKey1KeyM($crimpApplyKeyM($fuelSKey(${prefix}f), ${prefix}crh, ${prefix}c, ${prefix}fs), ${prefix}key): Bool),
+          ($crHeapElemKeyM(${prefix}crh, ${prefix}c, ${prefix}key): $crimpDTV2) }
         (${prefix}key in ${prefix}fs) ==>
         (${prefix}key in ${prefix}fs) &&
-        $crimpApplyKeyM($fuelSKey(${prefix}f), ${prefix}rh, ${prefix}c, ${prefix}fs) ==
+        $crimpApplyKeyM($fuelSKey(${prefix}f), ${prefix}crh, ${prefix}c, ${prefix}fs) ==
         $opApplyKey($crimpGetOperKeyM(${prefix}c),
-          $crimpApplyKeyM(${prefix}f, ${prefix}rh, ${prefix}c, $setDeleteKey(${prefix}fs, Set(${prefix}key))),
-          $cHeapElemKeyM(${prefix}rh, ${prefix}c, ${prefix}key))
+          $crimpApplyKeyM(${prefix}f, ${prefix}crh, ${prefix}c, $setDeleteKey(${prefix}fs, Set(${prefix}key))),
+          $crHeapElemKeyM(${prefix}crh, ${prefix}c, ${prefix}key))
     }"""
   }
 
   private def loseManyAxiomWithoutId(): String = {
     s"""axiom $loseManyAxiomS {
         forall ${prefix}f: $fuelDKey,
-               ${prefix}rh: $intKey,
+               ${prefix}crh: $intKey,
                ${prefix}c: $crimpDKeyS[$crimpDTV0,$crimpDTV1,$crimpDTV2],
                ${prefix}fs: Set[$crimpDTV0],
                ${prefix}keys: Set[$crimpDTV0] ::
-        { $trigDelBlockKeyS($crimpApplyKeyS($fuelSKey(${prefix}f), ${prefix}rh, ${prefix}c, ${prefix}fs), ${prefix}keys) }
+        { $trigDelBlockKeyS($crimpApplyKeyS($fuelSKey(${prefix}f), ${prefix}crh, ${prefix}c, ${prefix}fs), ${prefix}keys) }
         (${prefix}keys subset ${prefix}fs && (${prefix}keys != ${prefix}fs)) ==>
         (${prefix}keys subset ${prefix}fs && (${prefix}keys != ${prefix}fs)) &&
-        $crimpApplyKeyS($fuelSKey(${prefix}f), ${prefix}rh, ${prefix}c, ${prefix}fs) ==
+        $crimpApplyKeyS($fuelSKey(${prefix}f), ${prefix}crh, ${prefix}c, ${prefix}fs) ==
         $opApplyKey($crimpGetOperKeyS(${prefix}c),
-          $crimpApplyKeyS(${prefix}f, ${prefix}rh, ${prefix}c, $setDeleteKey(${prefix}fs, ${prefix}keys)),
-          $crimpApplyKeyS(${prefix}f, ${prefix}rh, ${prefix}c, ${prefix}keys))
+          $crimpApplyKeyS(${prefix}f, ${prefix}crh, ${prefix}c, $setDeleteKey(${prefix}fs, ${prefix}keys)),
+          $crimpApplyKeyS(${prefix}f, ${prefix}crh, ${prefix}c, ${prefix}keys))
     }"""
   }
 
   private def loseManyAxiom(): String = {
     s"""axiom $loseManyAxiomM {
         forall ${prefix}f: $fuelDKey,
-               ${prefix}rh: $intKey,
+               ${prefix}crh: $intKey,
                ${prefix}c: $crimpDKeyM[$crimpDTV0,$crimpDTV1,$crimpDTV2],
                ${prefix}fs: Set[$crimpDTV0],
                ${prefix}keys: Set[$crimpDTV0] ::
-        { $trigDelBlockKeyM($crimpApplyKeyM($fuelSKey(${prefix}f), ${prefix}rh, ${prefix}c, ${prefix}fs), ${prefix}keys) }
+        { $trigDelBlockKeyM($crimpApplyKeyM($fuelSKey(${prefix}f), ${prefix}crh, ${prefix}c, ${prefix}fs), ${prefix}keys) }
         (${prefix}keys subset ${prefix}fs) ==>
         (${prefix}keys subset ${prefix}fs) &&
-        $crimpApplyKeyM($fuelSKey(${prefix}f), ${prefix}rh, ${prefix}c, ${prefix}fs) ==
+        $crimpApplyKeyM($fuelSKey(${prefix}f), ${prefix}crh, ${prefix}c, ${prefix}fs) ==
         $opApplyKey($crimpGetOperKeyM(${prefix}c),
-          $crimpApplyKeyM(${prefix}f, ${prefix}rh, ${prefix}c, $setDeleteKey(${prefix}fs, ${prefix}keys)),
-          $crimpApplyKeyM(${prefix}f, ${prefix}rh, ${prefix}c, ${prefix}keys))
+          $crimpApplyKeyM(${prefix}f, ${prefix}crh, ${prefix}c, $setDeleteKey(${prefix}fs, ${prefix}keys)),
+          $crimpApplyKeyM(${prefix}f, ${prefix}crh, ${prefix}c, ${prefix}keys))
     }"""
   }
 
@@ -291,24 +291,24 @@ object DomainsGenerator {
     s"""axiom $disjUnionAxiomS {
         forall ${prefix}f1: $fuelDKey,
                ${prefix}f2: $fuelDKey,
-               ${prefix}rh: $intKey,
+               ${prefix}crh: $intKey,
                ${prefix}c: $crimpDKeyS[$crimpDTV0,$crimpDTV1,$crimpDTV2],
                ${prefix}fs1: Set[$crimpDTV0],
                ${prefix}fs2: Set[$crimpDTV0],
                ${prefix}dus: Set[$crimpDTV0] ::
-        { ($crimpApplyKeyS(${prefix}f1, ${prefix}rh, ${prefix}c, ${prefix}fs1): $crimpDTV2),
-          ($crimpApplyKeyS(${prefix}f2, ${prefix}rh, ${prefix}c, ${prefix}fs2): $crimpDTV2),
+        { ($crimpApplyKeyS(${prefix}f1, ${prefix}crh, ${prefix}c, ${prefix}fs1): $crimpDTV2),
+          ($crimpApplyKeyS(${prefix}f2, ${prefix}crh, ${prefix}c, ${prefix}fs2): $crimpDTV2),
           ($disjUnionKey(${prefix}fs1, ${prefix}fs2, ${prefix}dus): Bool) }
         (($disjUnionKey(${prefix}fs1, ${prefix}fs2, ${prefix}dus): Bool) &&
          (${prefix}fs1 != Set()) && (${prefix}fs2 != Set())) ==>
-          (($crimpApplyKeyS(${prefix}f1, ${prefix}rh, ${prefix}c, ${prefix}dus): $crimpDTV2) ==
+          (($crimpApplyKeyS(${prefix}f1, ${prefix}crh, ${prefix}c, ${prefix}dus): $crimpDTV2) ==
           ($opApplyKey($crimpGetOperKeyS(${prefix}c),
-            ($crimpApplyKeyS(${prefix}f1, ${prefix}rh, ${prefix}c, ${prefix}fs1): $crimpDTV2),
-            ($crimpApplyKeyS(${prefix}f2, ${prefix}rh, ${prefix}c, ${prefix}fs2): $crimpDTV2)): $crimpDTV2)) &&
-          (($crimpApplyKeyS(${prefix}f2, ${prefix}rh, ${prefix}c, ${prefix}dus): $crimpDTV2) ==
+            ($crimpApplyKeyS(${prefix}f1, ${prefix}crh, ${prefix}c, ${prefix}fs1): $crimpDTV2),
+            ($crimpApplyKeyS(${prefix}f2, ${prefix}crh, ${prefix}c, ${prefix}fs2): $crimpDTV2)): $crimpDTV2)) &&
+          (($crimpApplyKeyS(${prefix}f2, ${prefix}crh, ${prefix}c, ${prefix}dus): $crimpDTV2) ==
           ($opApplyKey($crimpGetOperKeyS(${prefix}c),
-            ($crimpApplyKeyS(${prefix}f1, ${prefix}rh, ${prefix}c, ${prefix}fs1): $crimpDTV2),
-            ($crimpApplyKeyS(${prefix}f2, ${prefix}rh, ${prefix}c, ${prefix}fs2): $crimpDTV2)): $crimpDTV2))
+            ($crimpApplyKeyS(${prefix}f1, ${prefix}crh, ${prefix}c, ${prefix}fs1): $crimpDTV2),
+            ($crimpApplyKeyS(${prefix}f2, ${prefix}crh, ${prefix}c, ${prefix}fs2): $crimpDTV2)): $crimpDTV2))
     }"""
   }
 
@@ -316,23 +316,23 @@ object DomainsGenerator {
     s"""axiom $disjUnionAxiomM {
         forall ${prefix}f1: $fuelDKey,
                ${prefix}f2: $fuelDKey,
-               ${prefix}rh: $intKey,
+               ${prefix}crh: $intKey,
                ${prefix}c: $crimpDKeyM[$crimpDTV0,$crimpDTV1,$crimpDTV2],
                ${prefix}fs1: Set[$crimpDTV0],
                ${prefix}fs2: Set[$crimpDTV0],
                ${prefix}dus: Set[$crimpDTV0] ::
-        { ($crimpApplyKeyM(${prefix}f1, ${prefix}rh, ${prefix}c, ${prefix}fs1): $crimpDTV2),
-          ($crimpApplyKeyM(${prefix}f2, ${prefix}rh, ${prefix}c, ${prefix}fs2): $crimpDTV2),
+        { ($crimpApplyKeyM(${prefix}f1, ${prefix}crh, ${prefix}c, ${prefix}fs1): $crimpDTV2),
+          ($crimpApplyKeyM(${prefix}f2, ${prefix}crh, ${prefix}c, ${prefix}fs2): $crimpDTV2),
           ($disjUnionKey(${prefix}fs1, ${prefix}fs2, ${prefix}dus): Bool) }
         ($disjUnionKey(${prefix}fs1, ${prefix}fs2, ${prefix}dus): Bool) ==>
-          (($crimpApplyKeyM(${prefix}f1, ${prefix}rh, ${prefix}c, ${prefix}dus): $crimpDTV2) ==
+          (($crimpApplyKeyM(${prefix}f1, ${prefix}crh, ${prefix}c, ${prefix}dus): $crimpDTV2) ==
           ($opApplyKey($crimpGetOperKeyM(${prefix}c),
-            ($crimpApplyKeyM(${prefix}f1, ${prefix}rh, ${prefix}c, ${prefix}fs1): $crimpDTV2),
-            ($crimpApplyKeyM(${prefix}f2, ${prefix}rh, ${prefix}c, ${prefix}fs2): $crimpDTV2)): $crimpDTV2)) &&
-          (($crimpApplyKeyM(${prefix}f2, ${prefix}rh, ${prefix}c, ${prefix}dus): $crimpDTV2) ==
+            ($crimpApplyKeyM(${prefix}f1, ${prefix}crh, ${prefix}c, ${prefix}fs1): $crimpDTV2),
+            ($crimpApplyKeyM(${prefix}f2, ${prefix}crh, ${prefix}c, ${prefix}fs2): $crimpDTV2)): $crimpDTV2)) &&
+          (($crimpApplyKeyM(${prefix}f2, ${prefix}crh, ${prefix}c, ${prefix}dus): $crimpDTV2) ==
           ($opApplyKey($crimpGetOperKeyM(${prefix}c),
-            ($crimpApplyKeyM(${prefix}f1, ${prefix}rh, ${prefix}c, ${prefix}fs1): $crimpDTV2),
-            ($crimpApplyKeyM(${prefix}f2, ${prefix}rh, ${prefix}c, ${prefix}fs2): $crimpDTV2)): $crimpDTV2))
+            ($crimpApplyKeyM(${prefix}f1, ${prefix}crh, ${prefix}c, ${prefix}fs1): $crimpDTV2),
+            ($crimpApplyKeyM(${prefix}f2, ${prefix}crh, ${prefix}c, ${prefix}fs2): $crimpDTV2)): $crimpDTV2))
     }"""
   }
 
@@ -340,19 +340,19 @@ object DomainsGenerator {
     s"""axiom $extensionalityAxiomS {
         forall ${prefix}f1: $fuelDKey,
                ${prefix}f2: $fuelDKey,
-               ${prefix}rh_old: $intKey,
-               ${prefix}rh_new: $intKey,
+               ${prefix}crh_old: $intKey,
+               ${prefix}crh_new: $intKey,
                ${prefix}c: $crimpDKeyS[$crimpDTV0,$crimpDTV1,$crimpDTV2],
                ${prefix}fs: Set[$crimpDTV0] ::
-        { ($trigExtKeyS(($crimpApplyKeyS(${prefix}f1, ${prefix}rh_old, ${prefix}c, ${prefix}fs): $crimpDTV2),
-                       ($crimpApplyKeyS(${prefix}f2, ${prefix}rh_new, ${prefix}c, ${prefix}fs): $crimpDTV2)): Bool) }
-        (${prefix}rh_old < ${prefix}rh_new) ==>
-        (($crimpApplyKeyS(${prefix}f1, ${prefix}rh_old, ${prefix}c, ${prefix}fs) == $crimpApplyKeyS(${prefix}f2, ${prefix}rh_new, ${prefix}c, ${prefix}fs)) ||
-        (((${prefix}fs != Set()) && ($skExtKeyS(${prefix}c, $crimpApplyKeyS(${prefix}f1, ${prefix}rh_old, ${prefix}c, ${prefix}fs), $crimpApplyKeyS(${prefix}f2, ${prefix}rh_new, ${prefix}c, ${prefix}fs)) in ${prefix}fs ==>
-            (($cHeapElemKeyS(${prefix}rh_old, ${prefix}c, $skExtKeyS(${prefix}c, $crimpApplyKeyS(${prefix}f1, ${prefix}rh_old, ${prefix}c, ${prefix}fs), $crimpApplyKeyS(${prefix}f2, ${prefix}rh_new, ${prefix}c, ${prefix}fs))): $crimpDTV2)) ==
-            (($cHeapElemKeyS(${prefix}rh_new, ${prefix}c, $skExtKeyS(${prefix}c, $crimpApplyKeyS(${prefix}f1, ${prefix}rh_old, ${prefix}c, ${prefix}fs), $crimpApplyKeyS(${prefix}f2, ${prefix}rh_new, ${prefix}c, ${prefix}fs))): $crimpDTV2))))
+        { ($trigExtKeyS(($crimpApplyKeyS(${prefix}f1, ${prefix}crh_old, ${prefix}c, ${prefix}fs): $crimpDTV2),
+                       ($crimpApplyKeyS(${prefix}f2, ${prefix}crh_new, ${prefix}c, ${prefix}fs): $crimpDTV2)): Bool) }
+        (${prefix}crh_old < ${prefix}crh_new) ==>
+        (($crimpApplyKeyS(${prefix}f1, ${prefix}crh_old, ${prefix}c, ${prefix}fs) == $crimpApplyKeyS(${prefix}f2, ${prefix}crh_new, ${prefix}c, ${prefix}fs)) ||
+        (((${prefix}fs != Set()) && ($skExtKeyS(${prefix}c, $crimpApplyKeyS(${prefix}f1, ${prefix}crh_old, ${prefix}c, ${prefix}fs), $crimpApplyKeyS(${prefix}f2, ${prefix}crh_new, ${prefix}c, ${prefix}fs)) in ${prefix}fs ==>
+            (($crHeapElemKeyS(${prefix}crh_old, ${prefix}c, $skExtKeyS(${prefix}c, $crimpApplyKeyS(${prefix}f1, ${prefix}crh_old, ${prefix}c, ${prefix}fs), $crimpApplyKeyS(${prefix}f2, ${prefix}crh_new, ${prefix}c, ${prefix}fs))): $crimpDTV2)) ==
+            (($crHeapElemKeyS(${prefix}crh_new, ${prefix}c, $skExtKeyS(${prefix}c, $crimpApplyKeyS(${prefix}f1, ${prefix}crh_old, ${prefix}c, ${prefix}fs), $crimpApplyKeyS(${prefix}f2, ${prefix}crh_new, ${prefix}c, ${prefix}fs))): $crimpDTV2))))
         ==>
-        ($crimpApplyKeyS(${prefix}f1, ${prefix}rh_old, ${prefix}c, ${prefix}fs) == $crimpApplyKeyS(${prefix}f2, ${prefix}rh_new, ${prefix}c, ${prefix}fs))))
+        ($crimpApplyKeyS(${prefix}f1, ${prefix}crh_old, ${prefix}c, ${prefix}fs) == $crimpApplyKeyS(${prefix}f2, ${prefix}crh_new, ${prefix}c, ${prefix}fs))))
     }"""
   }
 
@@ -360,65 +360,65 @@ object DomainsGenerator {
     s"""axiom $extensionalityAxiomM {
         forall ${prefix}f1: $fuelDKey,
                ${prefix}f2: $fuelDKey,
-               ${prefix}rh_old: $intKey,
-               ${prefix}rh_new: $intKey,
+               ${prefix}crh_old: $intKey,
+               ${prefix}crh_new: $intKey,
                ${prefix}c: $crimpDKeyM[$crimpDTV0,$crimpDTV1,$crimpDTV2],
                ${prefix}fs: Set[$crimpDTV0] ::
-        { ($trigExtKeyM(($crimpApplyKeyM(${prefix}f1, ${prefix}rh_old, ${prefix}c, ${prefix}fs): $crimpDTV2),
-                       ($crimpApplyKeyM(${prefix}f2, ${prefix}rh_new, ${prefix}c, ${prefix}fs): $crimpDTV2)): Bool) }
-        (${prefix}rh_old < ${prefix}rh_new) ==>
-        (($crimpApplyKeyM(${prefix}f1, ${prefix}rh_old, ${prefix}c, ${prefix}fs) == $crimpApplyKeyM(${prefix}f2, ${prefix}rh_new, ${prefix}c, ${prefix}fs)) ||
-        (($skExtKeyM(${prefix}c, $crimpApplyKeyM(${prefix}f1, ${prefix}rh_old, ${prefix}c, ${prefix}fs), $crimpApplyKeyM(${prefix}f2, ${prefix}rh_new, ${prefix}c, ${prefix}fs)) in ${prefix}fs ==>
-            (($cHeapElemKeyM(${prefix}rh_old, ${prefix}c, $skExtKeyM(${prefix}c, $crimpApplyKeyM(${prefix}f1, ${prefix}rh_old, ${prefix}c, ${prefix}fs), $crimpApplyKeyM(${prefix}f2, ${prefix}rh_new, ${prefix}c, ${prefix}fs))): $crimpDTV2)) ==
-            (($cHeapElemKeyM(${prefix}rh_new, ${prefix}c, $skExtKeyM(${prefix}c, $crimpApplyKeyM(${prefix}f1, ${prefix}rh_old, ${prefix}c, ${prefix}fs), $crimpApplyKeyM(${prefix}f2, ${prefix}rh_new, ${prefix}c, ${prefix}fs))): $crimpDTV2)))
+        { ($trigExtKeyM(($crimpApplyKeyM(${prefix}f1, ${prefix}crh_old, ${prefix}c, ${prefix}fs): $crimpDTV2),
+                       ($crimpApplyKeyM(${prefix}f2, ${prefix}crh_new, ${prefix}c, ${prefix}fs): $crimpDTV2)): Bool) }
+        (${prefix}crh_old < ${prefix}crh_new) ==>
+        (($crimpApplyKeyM(${prefix}f1, ${prefix}crh_old, ${prefix}c, ${prefix}fs) == $crimpApplyKeyM(${prefix}f2, ${prefix}crh_new, ${prefix}c, ${prefix}fs)) ||
+        (($skExtKeyM(${prefix}c, $crimpApplyKeyM(${prefix}f1, ${prefix}crh_old, ${prefix}c, ${prefix}fs), $crimpApplyKeyM(${prefix}f2, ${prefix}crh_new, ${prefix}c, ${prefix}fs)) in ${prefix}fs ==>
+            (($crHeapElemKeyM(${prefix}crh_old, ${prefix}c, $skExtKeyM(${prefix}c, $crimpApplyKeyM(${prefix}f1, ${prefix}crh_old, ${prefix}c, ${prefix}fs), $crimpApplyKeyM(${prefix}f2, ${prefix}crh_new, ${prefix}c, ${prefix}fs))): $crimpDTV2)) ==
+            (($crHeapElemKeyM(${prefix}crh_new, ${prefix}c, $skExtKeyM(${prefix}c, $crimpApplyKeyM(${prefix}f1, ${prefix}crh_old, ${prefix}c, ${prefix}fs), $crimpApplyKeyM(${prefix}f2, ${prefix}crh_new, ${prefix}c, ${prefix}fs))): $crimpDTV2)))
         ==>
-        ($crimpApplyKeyM(${prefix}f1, ${prefix}rh_old, ${prefix}c, ${prefix}fs) == $crimpApplyKeyM(${prefix}f2, ${prefix}rh_new, ${prefix}c, ${prefix}fs))))
+        ($crimpApplyKeyM(${prefix}f1, ${prefix}crh_old, ${prefix}c, ${prefix}fs) == $crimpApplyKeyM(${prefix}f2, ${prefix}crh_new, ${prefix}c, ${prefix}fs))))
     }"""
   }
 
   private def crimpDomainStringSorM(domainName: String,
-                                     crimpConstructKey: String,
-                                     crimpApplyKey: String,
-                                     crimpApplyDummyKey: String,
-                                     setEqDummyKey: String,
-                                     crimpGetRecvKey: String,
-                                     crimpGetOperKey: String,
-                                     crimpGetMappingKey: String,
-                                     cHeapElemKey: String,
-                                     trigDelKey1Key: String,
-                                     trigDelBlockKey: String,
-                                     getFieldIDKey: String,
-                                     skExtKey: String,
-                                     trigExtKey: String,
-                                     emptyAxiom: String,
-                                     dropAxiom: String,
-                                     loseAxiom: String,
-                                     disjAxiom: String,
-                                     extAxiom: String,
-                                     applyCrimpFuelEqAxiom: String,
-                                     invAxCrimpAxiom: String,
-                                     singletonAxiom: String,
-                                     setExtEqAxiom: String,
-                                     trigExtensionalityAxiom: String): String = {
+                                    crimpConstructKey: String,
+                                    crimpApplyKey: String,
+                                    crimpApplyDummyKey: String,
+                                    setEqDummyKey: String,
+                                    crimpGetRecvKey: String,
+                                    crimpGetOperKey: String,
+                                    crimpGetMappingKey: String,
+                                    crHeapElemKey: String,
+                                    trigDelKey1Key: String,
+                                    trigDelBlockKey: String,
+                                    getFieldIDKey: String,
+                                    skExtKey: String,
+                                    trigExtKey: String,
+                                    emptyAxiom: String,
+                                    dropAxiom: String,
+                                    loseAxiom: String,
+                                    disjAxiom: String,
+                                    extAxiom: String,
+                                    applyCrimpFuelEqAxiom: String,
+                                    invAxCrimpAxiom: String,
+                                    singletonAxiom: String,
+                                    setExtEqAxiom: String,
+                                    trigExtensionalityAxiom: String): String = {
     val crimpOut =
       s"""domain $domainName[$crimpDTV0,$crimpDTV1,$crimpDTV2] {
          |
          |    function $crimpConstructKey(r: $recDKey[$crimpDTV0], m: $mapDKey[$crimpDTV1,$crimpDTV2], op: $opDKey[$crimpDTV2]): $domainName[$crimpDTV0,$crimpDTV1,$crimpDTV2]
-         |    function $crimpApplyKey(f: $fuelDKey, rh: $intKey, c: $domainName[$crimpDTV0,$crimpDTV1,$crimpDTV2], fs: Set[$crimpDTV0]): $crimpDTV2
+         |    function $crimpApplyKey(f: $fuelDKey, crh: $intKey, c: $domainName[$crimpDTV0,$crimpDTV1,$crimpDTV2], fs: Set[$crimpDTV0]): $crimpDTV2
          |    function $crimpApplyDummyKey(a: $crimpDTV2): Bool
          |    function $setEqDummyKey(b: Bool): Bool
          |
          |    axiom $applyCrimpFuelEqAxiom {
-         |        forall ${prefix}f: $fuelDKey, ${prefix}rh: $intKey, ${prefix}c: $domainName[$crimpDTV0,$crimpDTV1,$crimpDTV2], ${prefix}fs: Set[$crimpDTV0] ::
-         |            { ($crimpApplyKey($fuelSKey(${prefix}f), ${prefix}rh, ${prefix}c, ${prefix}fs): $crimpDTV2) }
-         |        $crimpApplyKey($fuelSKey(${prefix}f), ${prefix}rh, ${prefix}c, ${prefix}fs) == $crimpApplyKey(${prefix}f, ${prefix}rh, ${prefix}c, ${prefix}fs)
+         |        forall ${prefix}f: $fuelDKey, ${prefix}crh: $intKey, ${prefix}c: $domainName[$crimpDTV0,$crimpDTV1,$crimpDTV2], ${prefix}fs: Set[$crimpDTV0] ::
+         |            { ($crimpApplyKey($fuelSKey(${prefix}f), ${prefix}crh, ${prefix}c, ${prefix}fs): $crimpDTV2) }
+         |        $crimpApplyKey($fuelSKey(${prefix}f), ${prefix}crh, ${prefix}c, ${prefix}fs) == $crimpApplyKey(${prefix}f, ${prefix}crh, ${prefix}c, ${prefix}fs)
          |    }
          |
          |    function $crimpGetRecvKey(c: $domainName[$crimpDTV0,$crimpDTV1,$crimpDTV2]): $recDKey[$crimpDTV0]
          |    function $crimpGetOperKey(c: $domainName[$crimpDTV0,$crimpDTV1,$crimpDTV2]): $opDKey[$crimpDTV2]
          |    function $crimpGetMappingKey(c: $domainName[$crimpDTV0,$crimpDTV1,$crimpDTV2]): $mapDKey[$crimpDTV1,$crimpDTV2]
          |
-         |    function $cHeapElemKey(rh: $intKey, c: $domainName[$crimpDTV0,$crimpDTV1,$crimpDTV2], a: $crimpDTV0): $crimpDTV2
+         |    function $crHeapElemKey(crh: $intKey, c: $domainName[$crimpDTV0,$crimpDTV1,$crimpDTV2], a: $crimpDTV0): $crimpDTV2
          |
          |    function $trigDelBlockKey(applyC: $crimpDTV2, block: Set[$crimpDTV0]): Bool
          |    function $trigDelKey1Key(applyC: $crimpDTV2, key: $crimpDTV0): Bool
@@ -437,12 +437,12 @@ object DomainsGenerator {
          |    $emptyAxiom
          |    axiom $singletonAxiom {
          |        forall ${prefix}f: $fuelDKey,
-         |               ${prefix}rh: $intKey,
+         |               ${prefix}crh: $intKey,
          |               ${prefix}c: $domainName[$crimpDTV0,$crimpDTV1,$crimpDTV2],
          |               ${prefix}elem: $crimpDTV0 ::
-         |        { ($crimpApplyKey(${prefix}f, ${prefix}rh, ${prefix}c, Set(${prefix}elem)): $crimpDTV2),
-         |          ($cHeapElemKey(${prefix}rh, ${prefix}c, ${prefix}elem): $crimpDTV2) }
-         |        $crimpApplyKey(${prefix}f, ${prefix}rh, ${prefix}c, Set(${prefix}elem)) == $cHeapElemKey(${prefix}rh, ${prefix}c, ${prefix}elem)
+         |        { ($crimpApplyKey(${prefix}f, ${prefix}crh, ${prefix}c, Set(${prefix}elem)): $crimpDTV2),
+         |          ($crHeapElemKey(${prefix}crh, ${prefix}c, ${prefix}elem): $crimpDTV2) }
+         |        $crimpApplyKey(${prefix}f, ${prefix}crh, ${prefix}c, Set(${prefix}elem)) == $crHeapElemKey(${prefix}crh, ${prefix}c, ${prefix}elem)
          |    }
          |
          |    $dropAxiom
@@ -452,12 +452,12 @@ object DomainsGenerator {
          |    axiom $setExtEqAxiom {
          |        forall ${prefix}f1: $fuelDKey,
          |               ${prefix}f2: $fuelDKey,
-         |               ${prefix}rh: $intKey,
+         |               ${prefix}crh: $intKey,
          |               ${prefix}c: $domainName[$crimpDTV0,$crimpDTV1,$crimpDTV2],
          |               ${prefix}fs1: Set[$crimpDTV0],
          |               ${prefix}fs2: Set[$crimpDTV0] ::
-         |        { ($crimpApplyKey(${prefix}f1, ${prefix}rh, ${prefix}c, ${prefix}fs1): $crimpDTV2),
-         |          ($crimpApplyKey(${prefix}f2, ${prefix}rh, ${prefix}c, ${prefix}fs2): $crimpDTV2) }
+         |        { ($crimpApplyKey(${prefix}f1, ${prefix}crh, ${prefix}c, ${prefix}fs1): $crimpDTV2),
+         |          ($crimpApplyKey(${prefix}f2, ${prefix}crh, ${prefix}c, ${prefix}fs2): $crimpDTV2) }
          |        $setEqDummyKey(${prefix}fs1 == ${prefix}fs2)
          |    }
          |
@@ -469,14 +469,14 @@ object DomainsGenerator {
          |    axiom $trigExtensionalityAxiom {
          |        forall ${prefix}f1: $fuelDKey,
          |               ${prefix}f2: $fuelDKey,
-         |               ${prefix}rh_old: $intKey,
-         |               ${prefix}rh_new: $intKey,
+         |               ${prefix}crh_old: $intKey,
+         |               ${prefix}crh_new: $intKey,
          |               ${prefix}c: $domainName[$crimpDTV0,$crimpDTV1,$crimpDTV2],
          |               ${prefix}fs: Set[$crimpDTV0] ::
-         |        { ($crimpApplyKey(${prefix}f1, ${prefix}rh_old, ${prefix}c, ${prefix}fs): $crimpDTV2),
-         |          ($crimpApplyKey(${prefix}f2, ${prefix}rh_new, ${prefix}c, ${prefix}fs): $crimpDTV2) }
-         |        ($trigExtKey(($crimpApplyKey(${prefix}f1, ${prefix}rh_old, ${prefix}c, ${prefix}fs): $crimpDTV2),
-         |                     ($crimpApplyKey(${prefix}f2, ${prefix}rh_new, ${prefix}c, ${prefix}fs): $crimpDTV2)))
+         |        { ($crimpApplyKey(${prefix}f1, ${prefix}crh_old, ${prefix}c, ${prefix}fs): $crimpDTV2),
+         |          ($crimpApplyKey(${prefix}f2, ${prefix}crh_new, ${prefix}c, ${prefix}fs): $crimpDTV2) }
+         |        ($trigExtKey(($crimpApplyKey(${prefix}f1, ${prefix}crh_old, ${prefix}c, ${prefix}fs): $crimpDTV2),
+         |                     ($crimpApplyKey(${prefix}f2, ${prefix}crh_new, ${prefix}c, ${prefix}fs): $crimpDTV2)))
          |    }
          |
          |    $extAxiom
@@ -494,7 +494,7 @@ object DomainsGenerator {
       crimpGetRecvKeyS,
       crimpGetOperKeyS,
       crimpGetMappingKeyS,
-      cHeapElemKeyS,
+      crHeapElemKeyS,
       trigDelKey1KeyS,
       trigDelBlockKeyS,
       getFieldIDKeyS,
@@ -522,7 +522,7 @@ object DomainsGenerator {
       crimpGetRecvKeyM,
       crimpGetOperKeyM,
       crimpGetMappingKeyM,
-      cHeapElemKeyM,
+      crHeapElemKeyM,
       trigDelKey1KeyM,
       trigDelBlockKeyM,
       getFieldIDKeyM,

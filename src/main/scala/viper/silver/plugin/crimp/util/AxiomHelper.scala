@@ -37,8 +37,8 @@ class AxiomHelper(program: Program, fuelIsTwo: Boolean) {
     "_crimpLabel"
   }
 
-  def cHeapPrefix: String = {
-    "_ch"
+  def crHeapPrefix: String = {
+    "_crh"
   }
 
   def methodLabelPrefix : String = {
@@ -96,47 +96,47 @@ class AxiomHelper(program: Program, fuelIsTwo: Boolean) {
     DomainFuncApp(domainFunc, applyTo, typMap)()
   }
 
-  def crimpApply(fuel: Exp, cHeap: Exp, crimp: Exp, filter: Exp)(hasID: Boolean): DomainFuncApp = {
+  def crimpApply(fuel: Exp, crHeap: Exp, crimp: Exp, filter: Exp)(hasID: Boolean): DomainFuncApp = {
     val crimpApply = if (hasID) DomainsGenerator.crimpApplyKeyM else DomainsGenerator.crimpApplyKeyS
     applyDomainFunc(
       crimpApply,
-      Seq(fuel, cHeap, crimp, filter),
+      Seq(fuel, crHeap, crimp, filter),
       crimp.typ.asInstanceOf[DomainType].typVarsMap
     )
   }
 
-//  def crimpPrimeApply(cHeap: Exp, crimp: Exp, filter: Exp)(hasID: Boolean): DomainFuncApp = {
+//  def crimpPrimeApply(crHeap: Exp, crimp: Exp, filter: Exp)(hasID: Boolean): DomainFuncApp = {
 //    val crimpApplyPrime = if (hasID) DomainsGenerator.crimpApplyPrimeKeyM else DomainsGenerator.crimpApplyPrimeKeyS
 //    applyDomainFunc(
 //      crimpApplyPrime,
-//      Seq(cHeap, crimp, filter),
+//      Seq(crHeap, crimp, filter),
 //      crimp.typ.asInstanceOf[DomainType].typVarsMap
 //    )
 //  }
 
-  def crimpDummyApply(fuel: Exp, cHeap: Exp, crimp: Exp, filter: Exp)(hasID: Boolean): DomainFuncApp = {
+  def crimpDummyApply(fuel: Exp, crHeap: Exp, crimp: Exp, filter: Exp)(hasID: Boolean): DomainFuncApp = {
     val crimpApplyDummyKey = if (hasID) DomainsGenerator.crimpApplyDummyKeyM else DomainsGenerator.crimpApplyDummyKeyS
     applyDomainFunc(
       crimpApplyDummyKey,
-      Seq(crimpApply(fuel, cHeap, crimp, filter)(hasID)),
+      Seq(crimpApply(fuel, crHeap, crimp, filter)(hasID)),
       crimp.typ.asInstanceOf[DomainType].typVarsMap
     )
   }
 
-//  def exhaleCrimpSetApply(cHeap: Exp, crimp: Exp, filter: Exp, fieldId: Exp)(hasID: Boolean): DomainFuncApp = {
+//  def exhaleCrimpSetApply(crHeap: Exp, crimp: Exp, filter: Exp, fieldId: Exp)(hasID: Boolean): DomainFuncApp = {
 //    val exhaleCrimpSetKey = if (hasID) DomainsGenerator.exhaleCrimpSetKeyM else DomainsGenerator.exhaleCrimpSetKeyS
 //    applyDomainFunc(
 //      exhaleCrimpSetKey,
-//      Seq(cHeap, crimp, filter, fieldId),
+//      Seq(crHeap, crimp, filter, fieldId),
 //      crimp.typ.asInstanceOf[DomainType].typVarsMap
 //    )
 //  }
 
-  def trigExtApply(fuel1: Exp, cHeap1: Exp, fuel2: Exp, cHeap2: Exp, crimp: Exp, filter: Exp)(hasID: Boolean): DomainFuncApp = {
+  def trigExtApply(fuel1: Exp, crHeap1: Exp, fuel2: Exp, crHeap2: Exp, crimp: Exp, filter: Exp)(hasID: Boolean): DomainFuncApp = {
     val trigExtKey = if (hasID) DomainsGenerator.trigExtKeyM else DomainsGenerator.trigExtKeyS
     applyDomainFunc(
       trigExtKey,
-      Seq(crimpApply(fuel1, cHeap1, crimp, filter)(hasID), crimpApply(fuel2, cHeap2, crimp, filter)(hasID)),
+      Seq(crimpApply(fuel1, crHeap1, crimp, filter)(hasID), crimpApply(fuel2, crHeap2, crimp, filter)(hasID)),
       crimp.typ.asInstanceOf[DomainType].typVarsMap
     )
   }
@@ -159,9 +159,9 @@ class AxiomHelper(program: Program, fuelIsTwo: Boolean) {
     )
   }
 
-  def trigDelKeyApply(fuel: Exp, cHeap: Exp, crimp: Exp, filter: Exp, key: Exp)(hasID: Boolean): DomainFuncApp = {
+  def trigDelKeyApply(fuel: Exp, crHeap: Exp, crimp: Exp, filter: Exp, key: Exp)(hasID: Boolean): DomainFuncApp = {
     val trigDelKey1Key = if (hasID) DomainsGenerator.trigDelKey1KeyM else DomainsGenerator.trigDelKey1KeyS
-    val crimpApplyApp = crimpApply(fuel, cHeap, crimp, filter)(hasID)
+    val crimpApplyApp = crimpApply(fuel, crHeap, crimp, filter)(hasID)
     applyDomainFunc(
       trigDelKey1Key,
       Seq(crimpApplyApp, key),
@@ -169,9 +169,9 @@ class AxiomHelper(program: Program, fuelIsTwo: Boolean) {
     )
   }
 
-  def trigDelBlockApply(fuel: Exp, cHeap: Exp, crimp: Exp, filter: Exp, keySet: Exp)(hasID: Boolean): DomainFuncApp = {
+  def trigDelBlockApply(fuel: Exp, crHeap: Exp, crimp: Exp, filter: Exp, keySet: Exp)(hasID: Boolean): DomainFuncApp = {
     val trigDelBlockKey = if (hasID) DomainsGenerator.trigDelBlockKeyM else DomainsGenerator.trigDelBlockKeyS
-    val crimpApplyApp = crimpApply(fuel, cHeap, crimp, filter)(hasID)
+    val crimpApplyApp = crimpApply(fuel, crHeap, crimp, filter)(hasID)
     applyDomainFunc(
       trigDelBlockKey,
       Seq(crimpApplyApp, keySet),
@@ -264,13 +264,13 @@ class AxiomHelper(program: Program, fuelIsTwo: Boolean) {
     )()
   }
 
-  def cHeapElemApplyTo(cHeap: Exp, crimpExp: Exp, arg: Exp)(hasID: Boolean): DomainFuncApp = {
+  def crHeapElemApplyTo(crHeap: Exp, crimpExp: Exp, arg: Exp)(hasID: Boolean): DomainFuncApp = {
     val crimpType = crimpExp.typ.asInstanceOf[DomainType]
-    val cHeapFuncKey = if (hasID) DomainsGenerator.cHeapElemKeyM else DomainsGenerator.cHeapElemKeyS
-    val cHeapFunc: DomainFunc = program.findDomainFunction(cHeapFuncKey)
+    val crHeapFuncKey = if (hasID) DomainsGenerator.crHeapElemKeyM else DomainsGenerator.crHeapElemKeyS
+    val crHeapFunc: DomainFunc = program.findDomainFunction(crHeapFuncKey)
     DomainFuncApp(
-      cHeapFunc,
-      Seq(cHeap, crimpExp, arg),
+      crHeapFunc,
+      Seq(crHeap, crimpExp, arg),
       crimpType.typVarsMap
     )()
   }

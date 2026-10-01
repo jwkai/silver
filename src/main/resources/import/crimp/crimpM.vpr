@@ -14,7 +14,7 @@ domain CrimpM[I, V, S]  {
 
   function getmappingM(c: CrimpM[I, V, S]): Mapping[V, S]
 
-  function rHeapElemM(crh: Int, c: CrimpM[I, V, S], a: I): S
+  function crHeapElemM(crh: Int, c: CrimpM[I, V, S], a: I): S
 
   function triggerDeleteBlockM(applyC: S, block: Set[I]): Bool
 
@@ -59,23 +59,23 @@ domain CrimpM[I, V, S]  {
     (forall __crimp_f: Fuel, __crimp_crh: Int, __crimp_c: CrimpM[I, V, S],
     __crimp_elem: I ::
       { (crimpApplyM(__crimp_f, __crimp_crh, __crimp_c, Set(__crimp_elem)): S),
-      (rHeapElemM(__crimp_crh, __crimp_c, __crimp_elem): S) }
+      (crHeapElemM(__crimp_crh, __crimp_c, __crimp_elem): S) }
       (crimpApplyM(__crimp_f, __crimp_crh, __crimp_c, Set(__crimp_elem)): S) ==
-      (rHeapElemM(__crimp_crh, __crimp_c, __crimp_elem): S))
+      (crHeapElemM(__crimp_crh, __crimp_c, __crimp_elem): S))
   }
 
   axiom _dropOne1M {
     (forall __crimp_f: Fuel, __crimp_crh: Int, __crimp_c: CrimpM[I, V, S],
     __crimp_fs: Set[I], __crimp_key: I ::
       { (triggerDeleteKey1M((crimpApplyM(succ(__crimp_f), __crimp_crh, __crimp_c,
-      __crimp_fs): S), __crimp_key): Bool), (rHeapElemM(__crimp_crh, __crimp_c,
+      __crimp_fs): S), __crimp_key): Bool), (crHeapElemM(__crimp_crh, __crimp_c,
       __crimp_key): S) }
       (__crimp_key in __crimp_fs) ==>
       (__crimp_key in __crimp_fs) &&
       (crimpApplyM(succ(__crimp_f), __crimp_crh, __crimp_c, __crimp_fs): S) ==
       (opApply((getoperatorM(__crimp_c): Operator[S]), (crimpApplyM(__crimp_f,
       __crimp_crh, __crimp_c, (setDelete(__crimp_fs, Set(__crimp_key)): Set[I])): S),
-      (rHeapElemM(__crimp_crh, __crimp_c, __crimp_key): S)): S))
+      (crHeapElemM(__crimp_crh, __crimp_c, __crimp_key): S)): S))
   }
 
   axiom _loseManyM {
@@ -139,10 +139,10 @@ domain CrimpM[I, V, S]  {
       __crimp_fs): S), (crimpApplyM(__crimp_f2, __crimp_crh_new, __crimp_c,
       __crimp_fs): S)): I) in
       __crimp_fs) ==>
-      (rHeapElemM(__crimp_crh_old, __crimp_c, (skExtM(__crimp_c, (crimpApplyM(__crimp_f1,
+      (crHeapElemM(__crimp_crh_old, __crimp_c, (skExtM(__crimp_c, (crimpApplyM(__crimp_f1,
       __crimp_crh_old, __crimp_c, __crimp_fs): S), (crimpApplyM(__crimp_f2,
       __crimp_crh_new, __crimp_c, __crimp_fs): S)): I)): S) ==
-      (rHeapElemM(__crimp_crh_new, __crimp_c, (skExtM(__crimp_c, (crimpApplyM(__crimp_f1,
+      (crHeapElemM(__crimp_crh_new, __crimp_c, (skExtM(__crimp_c, (crimpApplyM(__crimp_f1,
       __crimp_crh_old, __crimp_c, __crimp_fs): S), (crimpApplyM(__crimp_f2,
       __crimp_crh_new, __crimp_c, __crimp_fs): S)): I)): S)) ==>
       (crimpApplyM(__crimp_f1, __crimp_crh_old, __crimp_c, __crimp_fs): S) ==
