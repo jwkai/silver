@@ -1,0 +1,34 @@
+// Two crimps that differ only in their field. Lowered, they must differ exactly in the field identifier (the fourth
+// argument of hcrimp{M,S}), so that inline axioms guarded by getFieldID for one field cannot constrain the other
+// (field-collapse fix, DESIGN.md §2). The unused field w makes the identifiers of v and vv nonzero.
+field w: Bool
+field v: Int
+field vv: Int
+
+domain Array {
+  function loc(a: Array, i: Int): Ref
+  function len(a: Array): Int
+  function first(r: Ref): Array
+  function second(r: Ref): Int
+  axiom all_diff { forall a: Array, i: Int :: {loc(a,i)} first(loc(a,i)) == a && second(loc(a,i)) == i }
+  axiom len_nonneg { forall a: Array :: { len(a) } len(a) >= 0 }
+}
+
+function max(x: Int, y: Int): Int
+  ensures (x <= y ==> result == y) && (x > y ==> result == x)
+
+function arrayRange(start: Int, end: Int): Set[Int]
+  ensures (forall i: Int :: { i in result } (i in result) == (i >= start && i < end))
+
+receiver arrayRec(a: Array) (fun (i: Int) : Ref :: loc(a, i))
+operator add() (fun (x: Int, y: Int) : Int :: x + y, 0)
+operator maxOp() (fun (x: Int, y: Int) : Int :: max(x, y))
+
+method m(a: Array) returns (s1: Int, s2: Int, t1: Int, t2: Int)
+  requires forall k: Int :: {loc(a, k)} k in arrayRange(0, 1) ==> acc(loc(a, k).v) && acc(loc(a, k).vv)
+{
+  s1 := crimp[add()][arrayRec(a).v](arrayRange(0, 1))
+  s2 := crimp[add()][arrayRec(a).vv](arrayRange(0, 1))
+  t1 := crimp[maxOp()][arrayRec(a).v](arrayRange(0, 1))
+  t2 := crimp[maxOp()][arrayRec(a).vv](arrayRange(0, 1))
+}

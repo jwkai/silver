@@ -1,0 +1,37 @@
+// Field footprints for AxiomHelper.footprintFields and modifiedFields (a mirror of hreduce's; unused until the crimp
+// lowering is ported). The comment after each method is the set of fields its body may change. The operator makes the
+// crimp plugin import its domains; the file is only run through the frontend.
+field v: Int
+field vv: Int
+field w: Bool
+field u: Int
+
+operator add() (fun (x: Int, y: Int) : Int :: x + y, 0)
+
+predicate P(x: Ref) { acc(x.v) }
+predicate Q(x: Ref) { P(x) && acc(x.vv) }
+predicate R(x: Ref) { acc(x.u) && R(x) }
+predicate A(x: Ref)
+
+method callee(x: Ref)
+  requires acc(x.w)
+  ensures acc(x.w)
+
+method m_write(x: Ref) requires acc(x.v) { x.v := 1 }                    // v
+method m_pred(x: Ref) requires Q(x) { exhale Q(x) }                      // v, vv (through P)
+method m_cycle(x: Ref) requires R(x) { exhale R(x) }                     // u
+method m_abstract(x: Ref) requires A(x) { exhale A(x) }                  // all fields
+method m_package(x: Ref) { package acc(x.vv) --* acc(x.vv) && acc(x.w) } // vv, w
+method m_call(x: Ref) requires acc(x.w) { callee(x) }                    // w
+method m_new() { var y: Ref; y := new(u) }                               // u
+method m_new_all() { var y: Ref; y := new(*) }                           // all fields
+method m_loop(x: Ref, b: Bool) requires acc(x.vv) {                      // vv
+  while (b) invariant acc(x.vv) {}
+}
+method m_quasihavoc(x: Ref) { quasihavoc x.v }                           // v
+method m_fold_pure(x: Ref) requires acc(x.v) {                           // none
+  fold P(x)
+  unfold P(x)
+  exhale x.v == x.v
+  inhale x.v == 0
+}

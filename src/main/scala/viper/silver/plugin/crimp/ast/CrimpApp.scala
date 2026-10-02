@@ -4,6 +4,7 @@ import viper.silver.ast.pretty.FastPrettyPrinter._
 import viper.silver.ast.pretty.PrettyPrintPrimitives
 import viper.silver.ast.{Position, _}
 import viper.silver.plugin.crimp.DomainsGenerator
+import viper.silver.plugin.crimp.util.AxiomHelper
 import viper.silver.verifier.VerificationResult
 
 case class CrimpApp(reduction: CrimpTriple, filter: Exp, fieldName: String)
@@ -16,29 +17,18 @@ case class CrimpApp(reduction: CrimpTriple, filter: Exp, fieldName: String)
     CrimpDecl(domainKey, receiverType, fieldName)
   }
 
-  var fuelExp: Option[Exp] = None
-  var cHeap: Option[CrHeap] = None
+  /** The key under which the lowering looks up this term's crimp-heap index (see CHeapMap). */
+  def heapKey: HeapKey = HeapKey(reduction.receiver, fieldName)
 
-  def toViper(input: Program): Exp = {
+  /** Output: hcrimpApply{M,S}(fuel, ch, hcrimp{M,S}(receiver, mapping, op, fid(fieldName)), filter) */
+  def toViper(input: Program, fuel: Exp, crh: CrHeap): Exp = {
     val crimpEvalFunc = input.findDomainFunction(reduction.crimpEvalFuncName())
-    val crimpConstructed = reduction.toViper(input)
-
-    cHeap match {
-      case Some(ch) =>
-        fuelExp match {
-          case Some(fuel) =>
-            DomainFuncApp(
-              crimpEvalFunc,
-              Seq(fuel, ch.toExp, crimpConstructed, filter),
-              crimpConstructed.typVarMap
-            )(this.pos, this.info, this.errT + NodeTrafo(this))
-          case None =>
-            throw new Exception("Crimp to Viper undefined with fuel = None")
-        }
-      case None =>
-        throw new Exception("Crimp to Viper undefined with cHeap = None")
-    }
-
+    val crimpConstructed = reduction.toViper(input, AxiomHelper.fieldIDLit(input, fieldName))
+    DomainFuncApp(
+      crimpEvalFunc,
+      Seq(fuel, crh.toExp, crimpConstructed, filter),
+      crimpConstructed.typVarMap
+    )(this.pos, this.info, this.errT + NodeTrafo(this))
   }
 
   def includeMapping(inside: Cont, mapping: Exp): Cont = {
@@ -113,7 +103,9 @@ sealed trait CrimpTriple extends ExtensionExp {
   def crimpConstructKeyName(): String
   def crimpEvalFuncName(): String
 
-  def toViper(input: Program) : DomainFuncApp = {
+  /** Output: hcrimp{M,S}(receiver, mapping, op, fieldID).
+    * `fieldID` identifies the crimp's field in `input`. */
+  def toViper(input: Program, fieldID: Exp) : DomainFuncApp = {
     val typeVars = input.findDomain(crimpDKeyName()).typVars
     if (typeVars.length != 3) {
       throw new Exception("Crimp domain must have 3 type variables")
@@ -124,7 +116,7 @@ sealed trait CrimpTriple extends ExtensionExp {
       typeVars(2) -> tripleType._3
     )
     val crimpFunc = input.findDomainFunction(crimpConstructKeyName())
-    DomainFuncApp.apply(crimpFunc, Seq(receiver, mapping, op), typeVarMap)(pos, info, errT)
+    DomainFuncApp.apply(crimpFunc, Seq(receiver, mapping, op, fieldID), typeVarMap)(pos, info, errT)
   }
   // Does not get used, transform to ordinary Viper before verification
   override def verifyExtExp(): VerificationResult = {

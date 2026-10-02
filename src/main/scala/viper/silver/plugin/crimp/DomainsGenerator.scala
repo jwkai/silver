@@ -403,7 +403,7 @@ object DomainsGenerator {
     val crimpOut =
       s"""domain $domainName[$crimpDTV0,$crimpDTV1,$crimpDTV2] {
          |
-         |    function $crimpConstructKey(r: $recDKey[$crimpDTV0], m: $mapDKey[$crimpDTV1,$crimpDTV2], op: $opDKey[$crimpDTV2]): $domainName[$crimpDTV0,$crimpDTV1,$crimpDTV2]
+         |    function $crimpConstructKey(r: $recDKey[$crimpDTV0], m: $mapDKey[$crimpDTV1,$crimpDTV2], op: $opDKey[$crimpDTV2], fid: $intKey): $domainName[$crimpDTV0,$crimpDTV1,$crimpDTV2]
          |    function $crimpApplyKey(f: $fuelDKey, crh: $intKey, c: $domainName[$crimpDTV0,$crimpDTV1,$crimpDTV2], fs: Set[$crimpDTV0]): $crimpDTV2
          |    function $crimpApplyDummyKey(a: $crimpDTV2): Bool
          |    function $setEqDummyKey(b: Bool): Bool
@@ -428,11 +428,13 @@ object DomainsGenerator {
          |    axiom $invAxCrimpAxiom {
          |        forall ${prefix}r: $recDKey[$crimpDTV0],
          |               ${prefix}m: $mapDKey[$crimpDTV1,$crimpDTV2],
-         |               ${prefix}o: $opDKey[$crimpDTV2] ::
-         |        { ($crimpConstructKey(${prefix}r, ${prefix}m, ${prefix}o): $domainName[$crimpDTV0,$crimpDTV1,$crimpDTV2]) }
-         |        $crimpGetRecvKey($crimpConstructKey(${prefix}r, ${prefix}m, ${prefix}o)) == ${prefix}r &&
-         |        $crimpGetMappingKey($crimpConstructKey(${prefix}r, ${prefix}m, ${prefix}o)) == ${prefix}m &&
-         |        $crimpGetOperKey($crimpConstructKey(${prefix}r, ${prefix}m, ${prefix}o)) == ${prefix}o
+         |               ${prefix}o: $opDKey[$crimpDTV2],
+         |               ${prefix}fid: $intKey ::
+         |        { ($crimpConstructKey(${prefix}r, ${prefix}m, ${prefix}o, ${prefix}fid): $domainName[$crimpDTV0,$crimpDTV1,$crimpDTV2]) }
+         |        $crimpGetRecvKey($crimpConstructKey(${prefix}r, ${prefix}m, ${prefix}o, ${prefix}fid)) == ${prefix}r &&
+         |        $crimpGetMappingKey($crimpConstructKey(${prefix}r, ${prefix}m, ${prefix}o, ${prefix}fid)) == ${prefix}m &&
+         |        $crimpGetOperKey($crimpConstructKey(${prefix}r, ${prefix}m, ${prefix}o, ${prefix}fid)) == ${prefix}o &&
+         |        $getFieldIDKey($crimpConstructKey(${prefix}r, ${prefix}m, ${prefix}o, ${prefix}fid)) == ${prefix}fid
          |    }
          |    $emptyAxiom
          |    axiom $singletonAxiom {

@@ -4,6 +4,8 @@ import viper.silver.ast._
 import viper.silver.ast.utility.Expressions
 import viper.silver.plugin.crimp.DomainsGenerator
 
+import scala.collection.mutable
+
 class AxiomHelper(program: Program, fuelIsTwo: Boolean) {
 
   //  def getStartLabel: Label = {
@@ -57,6 +59,54 @@ class AxiomHelper(program: Program, fuelIsTwo: Boolean) {
       case fieldAccessPredicate: FieldAccessPredicate =>
         fieldAccessPredicate.loc.field
     }).toSet
+  }
+
+  /** Conservative set of all fields whose permissions can be modified by an assertion, a resource or a wand:
+    *  - the field of every field access predicate, also under quantifiers;
+    *  - for every predicate it mentions, the footprint of the predicate's body (abstract predicate = every field);
+    *  - for a magic wand, the footprint of both sides.
+    * A bare field location (the resource of a quasihavoc) contributes its field. */
+  def footprintFields(n: Node): Set[String] = {
+    var fields = Set[String]()
+    var allFields = false
+    val seenPredicates = mutable.Set[String]()
+    def visitPredicate(name: String): Unit =
+      if (seenPredicates.add(name)) program.findPredicate(name).body match {
+        case Some(body) => visit(body)
+        case None => allFields = true
+      }
+    def visit(node: Node): Unit = node.visit {
+      case fap: FieldAccessPredicate => fields += fap.loc.field.name
+      case pa: PredicateAccess => visitPredicate(pa.predicateName)
+    }
+    n match {
+      case fa: FieldAccess => fields += fa.field.name
+      case _ => visit(n)
+    }
+    if (allFields) program.fields.map(_.name).toSet else fields
+  }
+
+  /** Conservative set of the fields whose locations a statement may change, in value or in permission: field assigns,
+    * impure exhales, inhales and assumes, loop invariants, allocation, wands, quasihavoc, and method calls).
+    * An extension statement of another plugin may change anything. */
+  def modifiedFields(s: Stmt): Set[String] = {
+    val all = program.fields.map(_.name).toSet
+    s.deepCollect({
+      case FieldAssign(lhs, _) => Set(lhs.field.name)
+      case e: Exhale if !checkIfPure(e) => footprintFields(e.exp)
+      case i: Inhale if !checkIfPure(i) => footprintFields(i.exp)
+      case a: Assume if !checkIfPure(a) => footprintFields(a.exp)
+      case w: While => w.invs.flatMap(footprintFields).toSet
+      case n: NewStmt => n.fields.map(_.name).toSet
+      case a: Apply => footprintFields(a.exp)
+      case p: Package => footprintFields(p.wand)
+      case q: Quasihavoc => footprintFields(q.exp)
+      case q: Quasihavocall => footprintFields(q.exp)
+      case mc: MethodCall =>
+        val callee = program.findMethod(mc.methodName)
+        (callee.pres ++ callee.posts).flatMap(footprintFields).toSet
+      case _: ExtensionStmt => all
+    }).flatten.toSet
   }
 
   def checkIfPure(stmt: Stmt): Boolean = {
@@ -149,6 +199,20 @@ class AxiomHelper(program: Program, fuelIsTwo: Boolean) {
       crimp.typ.asInstanceOf[DomainType].typVarsMap
     )
   }
+
+  def getFieldIDApply(crimp: Exp)(hasID: Boolean): DomainFuncApp = {
+    val getFieldIDKey = if (hasID) DomainsGenerator.getFieldIDKeyM else DomainsGenerator.getFieldIDKeyS
+    applyDomainFunc(
+      getFieldIDKey,
+      Seq(crimp),
+      crimp.typ.asInstanceOf[DomainType].typVarsMap
+    )
+  }
+
+  /** getFieldID{M,S}(crimp) == fid(fieldName): restricts an inline axiom that quantifies over crimps to the crimps
+    * over `fieldName`. */
+  def fieldIDGuard(crimp: Exp, fieldName: String)(hasID: Boolean): EqCmp =
+    EqCmp(getFieldIDApply(crimp)(hasID), AxiomHelper.fieldIDLit(program, fieldName))()
 
   def getMappingApply(crimp: Exp)(hasID: Boolean): DomainFuncApp = {
     val crimpGetMappingKey = if (hasID) DomainsGenerator.crimpGetMappingKeyM else DomainsGenerator.crimpGetMappingKeyS
@@ -525,6 +589,16 @@ class AxiomHelper(program: Program, fuelIsTwo: Boolean) {
 }
 
 object AxiomHelper {
+  /** The field identifier of `fieldName` in `program`: its position in `program.fields`. It is deterministic for a
+    * given program and never shared across programs; the terms and the axiom guards must use the same program. */
+  def fieldID(program: Program, fieldName: String): Int = {
+    val i = program.fields.indexWhere(_.name == fieldName)
+    if (i < 0) throw new IllegalArgumentException(s"crimp: field $fieldName not found in the program")
+    i
+  }
+
+  def fieldIDLit(program: Program, fieldName: String): IntLit = IntLit(fieldID(program, fieldName))()
+
   def tupleFieldToString(t: (Type, Type, Type), fieldID: String): String = {
     // replace letters [ and ] with _
     ("__getch_" + t._1.toString() + "_" + t._2.toString() + "_" + t._3.toString() + "_" + fieldID

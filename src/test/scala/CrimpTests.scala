@@ -5,11 +5,12 @@
 // Copyright (c) 2011-2021 ETH Zurich.
 
 import org.scalatest.funsuite.AnyFunSuite
-import viper.silver.ast.{DomainFuncApp, Program}
+import viper.silver.ast.{DomainFuncApp, IntLit, LocalVar, Program, Ref}
 import viper.silver.frontend.{SilFrontend, SilFrontendConfig}
 import viper.silver.parser.FastParser
 import viper.silver.plugin.SilverPluginManager
-import viper.silver.plugin.crimp.ast.{CrHeap, CrimpApp, CrimpTripleWithId, CrimpTripleWithoutId}
+import viper.silver.plugin.crimp.DomainsGenerator
+import viper.silver.plugin.crimp.ast.{CrHeap, CrHeapMap, CrimpApp, CrimpTripleWithId, CrimpTripleWithoutId, HeapKey}
 import viper.silver.plugin.crimp.util.AxiomHelper
 import viper.silver.reporter.{NoopReporter, Reporter, StdIOReporter}
 import viper.silver.verifier._
@@ -24,7 +25,9 @@ class CrimpTests extends AnyFunSuite {
     "crimp/arraySum-i1.vpr",
     "crimp/generic-filter.vpr",
     "crimp/component-decl-forward-ref.vpr",
-    "crimp/user-import.vpr"
+    "crimp/user-import.vpr",
+    "crimp/two-fields.vpr",
+    "crimp/footprints.vpr",
   )
   // Inputs the frontend must reject with exactly these errors, in particular without an additional internal error.
   val badInputfiles: Seq[(String, Seq[String])] = Seq(
@@ -133,31 +136,119 @@ class CrimpTests extends AnyFunSuite {
         .map { case (f, d) => s"$f (expected in $d, found in ${declared.getOrElse(f, "no domain")})" }
       assert(wrong.isEmpty, s"names not declared as expected: ${wrong.mkString(", ")}")
 
-      // The term builders must find their domain and functions, and applications must match the
-      // declarations (arity, argument and result types).
-        def conforms(app: DomainFuncApp): Boolean = {
-          val f = p.findDomainFunction(app.funcname)
-          f.formalArgs.size == app.args.size &&
-              f.formalArgs.map(_.typ.substitute(app.typVarMap)) == app.args.map(_.typ) &&
-              f.typ.substitute(app.typVarMap) == app.typ
-        }
-      val fuel = new AxiomHelper(p, true).fuelDefaultExp
-      val apps = p.deepCollect { case c: CrimpApp => c }
-      val n = apps.size
-      assert(n == 4, "arraySwapMax.vpr has four crimp terms")
-      val bad = apps.flatMap { c =>
-        c.fuelExp = Some(fuel)
-        c.cHeap = Some(CrHeap(0))
-        c.toViper(p) match {
-          case t @ DomainFuncApp(evalName, Seq(_, _, cons: DomainFuncApp, _), _)
-              if evalName == c.reduction.crimpEvalFuncName() && cons.funcname == c.reduction.crimpConstructKeyName() &&
-                conforms(t) && conforms(cons) => None
-            case t => Some(t.toString)
-          }
+    // The translation term builders must find their domain and functions, and build applications that match the
+    // declarations (arity, argument and result types).
+    val fuel = new AxiomHelper(p, true).fuelDefaultExp
+    val apps = p.deepCollect { case c: CrimpApp => c }
+    val n = apps.size
+    assert(n == 4, "arraySwapMax.vpr has four crimp terms")
+    val bad = apps.flatMap { c =>
+      c.toViper(p, fuel, CrHeap(0)) match {
+        case t @ DomainFuncApp(evalName, Seq(_, _, cons: DomainFuncApp, _), _)
+          if evalName == c.reduction.crimpEvalFuncName() && cons.funcname == c.reduction.crimpConstructKeyName() &&
+            conforms(p, t) && conforms(p, cons) => None
+        case t => Some(t.toString)
       }
-      assert(bad.isEmpty, s"ill-formed crimp terms: ${bad.mkString("; ")}")
     }
-  
+    assert(bad.isEmpty, s"ill-formed crimp terms: ${bad.mkString("; ")}")
+  }
+
+  test("CrimpApp.toViper: crimps over different fields differ only in the field identifier") {
+    // two-fields.vpr declares the fields w, v, vv (field identifiers 0, 1, 2) and applies an operator with a unit
+    // (crimpM) and one without (crimpS) to arrayRec(a).v and to arrayRec(a).vv.
+    val frontend = runFrontend("viper.silver.plugin.crimp.CrimpPlugin", "crimp/two-fields.vpr")
+    assert(frontend.errors.isEmpty, frontend.errors.map(_.readableMessage).mkString("\n"))
+    val p = frontend.translatedProgram.get
+    val helper = new AxiomHelper(p, true)
+    val fuel = helper.fuelDefaultExp
+    val fid = Map("w" -> 0, "v" -> 1, "vv" -> 2)
+    assert(fid.forall { case (f, i) => AxiomHelper.fieldID(p, f) == i }, "fieldID is the position in program.fields")
+    val apps = p.deepCollect { case c: CrimpApp => c }
+    val n = apps.size
+    assert(n == 4, "two-fields.vpr has four crimp terms")
+
+    // Only strings and Booleans are compared and reported (see above).
+    val problems = apps.flatMap { c =>
+      val hasID = c.reduction.isInstanceOf[CrimpTripleWithId]
+      val t = c.toViper(p, fuel, CrHeap(3)).asInstanceOf[DomainFuncApp]
+      val t2 = c.toViper(p, fuel, CrHeap(4)).asInstanceOf[DomainFuncApp]
+      val guard = helper.fieldIDGuard(t.args(2), c.fieldName)(hasID)
+      val checks: Seq[(Boolean, String)] = t match {
+        case DomainFuncApp(_, Seq(_, IntLit(ch), cons: DomainFuncApp, _), _) => Seq(
+          (ch == 3, "crimp-heap index argument"),
+          (cons.args.size == 4 && cons.args(3) == IntLit(fid(c.fieldName))(), "fid argument"),
+          (conforms(p, t) && conforms(p, cons), "matches the declarations"),
+          // toViper is pure: another index changes only the index argument, and the node keeps no state
+          (t2.args.updated(1, IntLit(3)()) == t.args && c.toViper(p, fuel, CrHeap(3)) == t, "pure"),
+          (guard.left match {
+            case g: DomainFuncApp => g.funcname == (if (hasID) DomainsGenerator.getFieldIDKeyM
+              else DomainsGenerator.getFieldIDKeyS) && g.args == Seq(cons) && conforms(p, g)
+            case _ => false
+          }, "getFieldID guard"),
+          (guard.right == IntLit(fid(c.fieldName))(), "guard literal"),
+          (c.heapKey == HeapKey(c.reduction.receiver, c.fieldName), "heap key"))
+        case _ => Seq((false, "shape"))
+      }
+      checks.collect { case (false, what) => s"${c.fieldName}/${if (hasID) "M" else "S"}: $what" }
+    }
+    assert(problems.isEmpty, problems.mkString(", "))
+
+    // Per encoding, the v and vv terms are equal except for the fid argument of the constructor.
+    val byEncoding = apps.groupBy(_.reduction.isInstanceOf[CrimpTripleWithId]).values.toSeq
+    val pairsDiffer = byEncoding.map { cs =>
+      val Seq(v, vv) = cs.sortBy(_.fieldName).map(_.toViper(p, fuel, CrHeap(0)).asInstanceOf[DomainFuncApp])
+      val (cv, cvv) = (v.args(2).asInstanceOf[DomainFuncApp], vv.args(2).asInstanceOf[DomainFuncApp])
+      cv.args.init == cvv.args.init && cv.args.last != cvv.args.last &&
+        v.args.updated(2, cvv) == vv.args
+    }
+    assert(byEncoding.size == 2 && pairsDiffer.forall(identity), "the v and vv terms differ only in the fid")
+
+    // Heap keys: receiver instance plus field; the M and S terms over one field share a key.
+    val keys = apps.map(_.heapKey).toSet
+    val initial = CrHeapMap.of(keys, CrHeap(0))
+    val shown = initial.toString
+    assert(keys.size == 2 && initial.fields == Set("v", "vv") && shown == "v:0 vv:0", shown)
+    val advanced = initial.withField("v", CrHeap(1))
+    val advancedShown = advanced.toString
+    assert(advanced.ofField("v") == CrHeap(1) && advanced.ofField("vv") == CrHeap(0) &&
+      apps.forall(c => advanced(c.heapKey) == (if (c.fieldName == "v") CrHeap(1) else CrHeap(0))), advancedShown)
+    // A receiver instance that is not in the map has the index of its field (lockstep); keys over one field at
+    // different indices are an internal error. `b` stands in for another receiver instance.
+    val other = HeapKey(LocalVar("b", Ref)(), "v")
+    assert(advanced(other) == CrHeap(1), advancedShown)
+    intercept[IllegalStateException](CrHeapMap(advanced.m + (other -> CrHeap(2))).ofField("v"))
+  }
+
+  test("AxiomHelper: field footprints of statements") {
+    // footprints.vpr states each method's expected footprint in a comment.
+    val frontend = runFrontend("viper.silver.plugin.crimp.CrimpPlugin", "crimp/footprints.vpr")
+    assert(frontend.errors.isEmpty, frontend.errors.map(_.readableMessage).mkString("\n"))
+    val p = frontend.translatedProgram.get
+    val helper = new AxiomHelper(p, true)
+    val all = Set("v", "vv", "w", "u")
+    val expected: Map[String, Set[String]] = Map(
+      "m_write" -> Set("v"), "m_pred" -> Set("v", "vv"), "m_cycle" -> Set("u"), "m_abstract" -> all,
+      "m_package" -> Set("vv", "w"), "m_call" -> Set("w"), "m_new" -> Set("u"), "m_new_all" -> all,
+      "m_loop" -> Set("vv"), "m_quasihavoc" -> Set("v"), "m_fold_pure" -> Set())
+    val wrong = expected.toSeq.sortBy(_._1).flatMap { case (m, fs) =>
+      val got = helper.modifiedFields(p.findMethod(m).body.get)
+      if (got == fs) None else Some(s"$m: ${got.toSeq.sorted.mkString(",")} (expected ${fs.toSeq.sorted.mkString(",")})")
+    }
+    assert(wrong.isEmpty, wrong.mkString("; "))
+    // Resources directly: a predicate instance contributes its body's footprint, transitively.
+    val q = p.findMethod("m_pred").pres.head
+    val a = p.findMethod("m_abstract").pres.head
+    assert(helper.footprintFields(q) == Set("v", "vv") && helper.footprintFields(a) == all)
+  }
+
+  /** `app` matches its declaration in `p`: arity, argument types and result type. */
+  def conforms(p: Program, app: DomainFuncApp): Boolean = {
+    val f = p.findDomainFunction(app.funcname)
+    f.formalArgs.size == app.args.size &&
+      f.formalArgs.map(_.typ.substitute(app.typVarMap)) == app.args.map(_.typ) &&
+      f.typ.substitute(app.typVarMap) == app.typ
+  }
+
   class MockPluginFrontend extends SilFrontend {
 
     protected var instance: MockPluginVerifier = _

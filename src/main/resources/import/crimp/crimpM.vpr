@@ -1,6 +1,6 @@
 domain CrimpM[I, V, S]  {
 
-  function crimpM(r: Receiver[I], m: Mapping[V, S], op: Operator[S]): CrimpM[I, V, S]
+  function crimpM(r: Receiver[I], m: Mapping[V, S], op: Operator[S], fid: Int): CrimpM[I, V, S]
 
   function crimpApplyM(f: Fuel, crh: Int, c: CrimpM[I, V, S], fs: Set[I]): S
 
@@ -35,14 +35,16 @@ domain CrimpM[I, V, S]  {
   }
 
   axiom _invAxCrimpM {
-    (forall __crimp_r: Receiver[I], __crimp_m: Mapping[V, S], __crimp_o: Operator[S] ::
-      { (crimpM(__crimp_r, __crimp_m, __crimp_o): CrimpM[I, V, S]) }
-      (getreceiverM((crimpM(__crimp_r, __crimp_m, __crimp_o): CrimpM[I, V, S])): Receiver[I]) ==
+    (forall __crimp_r: Receiver[I], __crimp_m: Mapping[V, S], __crimp_o: Operator[S], __crimp_fid: Int ::
+      { (crimpM(__crimp_r, __crimp_m, __crimp_o, __crimp_fid): CrimpM[I, V, S]) }
+      (getreceiverM((crimpM(__crimp_r, __crimp_m, __crimp_o, __crimp_fid): CrimpM[I, V, S])): Receiver[I]) ==
       __crimp_r &&
-      ((getmappingM((crimpM(__crimp_r, __crimp_m, __crimp_o): CrimpM[I, V, S])): Mapping[V, S]) ==
+      ((getmappingM((crimpM(__crimp_r, __crimp_m, __crimp_o, __crimp_fid): CrimpM[I, V, S])): Mapping[V, S]) ==
       __crimp_m &&
-      (getoperatorM((crimpM(__crimp_r, __crimp_m, __crimp_o): CrimpM[I, V, S])): Operator[S]) ==
-      __crimp_o))
+      ((getoperatorM((crimpM(__crimp_r, __crimp_m, __crimp_o, __crimp_fid): CrimpM[I, V, S])): Operator[S]) ==
+      __crimp_o) &&
+      (getFieldIDM((crimpM(__crimp_r, __crimp_m, __crimp_o, __crimp_fid): CrimpM[I, V, S])): Int) ==
+      __crimp_fid))
   }
 
   axiom _emptyCrimpM {
