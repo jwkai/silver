@@ -73,7 +73,7 @@ sealed trait CrimpTriple extends ExtensionExp {
   def mapping: Exp
 
   override lazy val prettyPrint: PrettyPrintPrimitives#Cont =
-    text("hcrimp") <+>  toParenDoc(op) <+> toParenDoc(receiver)
+    text("crimp") <+>  toParenDoc(op) <+> toParenDoc(receiver)
 
   override val extensionSubnodes: Seq[Node] = Seq(receiver, mapping, op).flatten
 

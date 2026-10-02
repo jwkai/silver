@@ -11,7 +11,7 @@ import viper.silver.verifier.errors
 case object PCrimpKeyword extends PKw("crimp") with PKeywordLang
 
 
-case class PCrimpInner(mapping: PCall, fieldID: PIdnUse, receiver: PExp)(val pos: (Position, Position))
+case class PCrimpInner(mapping: PExp, fieldID: PIdnUse, receiver: PExp)(val pos: (Position, Position))
   extends PExtender {
 
   override def subnodes: Iterator[PNode] = Iterator(mapping, fieldID, receiver)

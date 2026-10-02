@@ -55,7 +55,7 @@ case class PComponentCall(idnref: PIdnRef[PCrimpComponent], callArgs: PDelimited
     t.unifySequenceWithSubstitutions(rlts, argData) match {
       // The same message at the same argument as the type checker's.
       case Left((a, b, at)) =>
-          t.messages = FastMessaging.message(at, s"found incompatible type `${a.pretty}`, expected `${b.pretty}`")
+        t.messages ++= FastMessaging.message(at, s"found incompatible type `${a.pretty}`, expected `${b.pretty}`")
       case Right(substitutions) =>
         typeSubstitutions ++= substitutions
         val ts = typeSubsDistinct

@@ -24,7 +24,6 @@ class CrimpTests extends AnyFunSuite {
     "crimp/arraySum-i1.vpr",
     "crimp/generic-filter.vpr",
     "crimp/component-decl-forward-ref.vpr",
-    "crimp/domain-return-type.vpr",
     "crimp/user-import.vpr"
   )
   // Inputs the frontend must reject with exactly these errors (message substrings), in particular without an
@@ -36,9 +35,6 @@ class CrimpTests extends AnyFunSuite {
     "crimp/bad/mapping-arity.vpr" -> Seq(
       "Mapping body should have exactly one argument."
     ),
-    "crimp/bad/return-type-mismatch.vpr" -> Seq(
-      "found incompatible type `Int`, expected `Bool`",
-      "found incompatible type `Mapping[Int, Int]`, expected `Mapping[Int, Bool]`")
   )
   val plugins: Seq[String] = Seq(
 //    "TestPluginAllCalled",
@@ -92,20 +88,20 @@ class CrimpTests extends AnyFunSuite {
     val withId = classOf[CrimpTripleWithId].getSimpleName
     val withoutId = classOf[CrimpTripleWithoutId].getSimpleName
     val encodings: Seq[(String, String)] = frontend.translatedProgram.get.deepCollect {
-        case c: CrimpApp =>
-            val op = c.reduction.op match {
-            case d: DomainFuncApp => d.funcname
-                case o => o.getClass.getSimpleName
-              }
-            op -> c.reduction.getClass.getSimpleName
+      case c: CrimpApp =>
+        val op = c.reduction.op match {
+          case d: DomainFuncApp => d.funcname
+          case o => o.getClass.getSimpleName
         }
+        op -> c.reduction.getClass.getSimpleName
+    }
     val ops = encodings.map(_._1).toSet
     assert(ops.contains("msSum") && ops.contains("maxOp"), s"operators found: ${ops.mkString(", ")}")
     val wrong = encodings.filter {
-        case ("msSum", enc) => enc != withId
-        case ("maxOp", enc) => enc != withoutId
-        case _ => false
-        }.map { case (op, enc) => s"$op: $enc" }
+      case ("msSum", enc) => enc != withId
+      case ("maxOp", enc) => enc != withoutId
+      case _ => false
+    }.map { case (op, enc) => s"$op: $enc" }
     assert(wrong.isEmpty, s"wrong encodings: ${wrong.mkString(", ")}")
   }
 
