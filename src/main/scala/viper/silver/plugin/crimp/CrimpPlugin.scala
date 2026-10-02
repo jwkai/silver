@@ -387,13 +387,19 @@ class CrimpPlugin(@unused reporter: viper.silver.reporter.Reporter,
 
 object CrimpPlugin {
 
+  /** `[a, b, c]` without positions: the type arguments of a generated domain type such as `Operator[Int]`. The
+    * delimited list has no trailing delimiter (`end = None`), as the type arguments of a parsed domain type. */
+  def impliedBracketComma[T <: PNode](inner: Seq[T]): PDelimited.Comma[PSym.Bracket, T] =
+    PGrouped.impliedBracket(PDelimited[T, PSym.Comma](inner.headOption,
+      inner.map((PReserved.implied(PSym.Comma), _)).drop(1), None)(NoPosition, NoPosition))
+
   def defaultMappingIden(tuple: (Position, Position)): PCall = {
     PCall(PIdnRef(mapIdenKey)(tuple), PDelimited.impliedParenComma(Seq()), None)(tuple)
   }
 
   def makeDomainType(name: String, typeArgs: Seq[PType]): PDomainType = {
     val noPosTuple = (NoPosition, NoPosition)
-    val outType = PDomainType(PIdnRef(name)(noPosTuple), Some(PDelimited.impliedBracketComma(typeArgs)))(noPosTuple)
+    val outType = PDomainType(PIdnRef(name)(noPosTuple), Some(impliedBracketComma(typeArgs)))(noPosTuple)
     outType.kind = PDomainTypeKinds.Domain
     outType
   }

@@ -24,10 +24,14 @@ class HReducePlugin(@unused reporter: viper.silver.reporter.Reporter,
                     @unused config: viper.silver.frontend.SilFrontendConfig,
                     fp: FastParser) extends SilverPlugin with ParserPluginTemplate {
 
-  import fp.{ParserExtension, funcApp, exp, argList, commaSeparated, formalArg, fieldAccess, foldPExp, idndef, idnref, lineCol, _file}
-  import FastParserCompanion.{ExtendedParsing, PositionParsing, reservedKw, whitespace}
+  import fp.{ParserExtension, funcApp, exp, argList, formalArg, fieldAccess, foldPExp, idndef, idnref, lineCol, _file}
+  import FastParserCompanion.{ExtendedParsing, PositionParsing, reservedKw, reservedSym, whitespace}
 
   private val fuelIsTwo: Boolean = true
+
+  /** `a, b, c` without surrounding brackets (the arguments of `fun`). A plugin-local parser: Silver's FastParser has
+    * `argList` and `typeList` (with brackets) only. */
+  def commaSeparated[$: P, T](p: => P[T]): P[PDelimited[T, PSym.Comma]] = p.delimited(PSym.Comma)
   private var setOperators: Set[PReduceOperator] = Set()
 
   /** Parser for reduce statements. */
@@ -282,13 +286,19 @@ class HReducePlugin(@unused reporter: viper.silver.reporter.Reporter,
 
 object HReducePlugin {
 
+  /** `[a, b, c]` without positions: the type arguments of a generated domain type such as `Operator[Int]`. The
+    * delimited list has no trailing delimiter (`end = None`), as the type arguments of a parsed domain type. */
+  def impliedBracketComma[T <: PNode](inner: Seq[T]): PDelimited.Comma[PSym.Bracket, T] =
+    PGrouped.impliedBracket(PDelimited[T, PSym.Comma](inner.headOption,
+      inner.map((PReserved.implied(PSym.Comma), _)).drop(1), None)(NoPosition, NoPosition))
+
   def defaultMappingIden(tuple: (Position, Position)): PCall = {
     PCall(PIdnRef(mapIdenKey)(tuple), PDelimited.impliedParenComma(Seq()), None)(tuple)
   }
 
   def makeDomainType(name: String, typeArgs: Seq[PType]): PDomainType = {
     val noPosTuple = (NoPosition,NoPosition)
-    val outType = PDomainType(PIdnRef(name)(noPosTuple), Some(PDelimited.impliedBracketComma(typeArgs)))(noPosTuple)
+    val outType = PDomainType(PIdnRef(name)(noPosTuple), Some(impliedBracketComma(typeArgs)))(noPosTuple)
     outType.kind = PDomainTypeKinds.Domain
     outType
   }

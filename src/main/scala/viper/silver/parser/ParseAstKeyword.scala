@@ -44,13 +44,10 @@ case class PGrouped[G <: PSym.Group, +T](l: PReserved[G#L], inner: T, r: PReserv
 object PGrouped {
   /** Grouped and delimited. */
   type Paren[+T] = PGrouped[PSym.Paren, T]
-  type Brace[+T] = PGrouped[PSym.Brace, T]
-  type Bracket[+T] = PGrouped[PSym.Bracket, T]
 
   def implied[G <: PSym.Group, T](l: G#L, inner: T, r: G#R): PGrouped[G, T] =
     PGrouped[G, T](PReserved.implied(l), inner, PReserved.implied(r))(NoPosition, NoPosition)
-  def impliedBrace[T](inner: T): PGrouped.Brace[T] = implied[PSym.Brace, T](PSym.LBrace, inner, PSym.RBrace)
-  def impliedBracket[T](inner: T): PGrouped.Bracket[T] = implied[PSym.Bracket, T](PSym.LBracket, inner, PSym.RBracket)
+  def impliedBracket[T](inner: T): PGrouped[PSym.Bracket, T] = implied[PSym.Bracket, T](PSym.LBracket, inner, PSym.RBracket)
   def impliedParen[T](inner: T): PGrouped.Paren[T] = implied[PSym.Paren, T](PSym.LParen, inner, PSym.RParen)
 }
 
@@ -128,10 +125,6 @@ object PDelimited {
   }
   def impliedParenComma[T <: PNode](inner: Seq[T]): Comma[PSym.Paren, T] = {
     PGrouped.impliedParen(PDelimited.implied(inner, PReserved.implied(PSym.Comma)))
-  }
-  // Bracketed, comma-separated list without trailing comma (end = None)
-  def impliedBracketComma[T <: PNode](inner: Seq[T]): Comma[PSym.Bracket, T] = {
-    PGrouped.impliedBracket(PDelimited[T, PSym.Comma](inner.headOption, inner.map((PReserved.implied(PSym.Comma), _)).drop(1), None)(NoPosition, NoPosition))
   }
 }
 
