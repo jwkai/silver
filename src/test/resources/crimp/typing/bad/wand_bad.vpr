@@ -1,0 +1,43 @@
+// Crimp inside a magic wand or a package proof script are rejected
+field v: Int
+field vv: Int
+
+domain Array {
+  function loc(a: Array, i: Int): Ref
+  function first(r: Ref): Array
+  function second(r: Ref): Int
+  axiom all_diff {
+    forall a: Array, i: Int :: {loc(a,i)} first(loc(a,i)) == a && second(loc(a,i)) == i
+  }
+}
+
+receiver arrayRec(a: Array) (fun (i: Int) : Ref :: loc(a,i))
+domain ___arrayRange_Filter_Domain {
+    function arrayRange(start: Int, end: Int): Set[Int]
+    axiom { forall start: Int, end: Int, i: Int :: { i in arrayRange(start, end) }
+    (i in arrayRange(start, end)) == (i >= start && i < end) }
+}
+operator addU() (fun (a: Int, b: Int) : Int :: a + b, 0)
+
+define SUM1(a) crimp[addU()][arrayRec(a).v](arrayRange(0, 1))
+
+method c2_pre(a: Array)
+  requires acc(loc(a,0).v) && loc(a,0).v == 7
+  requires acc(loc(a,0).v) --* (acc(loc(a,0).v) && SUM1(a) == 1)
+{
+  apply acc(loc(a,0).v) --* (acc(loc(a,0).v) && SUM1(a) == 1)
+}
+
+method c2_inhale(a: Array)
+  requires acc(loc(a,0).v)
+{
+  inhale acc(loc(a,0).v) --* (acc(loc(a,0).v) && SUM1(a) == 1)
+}
+
+method c2_package(a: Array)
+  requires acc(loc(a,0).v) && acc(loc(a,0).vv)
+{
+  package acc(loc(a,0).vv) --* acc(loc(a,0).vv) {
+    assert SUM1(a) == loc(a,0).v
+  }
+}

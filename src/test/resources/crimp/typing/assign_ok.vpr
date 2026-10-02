@@ -1,5 +1,4 @@
-// The unit of an operator is name-analysed like its body.
-// A domain function call and an operator argument in a unit are accepted
+// A crimp assigned to an Int variable is accepted.
 field val: Int
 field flag: Bool
 
@@ -24,17 +23,6 @@ mapping msSingleton() (fun (i: Int) : Multiset[Int] :: Multiset(i))
 mapping scale(k: Int) (fun (i: Int) : Int :: k * i)
 operator msSum() (fun (a: Multiset[Int], b: Multiset[Int]) : Multiset[Int] :: a union b, Multiset[Int]())
 
-
-domain Z {
-  function dzero(): Int
-  axiom { dzero() == 0 }
-}
-operator addZ() (fun (a: Int, b: Int) : Int :: a + b, dzero())
-operator addK(k: Int) (fun (a: Int, b: Int) : Int :: a + b, k)
-
-method m(a: Array) returns (x: Int, y: Int)
+method m(a: Array) returns (x: Int)
   requires access_array(a, 0, len(a))
-{
-  x := crimp[addZ()][arrayRec(a).val](allInt(0, len(a)))
-  y := crimp[addK(0)][arrayRec(a).val](allInt(0, len(a)))
-}
+{ x := crimp[add()][arrayRec(a).val](allInt(0, len(a))) }

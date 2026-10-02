@@ -1,0 +1,29 @@
+// The program imports crimp's domains itself
+// CrimpPlugin must not import crimp.vpr a second time; it still adds crimpM.vpr, which the operator with a unit needs.
+import <crimp/crimp.vpr>
+field v: Int
+
+domain Array {
+    function loc(a: Array, i: Int): Ref
+    function len(a: Array): Int
+}
+
+receiver arrayRec(a: Array) (fun (i: Int) : Ref :: loc(a,i))
+
+domain ___arrayRange_Filter_Domain {
+    function arrayRange(start: Int, end: Int): Set[Int]
+    axiom { forall start: Int, end: Int, i: Int :: { i in arrayRange(start, end) }
+    (i in arrayRange(start, end)) == (i >= start && i < end) }
+}
+
+operator addU() (fun (a: Int, b: Int) : Int :: a + b, 0)
+
+method m(a: Array)
+    requires forall k: Int :: {loc(a,k)}
+        k in arrayRange(0, len(a)) ==> acc(loc(a,k).v)
+{
+    assert crimp[addU()][arrayRec(a).v](arrayRange(0, len(a))) ==
+            crimp[addU()][arrayRec(a).v](arrayRange(0, len(a)))
+}
+
+function useOp(o: Operator[Int]): Int

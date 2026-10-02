@@ -56,9 +56,9 @@ class CrimpTypingTests extends AnyFunSuite {
     "method_decreases_bad.vpr" -> Seq(decreases("method_decreases_bad.vpr@29.13")),
     "func_decreases_bad.vpr" -> Seq(decreases("func_decreases_bad.vpr@28.13")),
     "op_unit_bad.vpr" -> Seq(outside("op_unit_bad.vpr@28.58")),
-    "wand_bad.vpr" -> Seq(wand("wand_bad.vpr@24.52"), wand("wand_bad.vpr@26.49"), wand("wand_bad.vpr@32.50"),
-      script("wand_bad.vpr@39.12")),
-    "return_type_bad.vpr" -> Seq(),
+    "wand_bad.vpr" -> Seq(wand("wand_bad.vpr@26.52"), wand("wand_bad.vpr@28.49"), wand("wand_bad.vpr@34.50"),
+      script("wand_bad.vpr@41.12")),
+    "return_type_bad.vpr" -> Seq("found incompatible type `Int`, expected `Bool`"),
   ).map({b => ("bad/" ++ b._1, b._2) })
 
   def nested(at: String): String = s"Crimp inside another crimp is not supported. ($at"
@@ -90,9 +90,9 @@ class CrimpTypingTests extends AnyFunSuite {
       s"$inputfile: frontend reported errors:\n" + frontend.errors.map(_.readableMessage).mkString("\n"))
     assert(frontend.state == DefaultStates.Verification, s"$inputfile: frontend stopped in state ${frontend.state}")
     // The program handed to the verifier (after the plugins' beforeVerify) must not contain a crimp that was not
-    // lowered: CrimpApp.verifyExtExp is not implemented.
-    val unlowered = frontend.program.toSeq.flatMap(_.deepCollect { case e: ExtensionExp => e.toString })
-    assert(unlowered.isEmpty, s"$inputfile: not lowered before verification:\n" + unlowered.mkString("\n"))
+    // translated: CrimpApp.verifyExtExp is not implemented.
+    val untranslated = frontend.program.toSeq.flatMap(_.deepCollect { case e: ExtensionExp => e.toString })
+    assert(untranslated.isEmpty, s"$inputfile: not translated before verification:\n" + untranslated.mkString("\n"))
   }
 
   def testBad(inputfile: String, expected: Seq[String]): Unit = {
