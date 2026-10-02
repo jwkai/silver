@@ -26,16 +26,21 @@ class CrimpTests extends AnyFunSuite {
     "crimp/component-decl-forward-ref.vpr",
     "crimp/user-import.vpr"
   )
-  // Inputs the frontend must reject with exactly these errors (message substrings), in particular without an
-  // additional internal error.
+  // Inputs the frontend must reject with exactly these errors, in particular without an additional internal error.
   val badInputfiles: Seq[(String, Seq[String])] = Seq(
-    "crimp/bad/operator-arity.vpr" -> Seq(
-      "Operator body should have exactly two arguments."
-    ),
-    "crimp/bad/mapping-arity.vpr" -> Seq(
-      "Mapping body should have exactly one argument."
-    ),
+    "crimp/bad/operator-arity.vpr" -> Seq("Operator body should have exactly two arguments."),
+    "crimp/bad/mapping-arity.vpr" -> Seq("Mapping body should have exactly one argument."),
+    "crimp/bad/component-body-crimp.vpr" -> Seq("Crimp outside a method is not supported. (component-body-crimp.vpr@25."),
+    "crimp/bad/recursive-mapping.vpr" -> Seq(recursive("rec", "recursive-mapping.vpr@25.")),
+    "crimp/bad/recursive-mutual.vpr" -> Seq(recursive("ping", "recursive-mutual.vpr@27.")),
+    "crimp/bad/recursive-operator-unit.vpr" -> Seq(recursive("addU", "recursive-operator-unit.vpr@26.")),
+    "crimp/bad/unfolding-component.vpr" -> unfolding("unfolding-component.vpr@25.20"),
+    "crimp/bad/call-arity.vpr" ->
+      Seq("wrong number of arguments (call-arity.vpr@26.", "wrong number of arguments (call-arity.vpr@29.")
   )
+  def unfolding(at: String): Seq[String] = Seq(s"specified location is not a field nor a predicate ($at",
+    s"expected predicate access ($at", s"found incompatible type `<impure>`, expected `<predicate>` ($at")
+  def recursive(component: String, at: String): String = s"Recursive use of crimp component `$component` ($at"
   val plugins: Seq[String] = Seq(
 //    "TestPluginAllCalled",
     "viper.silver.plugin.crimp.CrimpPlugin"

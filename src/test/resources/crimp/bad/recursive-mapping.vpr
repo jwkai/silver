@@ -1,5 +1,4 @@
-// Regression (merge diagnosis C08): a mapping with the wrong arity and a user-domain return type must give only
-// the arity error (no MatchError / Invalid type substitution).
+// The body of a mapping calls the mapping itself. Recursive components are not supported.
 field val: Int
 field flag: Bool
 
@@ -18,14 +17,12 @@ function isB(b: Bool): Bool
 
 define access_array(a, i1, i2) (forall j: Int :: {loc(a, j)} j in allInt(i1, i2) ==> acc(loc(a, j).val) && acc(loc(a, j).flag))
 
+
 receiver arrayRec(a: Array) (fun (i: Int) : Ref :: loc(a, i))
 operator add() (fun (a: Int, b: Int) : Int :: a + b, 0)
-mapping msSingleton() (fun (i: Int) : Multiset[Int] :: Multiset(i))
-mapping scale(k: Int) (fun (i: Int) : Int :: k * i)
-operator msSum() (fun (a: Multiset[Int], b: Multiset[Int]) : Multiset[Int] :: a union b, Multiset[Int]())
-domain Box { function mk(i: Int): Box  function bz(): Box }
-operator boxOp() (fun (a: Box, b: Box) : Box :: a, bz())
-mapping badM() (fun (i: Int, j: Int) : Box :: mk(i))
-method m(a: Array) returns (x: Box)
+function useMap(mp: Mapping[Int, Int]): Int
+function useOp(o: Operator[Int]): Int
+mapping rec() (fun (i: Int) : Int :: i + useMap(rec()))
+method m(a: Array) returns (x: Int)
   requires access_array(a, 0, len(a))
-{ x := crimp[boxOp()][badM(arrayRec(a).val)](allInt(0, len(a))) }
+{ x := crimp[add()][rec(arrayRec(a).val)](allInt(0, len(a))) }

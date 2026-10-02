@@ -1,5 +1,6 @@
-// Regression (merge diagnosis C08/C09): an operator with the wrong arity must give only the arity error, not
-// an additional internal error from its unresolved declared type.
+// A crimp in a component body (here a mapping body that also refers to components declared after it) is rejected,
+// as hreduce rejects a reduce there: the lowering handles crimps in methods only, and the component's generated domain
+// axiom would contain a CrimpApp (in its body and trigger). Expected: one error, at the crimp in `early`.
 field val: Int
 field flag: Bool
 
@@ -19,10 +20,13 @@ function isB(b: Bool): Bool
 define access_array(a, i1, i2) (forall j: Int :: {loc(a, j)} j in allInt(i1, i2) ==> acc(loc(a, j).val) && acc(loc(a, j).flag))
 
 receiver arrayRec(a: Array) (fun (i: Int) : Ref :: loc(a, i))
-domain Box { function box(i: Int): Box }
+domain Box { function box(i: Int): Box  function unbox(b: Box): Int }
+operator add() (fun (a: Int, b: Int) : Int :: a + b, 0)
+mapping early(a: Array) (fun (i: Int) : Int :: unbox(crimp[boxOpLater()][boxIt(arrayRec(a).val)](allInt(0, i))))
+function useOp(o: Operator[Box]): Int
+mapping direct() (fun (i: Int) : Int :: i + useOp(boxOpLater()))
+operator boxOpLater() (fun (a: Box, b: Box) : Box :: a)
 mapping boxIt() (fun (i: Int) : Box :: box(i))
-operator badArity() (fun (a: Box) : Box :: a)
 method m(a: Array) returns (x: Int)
   requires access_array(a, 0, len(a))
-{ var y: Box
-  y := crimp[badArity()][boxIt(arrayRec(a).val)](allInt(0, len(a))) }
+{ x := crimp[add()][early(arrayRec(a).val, a)](allInt(0, len(a))) }
