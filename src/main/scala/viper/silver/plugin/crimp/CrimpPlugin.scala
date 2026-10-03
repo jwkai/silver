@@ -3,17 +3,16 @@ package viper.silver.plugin.crimp
 import fastparse.{NoCut, P}
 import viper.silver.ast.pretty.FastPrettyPrinter.pretty
 import viper.silver.ast.utility.rewriter.StrategyBuilder
-import viper.silver.ast.{NoPosition, Position, Program}
+import viper.silver.ast.{Assume, Infoed, Inhale, LabelledOld, Method, MethodCall, NoPosition, Node, Old, Position, Program}
 import viper.silver.frontend.{DefaultStates, ViperPAstProvider}
 import viper.silver.logger.SilentLogger
-import viper.silver.parser.FastParserCompanion.{ExtendedParsing, LeadingWhitespace, PositionParsing, reservedKw, reservedSym}
-import viper.silver.parser.PDelimited.Comma
-import viper.silver.parser.{FastParser, FastParserCompanion, PAccPred, PAnnotationsPosition, PAssign, PCall, PCallable, PDelimited, PDomain, PDomainType, PDomainTypeKinds, PExp, PFieldAccess, PFormalArgDecl, PGrouped, PIdnDef, PIdnRef, PKw, PKwOp, PLocationAccess, PMaybePairArgument, PNode, PProgram, PReserved, PSetType, PSym, PType, PUnfolding}
-import viper.silver.plugin.crimp.CrimpPlugin.defaultMappingIden
-import viper.silver.plugin.crimp.DomainsGenerator.{crimpDomainString, crimpDomainStringNoId, fuelDomainString, mapDKey, mapIdenKey, mappingDomainString, opDKey, opDomainString, parseDomainString, recDKey, receiverDomainString, setEditDomainString}
+import viper.silver.parser.{FastParser, FastParserCompanion, PAccPred, PAnnotationsPosition, PCall, PCallable, PKwOp, PLocationAccess, PMaybePairArgument, PUnfolding, PDelimited, PDomain, PDomainType, PDomainTypeKinds, PExp, PFieldAccess, PGrouped, PIdnRef, PKw, PNode, PProgram, PReserved, PSetType, PSym, PType}
+import viper.silver.plugin.crimp.CrimpPlugin.{addInlinedAxioms, defaultMappingIden}
+import viper.silver.plugin.crimp.ast.{CrimpApp, CrHeapMap, crHeapInfo}
+import viper.silver.plugin.crimp.DomainsGenerator.mapIdenKey
 import viper.silver.plugin.crimp.parser._
 import viper.silver.plugin.{ParserPluginTemplate, SilverPlugin}
-import viper.silver.reporter.{Entity, NoopReporter}
+import viper.silver.reporter.NoopReporter
 import viper.silver.verifier.{AbstractError, VerificationResult}
 
 import scala.annotation.unused
@@ -27,6 +26,7 @@ class CrimpPlugin(@unused reporter: viper.silver.reporter.Reporter,
   import fp.{ParserExtension, funcApp, exp, argList, formalArg, fieldAccess, foldPExp, idndef, idnref, typ, lineCol, _file}
   import FastParserCompanion.{ExtendedParsing, LeadingWhitespace, PositionParsing, reservedKw, reservedSym}
 
+  private val fuelIsTwo: Boolean = true
   private var setOperators: Set[POperator] = Set()
 
   /** Parser for crimp statements. */
@@ -233,97 +233,14 @@ class CrimpPlugin(@unused reporter: viper.silver.reporter.Reporter,
     }
   }
 
-////    if (input.filterMembers {
-////      case _: PCrimp | _: PReceiver | _: PMapping | _: PFilter | _: POperator => true
-////      case _ => false
-////    }.members.isEmpty) {
-////      input
-////    } else {
-////      val reduceDomainWithID =
-////        if (input.filterMembers {
-////          case op: POperator => op.opUnit match {
-////            case None => false
-////            case Some(_) => true
-////          }
-////          case _ => false
-////        }.members.nonEmpty) {
-////          Seq(crimpDomainString())
-////        } else {
-////          Seq()
-////        }
-////      val reduceDomainWithoutID =
-////        if (input.filterMembers {
-////          case op: POperator => op.opUnit match {
-////            case None => true
-////            case Some(_) => false
-////          }
-////          case _ => false
-////        }.members.nonEmpty) {
-////          Seq(crimpDomainStringNoId())
-////        } else {
-////          Seq()
-////        }
-////      val domainsToAdd = (reduceDomainWithID ++ reduceDomainWithoutID ++ Seq(
-////        fuelDomainString(),
-////        receiverDomainString(),
-////        opDomainString(),
-////        mappingDomainString(),
-////        setEditDomainString()
-////      )).map(parseDomainString) // :+ convertUserDefs(input.extensions)
-////
-////      val newInput = input.copy(
-////        members = input.members ++ domainsToAdd
-////      )(input.pos, input.localErrors, input.offsets, input.rawProgram)
-////      newInput
-////    }
+//  /** Called after identifiers have been resolved but before the parse AST is translated into the normal AST.
+//   *
+//   * @param input Parse AST
+//   * @return Modified Parse AST
+//   */
+//  override def beforeTranslate(input: PProgram): PProgram = {
+//    input
 //  }
-
-  /** Called after identifiers have been resolved but before the parse AST is translated into the normal AST.
-   *
-   * @param input Parse AST
-   * @return Modified Parse AST
-   */
-  override def beforeTranslate(input: PProgram): PProgram = {
-//    if (input.filterMembers {
-//      case _: PCrimp | _: PReceiver | _: PMapping | _: POperator => true
-//      case _ => false
-//    }.members.isEmpty) {
-//      input
-//    } else {
-//      setOperators = input.deepCollect({
-//        case op: POperator =>
-//          op
-//      }).toSet
-//
-//      val importCrimpM = if (input.filterMembers {
-//        case op: POperator => op.opUnit match {
-//          case None => false
-//          case Some(_) => true
-//        }
-//        case _ => false
-//      }.members.nonEmpty) {
-//        Set("import <crimp/crimpM.vpr>")
-//      } else { Set() }
-//
-//      val importCrimpS = if (input.filterMembers {
-//        case op: POperator => op.opUnit match {
-//          case None => true
-//          case Some(_) => false
-//        }
-//        case _ => false
-//      }.members.nonEmpty) {
-//        Set("import <crimp/crimpS.vpr>")
-//      } else { Set() }
-//
-//      val importStmts = Set("import <crimp/crimp.vpr>") ++ importCrimpM ++ importCrimpS
-//
-//      val importOnlyProgram = importStmts.mkString("\n")
-//      val importPProgram = PAstProvider.generateViperPAst(importOnlyProgram).get.filterMembers(_.isInstanceOf[PDomain])
-//      val mergedProgram = PProgram(input.imported :+ importPProgram, input.members)(input.pos, input.localErrors, input.offsets, input.rawProgram)
-//      super.beforeTranslate(mergedProgram)
-//    }
-    input
-  }
 
   /** Called after parse AST has been translated into the normal AST but before methods to verify are filtered.
    * In [[viper.silver.frontend.SilFrontend]] this step is confusingly called doTranslate.
@@ -341,14 +258,24 @@ class CrimpPlugin(@unused reporter: viper.silver.reporter.Reporter,
     val opMethods = setOperators.map(o => o.generatedOpWelldefinednessCheck(p)).toSeq
     p.copy(methods = opMethods ++ p.methods)(p.pos, p.info, p.errT)
   }
-//
-//  /** Called after methods are filtered but before the verification by the backend happens.
-//   *
-//   * @param input AST
-//   * @return Modified AST
-//   */
-//  override def beforeVerify(input: Program) : Program = ???
-//
+
+  /** Called after methods are filtered but before the verification by the backend happens: lowers the crimp
+   * expressions (as HReducePlugin.beforeVerify, without its debug print). A program without crimp expressions is
+   * returned unchanged (the lowering's AxiomHelper needs the imported crimp domains, which such a program may lack).
+   *
+   * @param input AST
+   * @return Modified AST
+   */
+  override def beforeVerify(input: Program) : Program = {
+    if (!input.existsDefined { case _: CrimpApp => }) return input
+    var newInput = addInlinedAxioms(input, fuelIsTwo, reportError)
+    newInput = newInput.transform({
+      case e@Assume(a) => Inhale(a)(e.pos, e.info, e.errT)
+    })
+//    print(pretty(newInput) + "\n\n")
+    newInput
+  }
+
 //  /** Called after the verification of an entity, which is used to stream verification results to the IDE
 //   * (which happens as soon as a member has been verified). Error transformation should happen here.
 //   * This will only be called if verification of `entity` took place.
@@ -358,7 +285,7 @@ class CrimpPlugin(@unused reporter: viper.silver.reporter.Reporter,
 //   * @return Modified result
 //   */
 //  override def mapEntityVerificationResult(entity: Entity, input: VerificationResult): VerificationResult = ???
-//
+
 //  /** Called after the verification. Error transformation should happen here.
 //   * This will only be called if verification took place.
 //   *
@@ -367,7 +294,7 @@ class CrimpPlugin(@unused reporter: viper.silver.reporter.Reporter,
 //   * @return Modified result
 //   */
 //  override def mapVerificationResult(program: Program, input: VerificationResult): VerificationResult = ???
-//
+
 //  /** Called after the verification just before the result is printed. Will not be called in tests.
 //   * This will also be called even if verification did not take place (i.e. an error during parsing/translation occurred).
 //   *
@@ -375,7 +302,7 @@ class CrimpPlugin(@unused reporter: viper.silver.reporter.Reporter,
 //   * @return Modified result
 //   */
 //  override def beforeFinish(input: VerificationResult) : VerificationResult = ???
-//
+
 //  /** Can be called by the plugin to report an error while transforming the input.
 //   *
 //   * The reported error should correspond to the stage in which it is generated (e.g. no ParseError in beforeVerify)
@@ -410,4 +337,107 @@ object CrimpPlugin {
     outType
   }
 
+  def addInlinedAxioms(p: Program, fuelIsTwo: Boolean, reportError: AbstractError => Unit) : Program = {
+    def modifyMethod(m: Method) : Method = {
+      // If a method evaluates no reduction (neither itself nor through the specification of a method it calls), keep
+      // the method the same
+      if (!InlineAxiomGenerator.needsLowering(p, m)) { return m }
+
+      val axiomGenerator = new InlineAxiomGenerator(p, m.name, fuelIsTwo, reportError)
+
+      // Convert all method calls to inhales and exhales
+      var outM: Method = m.transform({
+        case e: MethodCall => axiomGenerator.convertMethodToInhaleExhale(e)
+      })
+
+      // The receivers are those of the reductions of the method after the conversion (body, specification, loop
+      // invariants, and the callees' specifications).
+      axiomGenerator.initReceivers(outM)
+
+      // Add axioms for exhales, inhales and heap writes, tagging every statement with its crimp-heap indices
+      outM = outM.body match {
+        case Some(mBody) =>
+          outM.copy(body =
+            Some(axiomGenerator.lowerBody(mBody))
+          )(outM.pos, outM.info, outM.errT)
+        case None =>
+          axiomGenerator.lowerMissingBody()
+          outM
+      }
+
+//      // add axioms for heap reads, using bottom up traversal
+//      // TODO: ensure that the correct crHeap annotations are observed by these axioms
+//      outM = outM.transform({
+//        case s: Stmt  =>
+//          axiomGenerator.generateHeapReadAxioms(s, s match {
+//            case NodeWithCHeapInfo(cHeapInfo(rh)) => rh
+//            case _ => axiomGenerator.getCurrentCHeap
+//          })
+//      }, recurse = Traverse.BottomUp)
+
+      // Now, transform CrimpApp nodes in context of cHeap annotations. A reduction is evaluated at the index of its
+      // receiver (heapKey): in a statement, at the indices the statement is tagged with; inside old(e), at the method's
+      // entry indices; inside old[L](e), at the indices recorded at label L. The old(..)/old[L](..) wrapper is kept, so
+      // that Viper evaluates the reduction's receiver and filter arguments in that state, too.
+      val fuel = axiomGenerator.getFuelExp
+      def lowerReductions[N <: Node](n: N, rhInitial: CrHeapMap): N = n.transformWithContext[CrHeapMap]({
+        case (s@NodeWithCrHeapInfo(crHeapInfo(rh)), _) =>
+          (s, rh)
+        case (o: Old, _) =>
+          (o, axiomGenerator.getOldCrHeap)
+        case (lo: LabelledOld, _) if InlineAxiomGenerator.hasCrimp(lo) =>
+          (lo, axiomGenerator.getCrHeapFromUserLabel(lo.oldLabel, lo.pos))
+        case (ra: CrimpApp, rh) =>
+          (ra.toViper(p, fuel, rh(ra.heapKey)), rh)
+      }, initialContext = rhInitial)
+
+      outM = outM.body match {
+        case Some(mBody) =>
+          outM.copy(body =
+            Some(lowerReductions(mBody, axiomGenerator.getOldCrHeap))
+          )(outM.pos, outM.info, outM.errT)
+        case None => outM
+      }
+
+      // TODO: figure out why this doesn't work...
+//      def stripCHeapInfo(n: Node) = {
+//        val nMeta = n.meta.copy(_2 = n.meta._2.removeUniqueInfo[cHeapInfo])
+//        n.withMeta(nMeta)
+//      }
+//      outM = outM.body match {
+//        case Some(mBody) =>
+//          outM.copy(body =
+//            Some(mBody.transform({
+//              case n@NodeWithCHeapInfo(cHeapInfo(_)) =>
+//                stripCHeapInfo(n)
+//            }))
+//          )(outM.pos, outM.info, outM.errT)
+//        case None => outM
+//      }
+
+      // Add heap-dependent function to pre-/post-conditions. The invariants of the loops keep no reduction: the conjuncts
+      // containing one are asserted and assumed in the loop body instead (InlineAxiomGenerator).
+      outM = outM.copy(
+        pres =
+          outM.pres.map(pre => lowerReductions(pre, axiomGenerator.getOldCrHeap)),
+        posts =
+          outM.posts.map(post => lowerReductions(post, axiomGenerator.getCurrentCrHeap))
+      )(outM.pos, outM.info, outM.errT)
+
+      outM
+    }
+
+    // Modify all methods
+    val outMethods = p.methods.map(m => modifyMethod(m))
+
+    // Modify the program
+    p.copy(methods = outMethods)(p.pos, p.info, p.errT)
+  }
+}
+
+object NodeWithCrHeapInfo {
+  def unapply(node : Node) : Option[crHeapInfo] = node match {
+    case i: Infoed => i.info.getUniqueInfo[crHeapInfo]
+    case _ => None
+  }
 }
