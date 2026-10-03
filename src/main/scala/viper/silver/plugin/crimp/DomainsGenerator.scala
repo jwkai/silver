@@ -65,7 +65,7 @@ object DomainsGenerator {
   final val trigExtKeyS = "triggerExtS"
 
   final val recApplyKey = "recApply"
-  final val recInvKey = "recInv"
+  final val preimgElemKey = "preimgElem"
   final val opApplyKey = "opApply"
   final val opIdenKey = "opGetIden"
   final val mapApplyKey = "mapApply"
@@ -76,6 +76,8 @@ object DomainsGenerator {
   final val subsetNotInRefsKey = "subsetNotInRefs"
   final val idxNotInRefsKey = "idxNotInRefs"
   final val setDeleteKey = "setDelete"
+  final val extLinkDKey = "ExtLink"
+  final val extLinkKey = "extLink"
 
   final val fuelDKey = "Fuel"
   final val fuelSKey = "succ"
@@ -100,27 +102,30 @@ object DomainsGenerator {
     val receiverOut =
       s"""domain $recDKey[$crimpDTV0] {
          |    function $recApplyKey(r:$recDKey[$crimpDTV0], a:$crimpDTV0): Ref
-         |    function $recInvKey(rec:$recDKey[$crimpDTV0], ref:Ref): $crimpDTV0
          |    function $filterRecvGoodKey(f: Set[$crimpDTV0], r: $recDKey[$crimpDTV0]): Bool
+         |
+         |    function $preimgElemKey(r: $recDKey[$crimpDTV0], f: Set[$crimpDTV0], l: Ref): $crimpDTV0
          |
          |    function $subsetNotInRefsKey(f1: Set[$crimpDTV0], r: $recDKey[$crimpDTV0], lostR: Set[Ref]): Set[$crimpDTV0]
          |    function $idxNotInRefsKey(a: $crimpDTV0, r: $recDKey[$crimpDTV0], domR: Set[Ref]): Bool
          |
-         |    axiom _inverse_receiver {
-         |        forall ${prefix}a : $crimpDTV0, ${prefix}f: Set[$crimpDTV0], ${prefix}r: $recDKey[$crimpDTV0]
-         |        :: { $recApplyKey(${prefix}r,${prefix}a), $filterRecvGoodKey(${prefix}f,${prefix}r) }
-         |           { $filterRecvGoodKey(${prefix}f,${prefix}r), ${prefix}a in ${prefix}f }
-         |        $filterRecvGoodKey(${prefix}f,${prefix}r) && ${prefix}a in ${prefix}f ==>
-         |        $filterRecvGoodKey(${prefix}f,${prefix}r) &&
-         |        ${prefix}a in ${prefix}f && $recInvKey(${prefix}r,$recApplyKey(${prefix}r,${prefix}a)) == ${prefix}a
-         |    }
-         |
-         |    axiom _inverse_receiver1 {
-         |        forall ${prefix}ref: Ref, ${prefix}f: Set[$crimpDTV0], ${prefix}r:$recDKey[$crimpDTV0]
-         |        :: { $filterRecvGoodKey(${prefix}f, ${prefix}r), $recInvKey(${prefix}r, ${prefix}ref) }
-         |        $filterRecvGoodKey(${prefix}f, ${prefix}r) && $recInvKey(${prefix}r, ${prefix}ref) in ${prefix}f ==>
-         |        $filterRecvGoodKey(${prefix}f, ${prefix}r) && $recInvKey(${prefix}r, ${prefix}ref) in ${prefix}f &&
-         |        $recApplyKey(${prefix}r,$recInvKey(${prefix}r,${prefix}ref)) == ${prefix}ref
+         |    // Index footprints:
+         |    //   subsetNotInRefs(f, r, ls) = f minus {i | r(i) in ls} (the indices of f outside the preimage of ls).
+         |    // No preimage set {i | r(i) == l} is declared (need not be finite), and no receiver inverse is assumed/
+         |    // A receiver that is injective on a filter f (filterReceiverGood) maps at most one index of f to l,
+         |    // i.e. preimgElem(r, f, l), which depends on f, so filters on which r is injective never have to agree.
+         |    //
+         |    // On a filter on which r is injective, each index of the filter reaching l is the witness (at most one).
+         |    // Triggered on the witness term only: it fires for an index term whose receiver application is equal to
+         |    // the location of a witness term (which only the inline axioms create), and creates no other term.
+         |    // Logically the same as preimgElem(r, f, l) == a for every a in f with recApply(r, a) == l.
+         |    // Receivers whose body is no trigger term get their receiver applications from their own declaration
+         |    // (PReduceComponentDecl.getEvalFuncAxiom).
+         |    axiom _preimgElemInv {
+         |        forall ${prefix}a: $crimpDTV0, ${prefix}f: Set[$crimpDTV0], ${prefix}r: $recDKey[$crimpDTV0] ::
+         |        { $preimgElemKey(${prefix}r, ${prefix}f, $recApplyKey(${prefix}r, ${prefix}a)) }
+         |        $filterRecvGoodKey(${prefix}f, ${prefix}r) && ${prefix}a in ${prefix}f ==>
+         |        $preimgElemKey(${prefix}r, ${prefix}f, $recApplyKey(${prefix}r, ${prefix}a)) == ${prefix}a
          |    }
          |
          |    axiom _smallerF {
@@ -261,7 +266,7 @@ object DomainsGenerator {
                ${prefix}fs: Set[$crimpDTV0],
                ${prefix}keys: Set[$crimpDTV0] ::
         { $trigDelBlockKeyS($crimpApplyKeyS($fuelSKey(${prefix}f), ${prefix}crh, ${prefix}c, ${prefix}fs), ${prefix}keys) }
-        (${prefix}keys subset ${prefix}fs && (${prefix}keys != ${prefix}fs)) ==>
+        (${prefix}keys subset ${prefix}fs && (${prefix}keys != ${prefix}fs) && (${prefix}keys != Set[$crimpDTV0]())) ==>
         (${prefix}keys subset ${prefix}fs && (${prefix}keys != ${prefix}fs)) &&
         $crimpApplyKeyS($fuelSKey(${prefix}f), ${prefix}crh, ${prefix}c, ${prefix}fs) ==
         $opApplyKey($crimpGetOperKeyS(${prefix}c),
@@ -348,9 +353,9 @@ object DomainsGenerator {
                        ($crimpApplyKeyS(${prefix}f2, ${prefix}crh_new, ${prefix}c, ${prefix}fs): $crimpDTV2)): Bool) }
         (${prefix}crh_old < ${prefix}crh_new) ==>
         (($crimpApplyKeyS(${prefix}f1, ${prefix}crh_old, ${prefix}c, ${prefix}fs) == $crimpApplyKeyS(${prefix}f2, ${prefix}crh_new, ${prefix}c, ${prefix}fs)) ||
-        (((${prefix}fs != Set()) && ($skExtKeyS(${prefix}c, $crimpApplyKeyS(${prefix}f1, ${prefix}crh_old, ${prefix}c, ${prefix}fs), $crimpApplyKeyS(${prefix}f2, ${prefix}crh_new, ${prefix}c, ${prefix}fs)) in ${prefix}fs ==>
-            (($crHeapElemKeyS(${prefix}crh_old, ${prefix}c, $skExtKeyS(${prefix}c, $crimpApplyKeyS(${prefix}f1, ${prefix}crh_old, ${prefix}c, ${prefix}fs), $crimpApplyKeyS(${prefix}f2, ${prefix}crh_new, ${prefix}c, ${prefix}fs))): $crimpDTV2)) ==
-            (($crHeapElemKeyS(${prefix}crh_new, ${prefix}c, $skExtKeyS(${prefix}c, $crimpApplyKeyS(${prefix}f1, ${prefix}crh_old, ${prefix}c, ${prefix}fs), $crimpApplyKeyS(${prefix}f2, ${prefix}crh_new, ${prefix}c, ${prefix}fs))): $crimpDTV2))))
+        (((${prefix}fs != Set()) && ($skExtKeyS(${prefix}c, ${prefix}crh_old, ${prefix}rh_new, ${prefix}fs) in ${prefix}fs ==>
+            (($crHeapElemKeyS(${prefix}crh_old, ${prefix}c, $skExtKeyS(${prefix}c, ${prefix}crh_old, ${prefix}crh_new, ${prefix}fs)): $crimpDTV2)) ==
+            (($crHeapElemKeyS(${prefix}crh_new, ${prefix}c, $skExtKeyS(${prefix}c, ${prefix}crh_old, ${prefix}crh_new, ${prefix}fs)): $crimpDTV2))))
         ==>
         ($crimpApplyKeyS(${prefix}f1, ${prefix}crh_old, ${prefix}c, ${prefix}fs) == $crimpApplyKeyS(${prefix}f2, ${prefix}crh_new, ${prefix}c, ${prefix}fs))))
     }"""
@@ -368,9 +373,9 @@ object DomainsGenerator {
                        ($crimpApplyKeyM(${prefix}f2, ${prefix}crh_new, ${prefix}c, ${prefix}fs): $crimpDTV2)): Bool) }
         (${prefix}crh_old < ${prefix}crh_new) ==>
         (($crimpApplyKeyM(${prefix}f1, ${prefix}crh_old, ${prefix}c, ${prefix}fs) == $crimpApplyKeyM(${prefix}f2, ${prefix}crh_new, ${prefix}c, ${prefix}fs)) ||
-        (($skExtKeyM(${prefix}c, $crimpApplyKeyM(${prefix}f1, ${prefix}crh_old, ${prefix}c, ${prefix}fs), $crimpApplyKeyM(${prefix}f2, ${prefix}crh_new, ${prefix}c, ${prefix}fs)) in ${prefix}fs ==>
-            (($crHeapElemKeyM(${prefix}crh_old, ${prefix}c, $skExtKeyM(${prefix}c, $crimpApplyKeyM(${prefix}f1, ${prefix}crh_old, ${prefix}c, ${prefix}fs), $crimpApplyKeyM(${prefix}f2, ${prefix}crh_new, ${prefix}c, ${prefix}fs))): $crimpDTV2)) ==
-            (($crHeapElemKeyM(${prefix}crh_new, ${prefix}c, $skExtKeyM(${prefix}c, $crimpApplyKeyM(${prefix}f1, ${prefix}crh_old, ${prefix}c, ${prefix}fs), $crimpApplyKeyM(${prefix}f2, ${prefix}crh_new, ${prefix}c, ${prefix}fs))): $crimpDTV2)))
+        (($skExtKeyM(${prefix}c, ${prefix}crh_old, ${prefix}crh_new, ${prefix}fs) in ${prefix}fs ==>
+            (($crHeapElemKeyM(${prefix}crh_old, ${prefix}c, $skExtKeyM(${prefix}c, ${prefix}crh_old, ${prefix}crh_new, ${prefix}fs)): $crimpDTV2)) ==
+            (($crHeapElemKeyM(${prefix}crh_new, ${prefix}c, $skExtKeyM(${prefix}c, ${prefix}crh_old, ${prefix}crh_new, ${prefix}fs)): $crimpDTV2)))
         ==>
         ($crimpApplyKeyM(${prefix}f1, ${prefix}crh_old, ${prefix}c, ${prefix}fs) == $crimpApplyKeyM(${prefix}f2, ${prefix}crh_new, ${prefix}c, ${prefix}fs))))
     }"""
@@ -465,7 +470,7 @@ object DomainsGenerator {
          |
          |    $disjAxiom
          |
-         |    function $skExtKey(c: $domainName[$crimpDTV0,$crimpDTV1,$crimpDTV2], hfA1: $crimpDTV2, hfA2: $crimpDTV2): $crimpDTV0
+         |    function $skExtKey(c: $domainName[$crimpDTV0,$crimpDTV1,$crimpDTV2], crhOld: $intKey, crhNew: $intKey, fs: Set[$crimpDTV0]): $crimpDTV0
          |    function $trigExtKey(hfA1: $crimpDTV2, hfA2: $crimpDTV2): Bool
          |
          |    axiom $trigExtensionalityAxiom {
@@ -476,7 +481,8 @@ object DomainsGenerator {
          |               ${prefix}c: $domainName[$crimpDTV0,$crimpDTV1,$crimpDTV2],
          |               ${prefix}fs: Set[$crimpDTV0] ::
          |        { ($crimpApplyKey(${prefix}f1, ${prefix}crh_old, ${prefix}c, ${prefix}fs): $crimpDTV2),
-         |          ($crimpApplyKey(${prefix}f2, ${prefix}crh_new, ${prefix}c, ${prefix}fs): $crimpDTV2) }
+         |          ($crimpApplyKey(${prefix}f2, ${prefix}crh_new, ${prefix}c, ${prefix}fs): $crimpDTV2),
+         |          ($extLinkKey(${prefix}crh_old, ${prefix}crh_new): Bool) }
          |        ($trigExtKey(($crimpApplyKey(${prefix}f1, ${prefix}crh_old, ${prefix}c, ${prefix}fs): $crimpDTV2),
          |                     ($crimpApplyKey(${prefix}f2, ${prefix}crh_new, ${prefix}c, ${prefix}fs): $crimpDTV2)))
          |    }
@@ -542,6 +548,14 @@ object DomainsGenerator {
       trigExtensionalityAxiomM
     )
 
+  // Link terms: the lowering inhales extLink(o, n) for each pair of indices o < n of one field that its axioms relate
+  // (a write, a branch end and the join, an exhale or inhale, and the last inhale-or-write index and a later inhale, which
+  // spans a call's exhale/inhale). Extensionality is triggered only on linked pairs; extLink constrains nothing.
+  def extLinkDomainString(): String =
+    s"""domain $extLinkDKey {
+       |    function $extLinkKey(rhOld: $intKey, rhNew: $intKey): Bool
+       |}\n """.stripMargin
+
   def setEditDomainString(): String = {
     val setOut =
       s"""domain SetEdit[$crimpDTV0] {
@@ -591,8 +605,7 @@ object DomainsGenerator {
 
     fastparse.parse(input, myParserToPDomain(_)) match {
       case Parsed.Success(newDomain, _) =>
-        val d = changePosRecursive(newDomain.asInstanceOf[PNode], (NoPosition, NoPosition))
-        d.asInstanceOf[PDomain]
+        changePosRecursive(newDomain, (NoPosition, NoPosition)).asInstanceOf[PDomain]
       case fail: Parsed.Failure =>
         // This should not happen
         val trace = fail.trace()
@@ -608,6 +621,6 @@ object DomainsGenerator {
       case node: PNode => changePosRecursive(node, pos)
       case child => child
     }
-    body.withChildren(children, Some(pos), forceRewrite = true)
+    body.withChildren(children, Some(pos))
   }
 }

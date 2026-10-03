@@ -69,11 +69,11 @@ case class PCrimp(keyword: PReserved[PCrimpKeyword.type], operator: PExp, mappin
 
   override def extraLocalTypeVariables: Set[PDomainType] = _extraLocalTypeVariables
 
-  override def forceSubstitution(ots: PTypeSubstitution): Unit = {
+  override def forceSubstitution(ts: PTypeSubstitution): Unit = {
     // fresh type variables should have been generated for components by PCrimp.typecheck
     typeSubstitutions.clear()
-    typeSubstitutions += ots
-    typ = typ.substitute(ots)
+    typeSubstitutions += ts
+    typ = typ.substitute(ts)
   }
   
   override def signatures: List[PTypeSubstitution] = {

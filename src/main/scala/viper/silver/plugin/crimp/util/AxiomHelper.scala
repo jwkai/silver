@@ -182,6 +182,10 @@ class AxiomHelper(program: Program, fuelIsTwo: Boolean) {
 //    )
 //  }
 
+  // extLink(rchOld, crhNew): the link term of two indices that the translation relates (the extensionality trigger).
+  def extLinkApply(crhOld: Exp, crhNew: Exp): DomainFuncApp =
+    applyDomainFunc(DomainsGenerator.extLinkKey, Seq(crhOld, crhNew), Map())
+
   def trigExtApply(fuel1: Exp, crHeap1: Exp, fuel2: Exp, crHeap2: Exp, crimp: Exp, filter: Exp)(hasID: Boolean): DomainFuncApp = {
     val trigExtKey = if (hasID) DomainsGenerator.trigExtKeyM else DomainsGenerator.trigExtKeyS
     applyDomainFunc(
@@ -313,6 +317,28 @@ class AxiomHelper(program: Program, fuelIsTwo: Boolean) {
       injectiveFullCheck(filter, crimpExp)(hasID)
     )()
   }
+
+  // Index footprints as preimages (sec-indexical.tex, Definition "Index Footprints"): the plugin never assumes an
+  // inverse of a receiver. A receiver that is injective on a filter fs maps at most one index of fs to a location l;
+  // preimgElem names it (_preimgElemIdx), per filter.
+
+  private def receiverTypeOf(crimpExp: Exp): DomainType = {
+    val crimpType = crimpExp.typ.asInstanceOf[DomainType]
+    DomainType.apply(program.findDomain(DomainsGenerator.recDKey), crimpType.typVarsMap)
+  }
+
+
+  /** preimgElem(getreceiver(crimp), fs, loc): the index of fs at which the receiver reaches loc, if there is one. */
+  def preimgElemApply(crimpExp: Exp, filter: Exp, loc: Exp)(hasID: Boolean): DomainFuncApp =
+    applyDomainFunc(DomainsGenerator.preimgElemKey, Seq(getReceiverApply(crimpExp)(hasID), filter, loc),
+      receiverTypeOf(crimpExp).typVarsMap)
+
+  /** elem in fs && recApply(getreceiver(crimp), elem) == loc: the witness is an index of fs that reaches loc, i.e. it
+    * is the element of the block of fs at loc. */
+  def witnessReaches(elem: Exp, filter: Exp, crimpExp: Exp, loc: Exp)(hasID: Boolean): And =
+    And(AnySetContains(elem, filter)(),
+      EqCmp(applyDomainFunc(DomainsGenerator.recApplyKey, Seq(getReceiverApply(crimpExp)(hasID), elem),
+        receiverTypeOf(crimpExp).typVarsMap), loc)())()
 
   def subsetNotInRefs(fs: Exp, crimpExp: Exp, refs: LocalVar)(hasID: Boolean): DomainFuncApp = {
     val crimpType = crimpExp.typ.asInstanceOf[DomainType]

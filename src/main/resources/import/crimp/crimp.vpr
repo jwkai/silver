@@ -9,38 +9,19 @@ domain Receiver[I]  {
 
   function recApply(r: Receiver[I], a: I): Ref
 
-  function recInv(rec: Receiver[I], ref: Ref): I
-
   function filterReceiverGood(f: Set[I], r: Receiver[I]): Bool
+
+  function preimgElem(r: Receiver[I], f: Set[I], l: Ref): I
 
   function subsetNotInRefs(f1: Set[I], r: Receiver[I], lostR: Set[Ref]): Set[I]
 
   function idxNotInRefs(a: I, r: Receiver[I], domR: Set[Ref]): Bool
 
-  axiom _inverse_receiver {
+  axiom _preimgElemInv {
     (forall __crimp_a: I, __crimp_f: Set[I], __crimp_r: Receiver[I] ::
-      { (recApply(__crimp_r, __crimp_a): Ref), (filterReceiverGood(__crimp_f,
-      __crimp_r): Bool) }
-      { (filterReceiverGood(__crimp_f, __crimp_r): Bool), (__crimp_a in
-      __crimp_f) }
-      (filterReceiverGood(__crimp_f, __crimp_r): Bool) &&
-      (__crimp_a in __crimp_f) ==>
-      (filterReceiverGood(__crimp_f, __crimp_r): Bool) &&
-      ((__crimp_a in __crimp_f) &&
-      (recInv(__crimp_r, (recApply(__crimp_r, __crimp_a): Ref)): I) ==
-      __crimp_a))
-  }
-
-  axiom _inverse_receiver1 {
-    (forall __crimp_ref: Ref, __crimp_f: Set[I], __crimp_r: Receiver[I] ::
-      { (filterReceiverGood(__crimp_f, __crimp_r): Bool), (recInv(__crimp_r,
-      __crimp_ref): I) }
-      (filterReceiverGood(__crimp_f, __crimp_r): Bool) &&
-      ((recInv(__crimp_r, __crimp_ref): I) in __crimp_f) ==>
-      (filterReceiverGood(__crimp_f, __crimp_r): Bool) &&
-      (((recInv(__crimp_r, __crimp_ref): I) in __crimp_f) &&
-      (recApply(__crimp_r, (recInv(__crimp_r, __crimp_ref): I)): Ref) ==
-      __crimp_ref))
+      { (preimgElem(__crimp_r, __crimp_f, (recApply(__crimp_r, __crimp_a): Ref)): I) }
+      (filterReceiverGood(__crimp_f, __crimp_r): Bool) && (__crimp_a in __crimp_f) ==>
+      (preimgElem(__crimp_r, __crimp_f, (recApply(__crimp_r, __crimp_a): Ref)): I) == __crimp_a)
   }
 
   axiom _smallerF {
@@ -144,4 +125,9 @@ domain SetEdit[I]  {
       { (setDelete(__crimp_s, __crimp_e): Set[I]) }
       ((setDelete(__crimp_s, __crimp_e): Set[I]) subset __crimp_s))
   }
+}
+
+domain ExtLink  {
+
+  function extLink(crhOld: Int, crhNew: Int): Bool
 }

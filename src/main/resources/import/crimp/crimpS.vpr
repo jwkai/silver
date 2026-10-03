@@ -22,7 +22,7 @@ domain CrimpS[I, V, S]  {
 
   function getFieldIDS(c: CrimpS[I, V, S]): Int
 
-  function skExtS(c: CrimpS[I, V, S], hfA1: S, hfA2: S): I
+  function skExtS(c: CrimpS[I, V, S], crhOld: Int, crhNew: Int, fs: Set[I]): I
 
   function triggerExtS(hfA1: S, hfA2: S): Bool
 
@@ -63,7 +63,7 @@ domain CrimpS[I, V, S]  {
       __crimp_fs): S), __crimp_key): Bool), (crHeapElemS(__crimp_crh, __crimp_c,
       __crimp_key): S) }
       (__crimp_key in __crimp_fs) && __crimp_fs != Set(__crimp_key) ==>
-      (__crimp_key in __crimp_fs) && __crimp_fs != Set(__crimp_key) &&
+      ((__crimp_key in __crimp_fs) && __crimp_fs != Set(__crimp_key)) &&
       (crimpApplyS(succ(__crimp_f), __crimp_crh, __crimp_c, __crimp_fs): S) ==
       (opApply((getoperatorS(__crimp_c): Operator[S]), (crimpApplyS(__crimp_f,
       __crimp_crh, __crimp_c, (setDelete(__crimp_fs, Set(__crimp_key)): Set[I])): S),
@@ -75,8 +75,8 @@ domain CrimpS[I, V, S]  {
     __crimp_fs: Set[I], __crimp_keys: Set[I] ::
       { (triggerDeleteBlockS((crimpApplyS(succ(__crimp_f), __crimp_crh, __crimp_c,
       __crimp_fs): S), __crimp_keys): Bool) }
-      (__crimp_keys subset __crimp_fs) && __crimp_keys != __crimp_fs ==>
-      (__crimp_keys subset __crimp_fs) && __crimp_keys != __crimp_fs &&
+      (__crimp_keys subset __crimp_fs) && (__crimp_keys != __crimp_fs && __crimp_keys != Set[I]()) ==>
+      ((__crimp_keys subset __crimp_fs) && __crimp_keys != __crimp_fs) &&
       (crimpApplyS(succ(__crimp_f), __crimp_crh, __crimp_c, __crimp_fs): S) ==
       (opApply((getoperatorS(__crimp_c): Operator[S]), (crimpApplyS(__crimp_f,
       __crimp_crh, __crimp_c, (setDelete(__crimp_fs, __crimp_keys): Set[I])): S),
@@ -113,7 +113,8 @@ domain CrimpS[I, V, S]  {
     (forall __crimp_f1: Fuel, __crimp_f2: Fuel, __crimp_crh_old: Int, __crimp_crh_new: Int,
     __crimp_c: CrimpS[I, V, S], __crimp_fs: Set[I] ::
       { (crimpApplyS(__crimp_f1, __crimp_crh_old, __crimp_c, __crimp_fs): S),
-      (crimpApplyS(__crimp_f2, __crimp_crh_new, __crimp_c, __crimp_fs): S) }
+      (crimpApplyS(__crimp_f2, __crimp_crh_new, __crimp_c, __crimp_fs): S),
+      (extLink(__crimp_crh_old, __crimp_crh_new): Bool) }
       (triggerExtS((crimpApplyS(__crimp_f1, __crimp_crh_old, __crimp_c,
       __crimp_fs): S), (crimpApplyS(__crimp_f2, __crimp_crh_new, __crimp_c,
       __crimp_fs): S)): Bool))
@@ -129,16 +130,12 @@ domain CrimpS[I, V, S]  {
       (crimpApplyS(__crimp_f1, __crimp_crh_old, __crimp_c, __crimp_fs): S) ==
       (crimpApplyS(__crimp_f2, __crimp_crh_new, __crimp_c, __crimp_fs): S) ||
       (__crimp_fs != Set[I]() &&
-      (((skExtS(__crimp_c, (crimpApplyS(__crimp_f1, __crimp_crh_old, __crimp_c,
-      __crimp_fs): S), (crimpApplyS(__crimp_f2, __crimp_crh_new, __crimp_c,
-      __crimp_fs): S)): I) in
+      (((skExtS(__crimp_c, __crimp_crh_old, __crimp_crh_new, __crimp_fs): I) in
       __crimp_fs) ==>
-      (crHeapElemS(__crimp_crh_old, __crimp_c, (skExtS(__crimp_c, (crimpApplyS(__crimp_f1,
-      __crimp_crh_old, __crimp_c, __crimp_fs): S), (crimpApplyS(__crimp_f2,
-      __crimp_crh_new, __crimp_c, __crimp_fs): S)): I)): S) ==
-      (crHeapElemS(__crimp_crh_new, __crimp_c, (skExtS(__crimp_c, (crimpApplyS(__crimp_f1,
-      __crimp_crh_old, __crimp_c, __crimp_fs): S), (crimpApplyS(__crimp_f2,
-      __crimp_crh_new, __crimp_c, __crimp_fs): S)): I)): S)) ==>
+      (crHeapElemS(__crimp_crh_old, __crimp_c,
+      (skExtS(__crimp_c, __crimp_crh_old, __crimp_crh_new, __crimp_fs): I)): S) ==
+      (crHeapElemS(__crimp_crh_new, __crimp_c,
+      (skExtS(__crimp_c, __crimp_crh_old, __crimp_crh_new, __crimp_fs): I)): S)) ==>
       (crimpApplyS(__crimp_f1, __crimp_crh_old, __crimp_c, __crimp_fs): S) ==
       (crimpApplyS(__crimp_f2, __crimp_crh_new, __crimp_c, __crimp_fs): S)))
   }

@@ -127,10 +127,12 @@ class CrimpTests extends AnyFunSuite {
             crimpGetMappingKeyS, crHeapElemKeyS, trigDelKey1KeyS, trigDelBlockKeyS, getFieldIDKeyS, skExtKeyS,
             trigExtKeyS).map(_ -> crimpDKeyS) ++
         Seq(fuelSKey, fuelZKey).map(_ -> fuelDKey) ++
-        Seq(recApplyKey, recInvKey, filterRecvGoodKey, subsetNotInRefsKey, idxNotInRefsKey).map(_ -> recDKey) ++
+        Seq(recApplyKey, filterRecvGoodKey, preimgElemKey, subsetNotInRefsKey,
+          idxNotInRefsKey).map(_ -> recDKey) ++
         Seq(opApplyKey, opIdenKey).map(_ -> opDKey) ++
         Seq(mapApplyKey, mapIdenKey).map(_ -> mapDKey) ++
-        Seq(setDeleteKey, disjUnionKey).map(_ -> "SetEdit")
+        Seq(setDeleteKey, disjUnionKey).map(_ -> "SetEdit") ++
+        Seq(extLinkKey).map(_ -> extLinkDKey)
       val declared: Map[String, String] = p.domains.flatMap(d => d.functions.map(_.name -> d.name)).toMap
       val wrong = domainOf.filterNot { case (f, d) => declared.get(f).contains(d) }
         .map { case (f, d) => s"$f (expected in $d, found in ${declared.getOrElse(f, "no domain")})" }
@@ -151,6 +153,9 @@ class CrimpTests extends AnyFunSuite {
       }
     }
     assert(bad.isEmpty, s"ill-formed crimp terms: ${bad.mkString("; ")}")
+    // The link term of two crimp-heap indices (extensionality trigger).
+    val link = new AxiomHelper(p, true).extLinkApply(IntLit(0)(), IntLit(1)())
+    assert(link.typ == viper.silver.ast.Bool && conforms(p, link), s"ill-formed link term: $link")
   }
 
   test("CrimpApp.toViper: crimps over different fields differ only in the field identifier") {

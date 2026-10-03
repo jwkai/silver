@@ -36,7 +36,7 @@ case class PFunInline(keyword: PReserved[PFunInlineKeyword.type],
     }
     this.getArgs.foreach(a => t.check(a.typ))
     t.check(returnType)
-    if (returnType != TypeHelper.Ref) return Some(Seq("Receiver body should return a Ref."))
+    if (returnType != TypeHelper.Ref) return Some(Seq("Receiver body should return Ref."))
     t.checkTopTyped(body, Some(TypeHelper.Ref))
     None
   }
@@ -177,8 +177,12 @@ trait PCrimpComponent extends PExtender with PNoSpecsFunction with PSingleMember
     DomainFunc(idndef.name, formalArgs.map(f => t.liftAnyArgDecl(f)), t.ttyp(resultType), unique = false, None)(
       pos = t.liftPos(this), info = Translator.toInfo(this.annotations, this), domainName)
 
+  /** The names of the functions applied as the receiver of a field access in `p` (`loc` for `loc(a, i).f`). */
+  def fieldReceiverHeads(p: PProgram): Set[String] =
+    p.deepCollect { case PFieldAccess(c: PCall, _, _) => c.idnref.name }.toSet
+
   def getEvalFuncAxiom(domain: Domain, evalFuncOpt: Option[DomainFunc],
-                       t: Translator): (DomainFunc,AnonymousDomainAxiom) = {
+                       t: Translator): (DomainFunc, Seq[AnonymousDomainAxiom]) = {
 
     val funct = translateDomainFunc(t, domain.name)
     val posInfoError = (t.liftPos(this), Translator.toInfo(this.annotations, this), NoTrafos)
@@ -230,7 +234,39 @@ trait PCrimpComponent extends PExtender with PNoSpecsFunction with PSingleMember
     val allVarsForall = (this.formalArgs ++ body.get.getArgs).map(a => t.liftArgDecl(a))
     val forall = (Forall(allVarsForall, triggers, equal)_).tupled(posInfoError)
     val axiom = AnonymousDomainAxiom(forall)(domainName = domain.name)
-    (funct, axiom)
+
+    // A receiver whose body is no trigger term (e.g. identity `fun r: Ref :: r`, a conditional, ...) has no ground
+    // receiver application for the witness axiom _preimgElemInv to match.
+    // It gets them from this defining equation under another trigger (no new assumption):
+    //   - the identity from each witness term, { preimgElem(R, f, l) };
+    //   - any other body from the members of the filters it is good on, { filterReceiverGood(f, R), i in f }.
+    // So does an offset receiver, whose body is a trigger term that no field access of the program has as its receiver
+    // (`shift(a, k, i)` with `shift(a, k, i) == loc(a, i + k)`, locations written `loc(a, j).f`)
+    val offsetBody = rhs match {
+      case app: DomainFuncApp => !fieldReceiverHeads(t.program).contains(app.funcname)
+      case app: FuncApp => !fieldReceiverHeads(t.program).contains(app.funcname)
+      case _ => false
+    }
+    val supply: Seq[AnonymousDomainAxiom] = evalFuncOpt match {
+      case Some(evalFunc) if evalFunc.name == DomainsGenerator.recApplyKey &&
+          (!rhs.isInstanceOf[PossibleTrigger] || offsetBody) && iteratorVar.size == 1 =>
+        val typMap = funct.typ match { case gt: DomainType => gt.typVarsMap; case _ => Map[TypeVar, Type]() }
+        val iter = iteratorVar.head
+        val fDecl = (LocalVarDecl("__crimp_sf", viper.silver.ast.SetType(iter.typ)) _).tupled(posInfoError)
+        def domFunc(name: String) = t.getMembers()(name).asInstanceOf[DomainFunc]
+        val trigger = rhs match {
+          case lv: LocalVar if lv.name == iter.name =>
+            Seq((DomainFuncApp.apply(domFunc(DomainsGenerator.preimgElemKey), Seq(funcApp, fDecl.localVar, iter),
+              typVarMap = typMap) _).tupled(posInfoError))
+          case _ =>
+            Seq((DomainFuncApp.apply(domFunc(DomainsGenerator.filterRecvGoodKey), Seq(fDecl.localVar, funcApp),
+              typVarMap = typMap) _).tupled(posInfoError), (AnySetContains(iter, fDecl.localVar) _).tupled(posInfoError))
+        }
+        val supplyForall = (Forall(allVarsForall :+ fDecl, Seq(Trigger(trigger)()), equal) _).tupled(posInfoError)
+        Seq(AnonymousDomainAxiom(supplyForall)(domainName = domain.name))
+      case _ => Seq()
+    }
+    (funct, axiom +: supply)
   }
 
   def translateMemberWithName(t: Translator, evalName: Option[String]): Member = {
@@ -238,10 +274,10 @@ trait PCrimpComponent extends PExtender with PNoSpecsFunction with PSingleMember
     val d = t.getMembers()(genDomainName).asInstanceOf[Domain]
     // Gets the evalRec function
     val evalFuncOpt = evalName.map(f => t.getMembers()(f).asInstanceOf[DomainFunc])
-    val (funct, axiom) = getEvalFuncAxiom(d, evalFuncOpt, t)
+    val (funct, axioms) = getEvalFuncAxiom(d, evalFuncOpt, t)
     val dd = d.copy(
       functions = d.functions :+ funct,
-      axioms = d.axioms :+ axiom
+      axioms = d.axioms ++ axioms
     )(d.pos, d.info, d.errT)
     t.getMembers()(genDomainName) = dd
     t.getMembers().put(funct.name, funct)

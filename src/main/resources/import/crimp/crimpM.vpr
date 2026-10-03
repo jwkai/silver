@@ -22,7 +22,7 @@ domain CrimpM[I, V, S]  {
 
   function getFieldIDM(c: CrimpM[I, V, S]): Int
 
-  function skExtM(c: CrimpM[I, V, S], hfA1: S, hfA2: S): I
+  function skExtM(c: CrimpM[I, V, S], crhOld: Int, crhNew: Int, fs: Set[I]): I
 
   function triggerExtM(hfA1: S, hfA2: S): Bool
 
@@ -122,7 +122,8 @@ domain CrimpM[I, V, S]  {
     (forall __crimp_f1: Fuel, __crimp_f2: Fuel, __crimp_crh_old: Int, __crimp_crh_new: Int,
     __crimp_c: CrimpM[I, V, S], __crimp_fs: Set[I] ::
       { (crimpApplyM(__crimp_f1, __crimp_crh_old, __crimp_c, __crimp_fs): S),
-      (crimpApplyM(__crimp_f2, __crimp_crh_new, __crimp_c, __crimp_fs): S) }
+      (crimpApplyM(__crimp_f2, __crimp_crh_new, __crimp_c, __crimp_fs): S),
+      (extLink(__crimp_crh_old, __crimp_crh_new): Bool) }
       (triggerExtM((crimpApplyM(__crimp_f1, __crimp_crh_old, __crimp_c,
       __crimp_fs): S), (crimpApplyM(__crimp_f2, __crimp_crh_new, __crimp_c,
       __crimp_fs): S)): Bool))
@@ -137,16 +138,12 @@ domain CrimpM[I, V, S]  {
       __crimp_crh_old < __crimp_crh_new ==>
       (crimpApplyM(__crimp_f1, __crimp_crh_old, __crimp_c, __crimp_fs): S) ==
       (crimpApplyM(__crimp_f2, __crimp_crh_new, __crimp_c, __crimp_fs): S) ||
-      ((((skExtM(__crimp_c, (crimpApplyM(__crimp_f1, __crimp_crh_old, __crimp_c,
-      __crimp_fs): S), (crimpApplyM(__crimp_f2, __crimp_crh_new, __crimp_c,
-      __crimp_fs): S)): I) in
+      ((((skExtM(__crimp_c, __crimp_crh_old, __crimp_crh_new, __crimp_fs): I) in
       __crimp_fs) ==>
-      (crHeapElemM(__crimp_crh_old, __crimp_c, (skExtM(__crimp_c, (crimpApplyM(__crimp_f1,
-      __crimp_crh_old, __crimp_c, __crimp_fs): S), (crimpApplyM(__crimp_f2,
-      __crimp_crh_new, __crimp_c, __crimp_fs): S)): I)): S) ==
-      (crHeapElemM(__crimp_crh_new, __crimp_c, (skExtM(__crimp_c, (crimpApplyM(__crimp_f1,
-      __crimp_crh_old, __crimp_c, __crimp_fs): S), (crimpApplyM(__crimp_f2,
-      __crimp_crh_new, __crimp_c, __crimp_fs): S)): I)): S)) ==>
+      (crHeapElemM(__crimp_crh_old, __crimp_c,
+      (skExtM(__crimp_c, __crimp_crh_old, __crimp_crh_new, __crimp_fs): I)): S) ==
+      (crHeapElemM(__crimp_crh_new, __crimp_c,
+      (skExtM(__crimp_c, __crimp_crh_old, __crimp_crh_new, __crimp_fs): I)): S)) ==>
       (crimpApplyM(__crimp_f1, __crimp_crh_old, __crimp_c, __crimp_fs): S) ==
       (crimpApplyM(__crimp_f2, __crimp_crh_new, __crimp_c, __crimp_fs): S)))
   }

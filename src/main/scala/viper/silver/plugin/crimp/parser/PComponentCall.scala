@@ -33,9 +33,9 @@ case class PComponentCall(idnref: PIdnRef[PCrimpComponent], callArgs: PDelimited
     args.foreach(t.checkInternal)
     var nestedTypeError = !args.forall(_.typ.isValidOrUndeclared)
     typeAnnotated.foreach { case (_, ta) =>
-        t.check(ta)
-        if (!ta.isValidOrUndeclared) nestedTypeError = true
-      }
+      t.check(ta)
+      if (!ta.isValidOrUndeclared) nestedTypeError = true
+    }
     if (idnref.decls.isEmpty) return Some(Seq(s"undeclared call `${idnref.name}`, expected function or predicate"))
     if (component.isEmpty) return Some(Seq(s"ambiguous call `${idnref.name}`"))
     val c = component.get
@@ -51,7 +51,7 @@ case class PComponentCall(idnref: PIdnRef[PCrimpComponent], callArgs: PDelimited
     val rlts = signatures.map(ts => new PTypeSubstitution(ts.map(kv => ltr.rename(kv._1) -> kv._2.substitute(ltr))))
     val rrt = POpApp.pRes.substitute(ltr).asInstanceOf[PDomainType]
     val argData = args.indices.map(i => (args(i).typ, POpApp.pArg(i).substitute(ltr), args(i).typeSubsDistinct.toSeq,
-        args(i))) ++ typeAnnotated.map { case (_, ta) => (ta, rrt, List(PTypeSubstitution.id), this) }
+      args(i))) ++ typeAnnotated.map { case (_, ta) => (ta, rrt, List(PTypeSubstitution.id), this) }
     t.unifySequenceWithSubstitutions(rlts, argData) match {
       // The same message at the same argument as the type checker's.
       case Left((a, b, at)) =>
