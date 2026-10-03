@@ -1,10 +1,10 @@
 package viper.silver.plugin.crimp.parser
 
 import viper.silver.FastMessaging
-import viper.silver.ast.{ErrTrafo, Exp, Position}
-import viper.silver.parser.{NameAnalyser, PCall, PDomainType, PExp, PExtender, PFieldDecl, PIdnUse, PKeywordLang, PKw, PMagicWandExp, PMethod, PNode, POpApp, PPackageWand, PProgram, PReserved, PSetType, PType, PTypeRenaming, PTypeSubstitution, PTypeVar, Translator, TypeChecker, TypeHelper}
+import viper.silver.ast.{AnnotationInfo, ErrTrafo, Exp, NoInfo, Position}
+import viper.silver.parser.{NameAnalyser, PAnnotatedExp, PCall, PDomainType, PExp, PExtender, PFieldDecl, PIdnUse, PKeywordLang, PKw, PMagicWandExp, PMethod, PNode, POpApp, PPackageWand, PProgram, PReserved, PSetType, PType, PTypeRenaming, PTypeSubstitution, PTypeVar, Translator, TypeChecker, TypeHelper}
 import viper.silver.plugin.crimp.ast.{CrimpApp, CrimpTriple, CrimpTripleWithId, CrimpTripleWithoutId}
-import viper.silver.plugin.crimp.{CrimpPlugin, DomainsGenerator, ReduceErrors}
+import viper.silver.plugin.crimp.{CrimpPlugin, DecompDepth, DomainsGenerator, ReduceErrors}
 import viper.silver.plugin.standard.termination.PDecreasesClause
 import viper.silver.verifier.errors
 
@@ -15,9 +15,6 @@ case class PCrimpInner(mapping: PExp, fieldID: PIdnUse, receiver: PExp)(val pos:
   extends PExtender {
 
   override def subnodes: Iterator[PNode] = Iterator(mapping, fieldID, receiver)
-
-//  def typeSubstitutions: Seq[PTypeSubstitution] =
-//    mapping.signatures ++ receiver.signatures
 
   def typecheckComp(t: TypeChecker, n: NameAnalyser, typeUnit: PType, typeFilter: PType): Seq[String] = {
     val errorSeq: Seq[String] = Seq()
@@ -127,11 +124,17 @@ case class PCrimp(keyword: PReserved[PCrimpKeyword.type], operator: PExp, mappin
       case a : CrimpTripleWithId => a.copy()(pos = t.liftPos(this), info = tuple.info, errT = errTFoldApply)
       case a : CrimpTripleWithoutId => a.copy()(pos = t.liftPos(this), info = tuple.info, errT = errTFoldApply)
     }
+    // A `@decompDepth("N")` annotation of this crimp expression is kept as the CrimpApp's info for the lowering (the
+    // Translator does not pass an extension expression's annotations on).
+    val depthInfo = PCrimp.decompDepthAnnotation(this).flatMap(_.toOption) match {
+      case Some(depth) => AnnotationInfo(Map(DecompDepth.key -> Seq(depth.toString)))
+      case None => NoInfo
+    }
     CrimpApp(
       liftedTuple,
       filterTranslated.withMeta((t.liftPos(this), filterTranslated.info, errTFoldApply)),
       fieldString
-    )(pos = t.liftPos(this), info = reduceApply.info, errT = errTFoldApply)
+    )(pos = t.liftPos(this), info = depthInfo, errT = errTFoldApply)
   }
 }
 
@@ -187,7 +190,7 @@ object PCrimp {
 
     if (pc.typeSubstitutions.nonEmpty) return None // already checked
     unsupportedPosition(pc).foreach(msg => return Some(Seq(msg)))
-
+    decompDepthAnnotation(pc).foreach(_.left.foreach(message => return Some(Seq(message))))
     var messagesOut : Seq[String] = Seq()
 
     // Check type of filter, must be a Set. Extract it out
@@ -222,6 +225,14 @@ object PCrimp {
     // Set type of this node, and pass ground type to expression context via identity substitution
     if (messagesOut.isEmpty && pc.typ.isGround) pc.typeSubstitutions += PTypeSubstitution.id
     if (messagesOut.isEmpty) None else Some(messagesOut)
+  }
+
+  /** The `@decompDepth("N")` annotation of `pc` (`@decompDepth("N") (crimp[..][..](..))`, also among other annotations
+   * of the same expression), if any. */
+  def decompDepthAnnotation(pc: PCrimp): Option[Either[String, Int]] = {
+    val annotations = Iterator.iterate(pc.getParent)(_.flatMap(_.getParent)).map(_.orNull)
+      .takeWhile(_.isInstanceOf[PAnnotatedExp]).map(_.asInstanceOf[PAnnotatedExp].annotation).toSeq
+    DecompDepth.of(annotations.map(a => a.key.str -> a.values.inner.toSeq.map(_.str)))
   }
 
   /** The error for a crimp in a position that is not supported.

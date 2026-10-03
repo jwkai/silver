@@ -6,14 +6,14 @@ import viper.silver.ast.utility.rewriter.StrategyBuilder
 import viper.silver.ast.{Assume, Infoed, Inhale, LabelledOld, Method, MethodCall, NoPosition, Node, Old, Position, Program}
 import viper.silver.frontend.{DefaultStates, ViperPAstProvider}
 import viper.silver.logger.SilentLogger
-import viper.silver.parser.{FastParser, FastParserCompanion, PAccPred, PAnnotationsPosition, PCall, PCallable, PKwOp, PLocationAccess, PMaybePairArgument, PUnfolding, PDelimited, PDomain, PDomainType, PDomainTypeKinds, PExp, PFieldAccess, PGrouped, PIdnRef, PKw, PNode, PProgram, PReserved, PSetType, PSym, PType}
+import viper.silver.parser.{FastParser, FastParserCompanion, PAccPred, PAnnotationsPosition, PCall, PCallable, PDelimited, PDomain, PDomainType, PDomainTypeKinds, PExp, PFieldAccess, PGrouped, PIdnRef, PKw, PKwOp, PLocationAccess, PMaybePairArgument, PNode, PProgram, PReserved, PSetType, PSym, PType, PUnfolding}
 import viper.silver.plugin.crimp.CrimpPlugin.{addInlinedAxioms, defaultMappingIden}
-import viper.silver.plugin.crimp.ast.{CrimpApp, CrHeapMap, crHeapInfo}
+import viper.silver.plugin.crimp.ast.{CrHeapMap, CrimpApp, crHeapInfo}
 import viper.silver.plugin.crimp.DomainsGenerator.mapIdenKey
 import viper.silver.plugin.crimp.parser._
 import viper.silver.plugin.{ParserPluginTemplate, SilverPlugin}
 import viper.silver.reporter.NoopReporter
-import viper.silver.verifier.{AbstractError, VerificationResult}
+import viper.silver.verifier.{AbstractError, ConsistencyError, VerificationResult}
 
 import scala.annotation.unused
 import scala.language.postfixOps
@@ -26,7 +26,14 @@ class CrimpPlugin(@unused reporter: viper.silver.reporter.Reporter,
   import fp.{ParserExtension, funcApp, exp, argList, formalArg, fieldAccess, foldPExp, idndef, idnref, typ, lineCol, _file}
   import FastParserCompanion.{ExtendedParsing, LeadingWhitespace, PositionParsing, reservedKw, reservedSym}
 
-  private val fuelIsTwo: Boolean = true
+  // The declared decomposition depths of operators and receivers (DecompDepth), collected in beforeTranslate.
+  private var declaredDepths: Map[String, Int] = Map()
+
+  /** Keeps the annotations written before a component declaration (e.g. `@decompDepth("1")`). */
+  private def withAnnotations[C <: PCrimpComponent](c: C, ap: PAnnotationsPosition): C = {
+    c.userAnnotations = ap.annotations
+    c
+  }
   private var setOperators: Set[POperator] = Set()
 
   /** Parser for crimp statements. */
@@ -85,11 +92,11 @@ class CrimpPlugin(@unused reporter: viper.silver.reporter.Reporter,
     P(P(POperatorKeyword) ~~~ idndef.lw ~~~ argList(formalArg).lw ~~~ (NoCut(componentBody.map((_, None))) | operatorBodyUnit).lw) map {
       case (kw, name, args, (body, None)) =>
         ap: PAnnotationsPosition => {
-          POperator(kw, name, args, Some(body), body.returnType, None)(ap.pos)
+          withAnnotations(POperator(kw, name, args, Some(body), body.returnType, None)(ap.pos), ap)
         }
       case (kw, name, args, (body, Some(unit))) =>
         ap: PAnnotationsPosition => {
-          POperator(kw, name, args, Some(body), body.returnType, Some(unit))(ap.pos)
+          withAnnotations(POperator(kw, name, args, Some(body), body.returnType, Some(unit))(ap.pos), ap)
         }
     }
 
@@ -104,7 +111,7 @@ class CrimpPlugin(@unused reporter: viper.silver.reporter.Reporter,
     P(P(PMappingKeyword) ~~~ idndef.lw ~~~ argList(formalArg).lw ~~~ componentBody.lw) map {
       case (kw, name, args, body) =>
         ap: PAnnotationsPosition => {
-          PMapping(kw, name, args, Some(body), body.returnType)(ap.pos)
+          withAnnotations(PMapping(kw, name, args, Some(body), body.returnType)(ap.pos), ap)
         }
     }
 
@@ -112,7 +119,7 @@ class CrimpPlugin(@unused reporter: viper.silver.reporter.Reporter,
     P(P(PReceiverKeyword) ~~~ idndef.lw ~~~ argList(formalArg).lw ~~~ componentBody.lw) map {
       case (kw, name, args, body) =>
         ap: PAnnotationsPosition => {
-          PReceiver(kw, name, args, Some(body))(ap.pos)
+          withAnnotations(PReceiver(kw, name, args, Some(body))(ap.pos), ap)
         }
     }
 
@@ -190,7 +197,7 @@ class CrimpPlugin(@unused reporter: viper.silver.reporter.Reporter,
       case pc@PCall(idnref, callArgs, typeAnnotated) if componentNames.contains(idnref.name) =>
         PComponentCall(idnref.retype(), callArgs, typeAnnotated)(pc.pos)
     }).recurseFunc({
-      case n: PNode => n.children collect {case ar: AnyRef => ar}
+      case n: PNode => n.children collect { case ar: AnyRef => ar }
     }).execute(input)
   }
 
@@ -233,14 +240,17 @@ class CrimpPlugin(@unused reporter: viper.silver.reporter.Reporter,
     }
   }
 
-//  /** Called after identifiers have been resolved but before the parse AST is translated into the normal AST.
-//   *
-//   * @param input Parse AST
-//   * @return Modified Parse AST
-//   */
-//  override def beforeTranslate(input: PProgram): PProgram = {
-//    input
-//  }
+  /** Called after identifiers have been resolved but before the parse AST is translated into the normal AST.
+   *
+   * @param input Parse AST
+   * @return Modified Parse AST
+   */
+  override def beforeTranslate(input: PProgram): PProgram = {
+    declaredDepths = input.extensions.collect {
+      case c: PCrimpComponent if c.declaredDecompDepth.isDefined => c.idndef.name -> c.declaredDecompDepth.get
+    }.toMap
+    input
+  }
 
   /** Called after parse AST has been translated into the normal AST but before methods to verify are filtered.
    * In [[viper.silver.frontend.SilFrontend]] this step is confusingly called doTranslate.
@@ -268,11 +278,21 @@ class CrimpPlugin(@unused reporter: viper.silver.reporter.Reporter,
    */
   override def beforeVerify(input: Program) : Program = {
     if (!input.existsDefined { case _: CrimpApp => }) return input
-    var newInput = addInlinedAxioms(input, fuelIsTwo, reportError)
+    val defaultDepth = DecompDepth.default match {
+      case Right(depth) => depth
+      case Left(message) =>
+        reportError(ConsistencyError(s"crimp: $message", NoPosition))
+        return input
+    }
+    var newInput = addInlinedAxioms(input, DecompDepth.Config(defaultDepth, declaredDepths), reportError)
     newInput = newInput.transform({
       case e@Assume(a) => Inhale(a)(e.pos, e.info, e.errT)
     })
-//    print(pretty(newInput) + "\n\n")
+    // The frontend's consistency check ran before the lowering; the lowered program must pass it as well (e.g. a
+    // generated declaration must not clash with a user's). A failure is a lowering bug: report it instead of handing an
+    // inconsistent program to the backend.
+    newInput.checkTransitively.foreach(e => reportError(ConsistencyError(
+      s"crimp: internal error: the lowered program is inconsistent: ${e.message}", e.pos)))
     newInput
   }
 
@@ -337,13 +357,13 @@ object CrimpPlugin {
     outType
   }
 
-  def addInlinedAxioms(p: Program, fuelIsTwo: Boolean, reportError: AbstractError => Unit) : Program = {
+  def addInlinedAxioms(p: Program, depths: DecompDepth.Config, reportError: AbstractError => Unit) : Program = {
     def modifyMethod(m: Method) : Method = {
       // If a method evaluates no reduction (neither itself nor through the specification of a method it calls), keep
       // the method the same
       if (!InlineAxiomGenerator.needsLowering(p, m)) { return m }
 
-      val axiomGenerator = new InlineAxiomGenerator(p, m.name, fuelIsTwo, reportError)
+      val axiomGenerator = new InlineAxiomGenerator(p, m.name, depths, reportError)
 
       // Convert all method calls to inhales and exhales
       var outM: Method = m.transform({
@@ -379,7 +399,6 @@ object CrimpPlugin {
       // receiver (heapKey): in a statement, at the indices the statement is tagged with; inside old(e), at the method's
       // entry indices; inside old[L](e), at the indices recorded at label L. The old(..)/old[L](..) wrapper is kept, so
       // that Viper evaluates the reduction's receiver and filter arguments in that state, too.
-      val fuel = axiomGenerator.getFuelExp
       def lowerReductions[N <: Node](n: N, rhInitial: CrHeapMap): N = n.transformWithContext[CrHeapMap]({
         case (s@NodeWithCrHeapInfo(crHeapInfo(rh)), _) =>
           (s, rh)
@@ -388,7 +407,7 @@ object CrimpPlugin {
         case (lo: LabelledOld, _) if InlineAxiomGenerator.hasCrimp(lo) =>
           (lo, axiomGenerator.getCrHeapFromUserLabel(lo.oldLabel, lo.pos))
         case (ra: CrimpApp, rh) =>
-          (ra.toViper(p, fuel, rh(ra.heapKey)), rh)
+          (ra.toViper(p, axiomGenerator.fuelOf(ra), rh(ra.heapKey)), rh)
       }, initialContext = rhInitial)
 
       outM = outM.body match {

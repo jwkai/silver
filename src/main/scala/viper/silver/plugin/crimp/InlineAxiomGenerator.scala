@@ -16,11 +16,11 @@ import scala.collection.mutable
   * indices are 0 on entry to the method. A command advances the receivers over the fields in its conservative field
   * footprint (AxiomHelper.footprintFields / modifiedFields) and no others; numbers are allocated per field, so all
   * receivers over one field advance together (CrHeapMap). A command that advances nothing gets no axioms. */
-class InlineAxiomGenerator(program: Program, methodName: String, fuelIsTwo: Boolean,
+class InlineAxiomGenerator(program: Program, methodName: String, depths: DecompDepth.Config,
                            reportError: AbstractError => Unit) {
 
   val method: Method = program.findMethod(methodName)
-  val helper = new AxiomHelper(program, fuelIsTwo)
+  val helper = new AxiomHelper(program, depths.default)
 
   // The receivers of the method, their fields and the crimp declarations it uses
   private var receivers: Set[HeapKey] = Set()
@@ -35,6 +35,24 @@ class InlineAxiomGenerator(program: Program, methodName: String, fuelIsTwo: Bool
   private val lastHeld: mutable.Map[String, CrHeap] = mutable.Map()
   // The indices at each user label and at each call's _methodLabel.
   private val labelCrHeaps: mutable.Map[String, CrHeapMap] = mutable.Map()
+
+  // The names of the program (members, domain functions, local variables incl. bound ones, labels) and the names this
+  // generator has declared so far. Every name the lowering introduces avoids them (freshName, boundName): a generated
+  // label or local that equals a user's is a duplicate declaration, and a generated bound variable that equals a user's
+  // variable would capture it in the user expressions the inline axioms contain (e.g. a written receiver loc(a, __ind)).
+  private val programNames: Set[String] = AxiomHelper.namesOf(program)
+  private val generatedNames: mutable.Set[String] = mutable.Set()
+
+  /** `base`, or `base_1`, `base_2`, ... if `base` is a name of the program or was generated before; recorded. */
+  private def freshName(base: String): String = {
+    val name = (Iterator(base) ++ Iterator.from(1).map(i => s"${base}_$i"))
+      .find(n => !programNames.contains(n) && !generatedNames.contains(n)).get
+    generatedNames += name
+    name
+  }
+
+  /** A bound variable of a generated axiom (AxiomHelper.boundName). Not recorded: each axiom binds its own variables. */
+  private def boundName(base: String): String = helper.boundName(base)
 
   private var uniqueIDMethodOut = 0
   private var uniqueIDMethodArg = 0
@@ -55,13 +73,13 @@ class InlineAxiomGenerator(program: Program, methodName: String, fuelIsTwo: Bool
   // get unique method label
   private def getUniqueLabelMethod: Label = {
     uniqueLabelMethod += 1
-    Label(s"${helper.methodLabelPrefix}l$uniqueLabelMethod", Seq())()
+    Label(freshName(s"${helper.methodLabelPrefix}l$uniqueLabelMethod"), Seq())()
   }
 
   // A fresh label placed immediately before an advancing command: old[..] of it is the state the command starts from.
   private def freshPreLabel(): Label = {
     uniqueLabelPre += 1
-    Label(s"${helper.labelPrefix}_pre$uniqueLabelPre", Seq())()
+    Label(freshName(s"${helper.labelPrefix}_pre$uniqueLabelPre"), Seq())()
   }
 
   def initReceivers(converted: Method): Unit = {
@@ -77,8 +95,16 @@ class InlineAxiomGenerator(program: Program, methodName: String, fuelIsTwo: Bool
     labelCrHeaps.clear()
   }
 
-  def getFuelExp: Exp = {
-    helper.fuelDefaultExp
+  /** The fuel term of a crimp term: succ^d(zero()) for its decomposition depth d: its own `@decompDepth` annotation
+    * (PCrimp.translateExp), else the larger declared depth of its operator and its receiver, else the default. */
+  def fuelOf(ra: CrimpApp): Exp = {
+    val own = ra.info.getUniqueInfo[AnnotationInfo].flatMap(_.values.get(DecompDepth.key))
+      .flatMap(values => DecompDepth.parseValues(values).toOption)
+    def name(e: Exp): Option[String] = e match {
+      case d: DomainFuncApp => Some(d.funcname)
+      case _ => None
+    }
+    helper.fuelExp(depths.of(own, name(ra.reduction.op), name(ra.reduction.receiver)))
   }
 
   def getCurrentCrHeap: CrHeapMap = current
@@ -238,7 +264,7 @@ class InlineAxiomGenerator(program: Program, methodName: String, fuelIsTwo: Bool
 
       // Create domain-typed vars for quantification
       val forallVarF = LocalVarDecl("__f", helper.fuelDomainType)()
-      val forallVarR = LocalVarDecl("__r", crimpDType)()
+      val forallVarR = LocalVarDecl("__c", crimpDType)()
       val forallVarFS = LocalVarDecl("__fs", SetType(crimpIdxType))()
       val forallVarIdx = LocalVarDecl("__i", crimpIdxType)()
       val fidGuard = helper.fieldIDGuard(forallVarR.localVar, crimpADecl.fieldName)(crimpHasID)
@@ -384,7 +410,7 @@ class InlineAxiomGenerator(program: Program, methodName: String, fuelIsTwo: Bool
 
     // LocalVarsDecls for temporary return values
     val returnDecls = methodDecl.formalReturns.map(r =>
-      LocalVarDecl(r.name ++ "_out_" ++ getUniqueIDMethodOut, r.typ)(r.pos, r.info, r.errT)
+      LocalVarDecl(freshName(r.name ++ "_out_" ++ getUniqueIDMethodOut), r.typ)(r.pos, r.info, r.errT)
     )
 
     // LocalVars for temporary return values
@@ -399,7 +425,8 @@ class InlineAxiomGenerator(program: Program, methodName: String, fuelIsTwo: Bool
     val argBindings = methodDecl.formalArgs.zip(methodCall.args).map {
       case (_, a@(_: LocalVar | _: Literal)) => (a, None)
       case (formal, a) =>
-        val decl = LocalVarDecl(formal.name ++ "_arg_" ++ getUniqueIDMethodArg, formal.typ)(a.pos, a.info, a.errT)
+        val decl =
+          LocalVarDecl(freshName(formal.name ++ "_arg_" ++ getUniqueIDMethodArg), formal.typ)(a.pos, a.info, a.errT)
         val assign = LocalVarAssign(decl.localVar, a)(a.pos, NoInfo, ErrTrafo({
           case errors.AssignmentFailed(_, reason, cached) => errors.CallFailed(methodCall, reason, cached)
         }))
@@ -582,7 +609,7 @@ class InlineAxiomGenerator(program: Program, methodName: String, fuelIsTwo: Bool
     val crimpHasID = crimpADecl.hasID
 
     // fuel declarations
-    val forallVarF = LocalVarDecl("__f", helper.fuelDomainType)()
+    val forallVarF = LocalVarDecl(boundName("__f"), helper.fuelDomainType)()
     val fuelVar = forallVarF.localVar
     val sFuel = helper.applyDomainFunc(
       DomainsGenerator.fuelSKey,
@@ -591,13 +618,13 @@ class InlineAxiomGenerator(program: Program, methodName: String, fuelIsTwo: Bool
     )
 
     // Crimp var declaration
-    val forallVarR = LocalVarDecl("__r", crimpDType)()
+    val forallVarR = LocalVarDecl(boundName("__c"), crimpDType)()
     val crimpVar = forallVarR.localVar
-    // Every axiom below quantifies over crimps __r; it is about field `field` only.
+    // Every axiom below quantifies over crimps __cr; it is about field `field` only.
     val fidGuard = helper.fieldIDGuard(crimpVar, field.name)(crimpHasID)
 
     // Filter Var declaration
-    val forallVarFS = LocalVarDecl("__fs", SetType(crimpIdxType))()
+    val forallVarFS = LocalVarDecl(boundName("__fs"), SetType(crimpIdxType))()
     var filterVar = forallVarFS.localVar
 
     val frGood = helper.filterReceiverGood(filterVar, crimpVar)(crimpHasID)
@@ -653,7 +680,7 @@ class InlineAxiomGenerator(program: Program, methodName: String, fuelIsTwo: Bool
     )()
 
     // Index var declaration
-    val forallVarIdx = LocalVarDecl("__ind", crimpIdxType)()
+    val forallVarIdx = LocalVarDecl(boundName("__ind"), crimpIdxType)()
     val idxVar = forallVarIdx.localVar
     val receiverAppIdx = helper.applyDomainFunc(
       DomainsGenerator.recApplyKey,
@@ -706,7 +733,7 @@ class InlineAxiomGenerator(program: Program, methodName: String, fuelIsTwo: Bool
     val crimpHasID = crimpADecl.hasID
 
     // fuel declarations
-    val forallVarF = LocalVarDecl("__f", helper.fuelDomainType)()
+    val forallVarF = LocalVarDecl(boundName("__f"), helper.fuelDomainType)()
     val fuelVar = forallVarF.localVar
     val sFuel = helper.applyDomainFunc(
       DomainsGenerator.fuelSKey,
@@ -715,13 +742,13 @@ class InlineAxiomGenerator(program: Program, methodName: String, fuelIsTwo: Bool
     )
 
     // Crimp var declaration
-    val forallVarR = LocalVarDecl("__r", crimpDType)()
+    val forallVarR = LocalVarDecl(boundName("__c"), crimpDType)()
     val crimpVar = forallVarR.localVar
-    // Every axiom below quantifies over crimps __r; it is about field `field` only.
+    // Every axiom below quantifies over crimps __c; it is about field `field` only.
     val fidGuard = helper.fieldIDGuard(crimpVar, field.name)(crimpHasID)
 
     // Filter Var declaration
-    val forallVarFS = LocalVarDecl("__fs", SetType(crimpIdxType))()
+    val forallVarFS = LocalVarDecl(boundName("__fs"), SetType(crimpIdxType))()
     val filterVar = forallVarFS.localVar
 
     val fRGood = helper.filterReceiverGood(filterVar, crimpVar)(crimpHasID)
@@ -758,7 +785,7 @@ class InlineAxiomGenerator(program: Program, methodName: String, fuelIsTwo: Bool
     )()
 
     // Index var declaration
-    val forallVarIdx = LocalVarDecl("__ind", crimpIdxType)()
+    val forallVarIdx = LocalVarDecl(boundName("__ind"), crimpIdxType)()
     val idxVar = forallVarIdx.localVar
     val receiverAppIdx = helper.applyDomainFunc(
       DomainsGenerator.recApplyKey,
@@ -805,11 +832,11 @@ class InlineAxiomGenerator(program: Program, methodName: String, fuelIsTwo: Bool
         Seqn(mainAxiom, Seq())()
       //  If not defined, generate lostP and exhale axiom
       case None =>
-        val declareLost = LocalVarDecl(s"lostP_${field.name}_p$uniqueLabelPre", SetType(Ref))()
+        val declareLost = LocalVarDecl(freshName(s"lostP_${field.name}_p$uniqueLabelPre"), SetType(Ref))()
         // Add this to the map
         declaredLosts.put(field.name, declareLost)
         //Forall(variables: Seq[LocalVarDecl], triggers: Seq[Trigger], exp: Exp)(val pos: Position = NoPosition, val info: Info = NoInfo, val errT: ErrorTrafo = NoTrafos)
-        val forallVars = LocalVarDecl("__pElem", Ref)()
+        val forallVars = LocalVarDecl(boundName("__pElem"), Ref)()
         val forallTriggers = Trigger(Seq(AnySetContains(forallVars.localVar, declareLost.localVar)()))()
         //var lostP_val : Set[Ref]
         //  assume forall iP : Ref:: {iP in lostP_val}
@@ -844,7 +871,7 @@ class InlineAxiomGenerator(program: Program, methodName: String, fuelIsTwo: Bool
     val crimpHasID = crimpADecl.hasID
 
     // fuel declarations
-    val forallVarF = LocalVarDecl("__f", helper.fuelDomainType)()
+    val forallVarF = LocalVarDecl(boundName("__f"), helper.fuelDomainType)()
     val fuelVar = forallVarF.localVar
     val sFuel = helper.applyDomainFunc(
       DomainsGenerator.fuelSKey,
@@ -854,17 +881,17 @@ class InlineAxiomGenerator(program: Program, methodName: String, fuelIsTwo: Bool
 
 
     // Crimp var declaration
-    val forallVarR = LocalVarDecl("__r", crimpDType)()
+    val forallVarR = LocalVarDecl(boundName("__c"), crimpDType)()
     val crimpVar = forallVarR.localVar
-    // Every axiom below quantifies over crimps __r; it is about field `field` only.
+    // Every axiom below quantifies over crimps __c; it is about field `field` only.
     val fidGuard = helper.fieldIDGuard(crimpVar, field.name)(crimpHasID)
 
     // Filter Var declaration
-    val forallVarFS = LocalVarDecl("__fs", SetType(crimpIdxType))()
+    val forallVarFS = LocalVarDecl(boundName("__fs"), SetType(crimpIdxType))()
     val filterVar = forallVarFS.localVar
 
     val triggerOld = Trigger(Seq(helper.crimpApply(sFuel, crhOld.toExp, crimpVar, filterVar)(crimpHasID)))()
-    val triggerNew = Trigger(Seq(helper.crimpApply(sFuel,crhNew.toExp, crimpVar, filterVar)(crimpHasID)))()
+    val triggerNew = Trigger(Seq(helper.crimpApply(sFuel, crhNew.toExp, crimpVar, filterVar)(crimpHasID)))()
 
     // ---------------Making the LHS---------------
     // FilterReceiverGood
@@ -891,11 +918,11 @@ class InlineAxiomGenerator(program: Program, methodName: String, fuelIsTwo: Bool
       filterNotLostApplied
     )(crimpHasID)
 
-    val dummyApplyNew = helper.crimpDummyApply(fuelVar,crhNew.toExp, crimpVar, filterNotLostApplied)(crimpHasID)
+    val dummyApplyNew = helper.crimpDummyApply(fuelVar, crhNew.toExp, crimpVar, filterNotLostApplied)(crimpHasID)
 
     val decompFramingEq = EqCmp(
       helper.crimpApply(fuelVar, crhOld.toExp, crimpVar, filterNotLostApplied)(crimpHasID),
-      helper.crimpApply(fuelVar,crhNew.toExp, crimpVar, filterNotLostApplied)(crimpHasID)
+      helper.crimpApply(fuelVar, crhNew.toExp, crimpVar, filterNotLostApplied)(crimpHasID)
     )()
 
     val crimpDecompOld = Assume(
@@ -916,7 +943,7 @@ class InlineAxiomGenerator(program: Program, methodName: String, fuelIsTwo: Bool
     val dummyApplyOld = helper.crimpDummyApply(fuelVar, crhOld.toExp, crimpVar, filterVar)(crimpHasID)
     val newFramingEq = EqCmp(
       helper.crimpApply(fuelVar, crhOld.toExp, crimpVar, filterVar)(crimpHasID),
-      helper.crimpApply(fuelVar,crhNew.toExp, crimpVar, filterVar)(crimpHasID)
+      helper.crimpApply(fuelVar, crhNew.toExp, crimpVar, filterVar)(crimpHasID)
     )()
 
     val crimpFramingNew = Assume(
@@ -933,7 +960,7 @@ class InlineAxiomGenerator(program: Program, methodName: String, fuelIsTwo: Bool
     val receiverApp = helper.getReceiverApply(crimpVar)(crimpHasID)
 
     // Index var declaration
-    val forallVarIdx = LocalVarDecl("__ind", crimpIdxType)()
+    val forallVarIdx = LocalVarDecl(boundName("__ind"), crimpIdxType)()
     val idxVar = forallVarIdx.localVar
     val receiverAppIdx = helper.applyDomainFunc(
       DomainsGenerator.recApplyKey,
@@ -1023,11 +1050,11 @@ class InlineAxiomGenerator(program: Program, methodName: String, fuelIsTwo: Bool
         Seqn(mainAxiom, Seq())()
       //  If not defined, generate gainedP and inhale axioms
       case None =>
-        val declareGained = LocalVarDecl(s"gainedP_${field.name}_p$uniqueLabelPre", SetType(Ref))()
+        val declareGained = LocalVarDecl(freshName(s"gainedP_${field.name}_p$uniqueLabelPre"), SetType(Ref))()
         // Add this to the map
         declaredGains.put(field.name, declareGained)
         //Forall(variables: Seq[LocalVarDecl], triggers: Seq[Trigger], exp: Exp)(val pos: Position = NoPosition, val info: Info = NoInfo, val errT: ErrorTrafo = NoTrafos)
-        val forallVars = LocalVarDecl("__pElem", Ref)()
+        val forallVars = LocalVarDecl(boundName("__pElem"), Ref)()
         val forallTriggers = Trigger(Seq(AnySetContains(forallVars.localVar, declareGained.localVar)()))()
         //var gainedP_Val : Set[Ref]
         //  assume forall iP : Ref:: {iP in lostP_val}
@@ -1062,7 +1089,7 @@ class InlineAxiomGenerator(program: Program, methodName: String, fuelIsTwo: Bool
     val crimpHasID = crimpADecl.hasID
 
     // fuel declarations
-    val forallVarF = LocalVarDecl("__f", helper.fuelDomainType)()
+    val forallVarF = LocalVarDecl(boundName("__f"), helper.fuelDomainType)()
     val fuelVar = forallVarF.localVar
     val sFuel = helper.applyDomainFunc(
       DomainsGenerator.fuelSKey,
@@ -1073,13 +1100,13 @@ class InlineAxiomGenerator(program: Program, methodName: String, fuelIsTwo: Bool
 //    val forallVarRH = LocalVarDecl("__exrh", Int)()
 
     // Crimp var declaration
-    val forallVarR = LocalVarDecl("__r", crimpDType)()
+    val forallVarR = LocalVarDecl(boundName("__c"), crimpDType)()
     val crimpVar = forallVarR.localVar
-    // Every axiom below quantifies over crimps __r; it is about field `field` only.
+    // Every axiom below quantifies over crimps __c; it is about field `field` only.
     val fidGuard = helper.fieldIDGuard(crimpVar, field.name)(crimpHasID)
 
     // Filter Var declaration
-    val forallVarFS = LocalVarDecl("__fs", SetType(crimpIdxType))()
+    val forallVarFS = LocalVarDecl(boundName("__fs"), SetType(crimpIdxType))()
     val filterVar = forallVarFS.localVar
 //    val forallVarExFS = LocalVarDecl("__exfs", SetType(crimpIdxType))()
 
@@ -1158,7 +1185,7 @@ class InlineAxiomGenerator(program: Program, methodName: String, fuelIsTwo: Bool
     )()
 
     // Index var declaration
-    val forallVarIdx = LocalVarDecl("__ind", crimpIdxType)()
+    val forallVarIdx = LocalVarDecl(boundName("__ind"), crimpIdxType)()
     val idxVar = forallVarIdx.localVar
     val receiverAppIdx = helper.applyDomainFunc(
       DomainsGenerator.recApplyKey,

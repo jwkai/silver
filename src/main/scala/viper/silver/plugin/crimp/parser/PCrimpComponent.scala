@@ -7,7 +7,7 @@ import viper.silver.parser.PSym.{Colon, ColonColon}
 import viper.silver.parser.TypeHelper.Ref
 import viper.silver.parser.{PFormalArgDecl, PGlobalCallableNamedArgs, Translator, _}
 import viper.silver.plugin.crimp.util.AxiomHelper
-import viper.silver.plugin.crimp.{CrimpPlugin, DomainsGenerator, ReduceErrors, ReduceReasons}
+import viper.silver.plugin.crimp.{CrimpPlugin, DecompDepth, DomainsGenerator, ReduceErrors, ReduceReasons}
 import viper.silver.verifier.errors.AssertFailed
 
 case object PFunInlineKeyword extends PKw("fun") with PKeywordLang
@@ -97,13 +97,6 @@ trait PCrimpComponent extends PExtender with PNoSpecsFunction with PSingleMember
   def declType: PType
   override def resultType: PType = if (typToInfer != null) typToInfer else PUnknown()
 
-//  /** Resolves every type the declared component type is built from (idempotent, see checkAllDeclaredTypes below) */
-//  def checkDeclaredTypes(t: TypeChecker): Unit = {
-//    formalArgs.foreach(a => t.check(a.typ))
-//    body.get.getArgs.foreach(a => t.check(a.typ))
-//    t.check(body.get.returnType)
-//  }
-
   protected def checkDeclaration(t: TypeChecker, n: NameAnalyser): Option[Seq[String]]
 
   final override def typecheck(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] =
@@ -147,17 +140,6 @@ trait PCrimpComponent extends PExtender with PNoSpecsFunction with PSingleMember
     }
     out
   }
-
-//  /** Resolves the declared types of all crimp components of the program.
-//    * The type checker checks extensions in the order of declaration, so check all components immediately */
-//  def checkAllDeclaredTypes(t: TypeChecker): Unit = {
-//    val root = Iterator.iterate(getAncestor[PProgram])(_.flatMap(_.getAncestor[PProgram]))
-//      .takeWhile(_.isDefined).flatten.toSeq.lastOption
-//    root.map(_.extensions).getOrElse(Seq(this)).foreach {
-//      case c: PCrimpComponent => c.checkDeclaredTypes(t)
-//        case _ =>
-//    }
-//  }
 
   override def body: Some[PFunInline]
 
@@ -286,6 +268,27 @@ trait PCrimpComponent extends PExtender with PNoSpecsFunction with PSingleMember
 
   override def annotations: Seq[PAnnotation] = Seq()
 
+  // The annotations written before the declaration (e.g. `@decompDepth("1") operator add() ..`), set by the parser.
+  // Kept apart from `annotations`, which would put them on the generated domain.
+  var userAnnotations: Seq[PAnnotation] = Seq()
+
+  /** Whether a `@decompDepth` annotation applies to this kind of component (operators and receivers). */
+  def decompDepthAllowed: Boolean = false
+
+  private def decompDepthAnnotation: Option[Either[String, Int]] =
+    DecompDepth.of(userAnnotations.map(a => a.key.str -> a.values.inner.toSeq.map(_.str)))
+
+  /** The declared decomposition depth (`@decompDepth("N")`), if any and well-formed. */
+  def declaredDecompDepth: Option[Int] = if (decompDepthAllowed) decompDepthAnnotation.flatMap(_.toOption) else None
+
+  /** The error for a malformed `@decompDepth` annotation or one on a mapping or filter. */
+  def decompDepthError: Option[String] = decompDepthAnnotation match {
+    case Some(Left(message)) => Some(message)
+    case Some(Right(_)) if !decompDepthAllowed =>
+      Some(s"@${DecompDepth.key} applies to operators, receivers and crimp expressions, not to a ${componentName.toLowerCase}.")
+    case _ => None
+  }
+
   override def c: Colon = PReserved.implied(PSym.Colon)
 
   override def args: Comma[PSym.Paren, PFormalArgDecl] = PDelimited.impliedParenComma(formalArgs)
@@ -309,20 +312,10 @@ case class PFilter(keyword: PReserved[PFilterKeyword.type], idndef: PIdnDef, ove
 
   override def declType: PType = CrimpPlugin.makeSetType(body.get.getArgs.head.typ)
 
-//  override def typecheck(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] = {
-//    t.checkMember(this) {
-//      checkAllDeclaredTypes(t)
-//      val s = body.get.typecheckFilter(t, n)
-//      s match {
-//        case out @ Some(_) => return out
-//        case None => this.typToInfer = CrimpPlugin.makeSetType(body.get.getArgs.head.typ)
-//      }
-//    }
-//    None
-//  }
-
-  override protected def checkDeclaration(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] =
+  override protected def checkDeclaration(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] = {
+    decompDepthError.foreach(message => return Some(Seq(message)))
     checkComponent(t)(body.get.typecheckFilter(t, n))
+  }
 
   override def translateMember(t: Translator): Member = {
     translateMemberWithName(t, None)
@@ -333,34 +326,15 @@ case class POperator(keyword: PReserved[POperatorKeyword.type], idndef: PIdnDef,
   extends PExtender with PSingleMember with PCrimpComponent {
 
   override val componentName: String = "Operator"
+  override def decompDepthAllowed: Boolean = true
 
   override def declType: PType = CrimpPlugin.makeDomainType(DomainsGenerator.opDKey, Seq(returnType))
 
   var sourcePos : Position = null
   var helper : AxiomHelper = null
 
-//  override def typecheck(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] = {
-//    t.checkMember(this){
-//      checkAllDeclaredTypes(t)
-//      opUnit match {
-//        case None =>
-//          body.get.typecheckOp(t, n, None) match {
-//            case out@Some(_) => return out
-//            case None => typToInfer = CrimpPlugin.makeDomainType(DomainsGenerator.opDKey, Seq(returnType))
-//          }
-//        case Some(opExp) =>
-//          t.check(returnType)
-//          t.checkTopTyped(opExp, Some(returnType))
-//          body.get.typecheckOp(t, n, Some(opExp.typ)) match {
-//            case out@Some(_) => return out
-//            case None => typToInfer = CrimpPlugin.makeDomainType(DomainsGenerator.opDKey, Seq(returnType))
-//          }
-//      }
-//    }
-//    None
-//  }
-
-  override protected def checkDeclaration(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] =
+  override protected def checkDeclaration(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] = {
+    decompDepthError.foreach(message => return Some(Seq(message)))
     checkComponent(t)(opUnit match {
       case Some(opExp) =>
         // check that unit expression has the return type
@@ -369,6 +343,7 @@ case class POperator(keyword: PReserved[POperatorKeyword.type], idndef: PIdnDef,
         body.get.typecheckOp(t, n, Some(opExp.typ))
       case None => body.get.typecheckOp(t, n, None)
     })
+  }
 
   override def translateMember(t: Translator): Member = {
     translateMemberWithName(t, Some(DomainsGenerator.opApplyKey))
@@ -457,7 +432,7 @@ case class POperator(keyword: PReserved[POperatorKeyword.type], idndef: PIdnDef,
   }
 
   def generatedOpWelldefinednessCheck(program: Program): Method = {
-    helper = new AxiomHelper(program, false)
+    helper = new AxiomHelper(program, DecompDepth.builtinDefault)
     // Find the domain function of the operator
     val domainFuncAST = program.findDomainFunction(idndef.name)
 
@@ -542,20 +517,10 @@ case class PMapping(keyword: PReserved[PMappingKeyword.type], idndef: PIdnDef, o
 
   val inputType: PType = body.get.args.inner.toSeq.head.typ
 
-//  override def typecheck(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] = {
-//    t.checkMember(this) {
-//      checkAllDeclaredTypes(t)
-//      body.get.typecheckMapping(t, n)  match {
-//        case out @ Some(_) => return out
-//        case None => typToInfer = CrimpPlugin.makeDomainType(DomainsGenerator.mapDKey,
-//          Seq(body.get.getArgs.head.typ, returnType))
-//      }
-//    }
-//    None
-//  }
-
-  override protected def checkDeclaration(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] =
+  override protected def checkDeclaration(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] = {
+    decompDepthError.foreach(message => return Some(Seq(message)))
     checkComponent(t)(body.get.typecheckMapping(t, n))
+  }
 
   override def translateMember(t: Translator): Member = {
     translateMemberWithName(t, Some(DomainsGenerator.mapApplyKey))
@@ -568,23 +533,13 @@ case class PReceiver(keyword: PReserved[PReceiverKeyword.type], idndef: PIdnDef,
   val returnType: PType = Ref
   val indexType: PType = body.get.getArgs.head.typ
   override val componentName: String = "Receiver"
-
+  override def decompDepthAllowed: Boolean = true
   override def declType: PType = CrimpPlugin.makeDomainType(DomainsGenerator.recDKey, Seq(indexType))
 
-//  override def typecheck(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] = {
-//    t.checkMember(this) {
-//      checkAllDeclaredTypes(t)
-//      body.get.typecheckReceiver(t, n) match {
-//        case out @ Some(_) => return out
-//        case None => typToInfer = CrimpPlugin.makeDomainType(DomainsGenerator.recDKey,
-//          Seq(body.get.getArgs.head.typ))
-//      }
-//    }
-//    None
-//  }
-
-  override protected def checkDeclaration(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] =
+  override protected def checkDeclaration(t: TypeChecker, n: NameAnalyser): Option[Seq[String]] = {
+    decompDepthError.foreach(message => return Some(Seq(message)))
     checkComponent(t)(body.get.typecheckReceiver(t, n))
+  }
 
   override def typecheck(t: TypeChecker, n: NameAnalyser, expected: PType): Option[Seq[String]] = {
     // There is no expected type. This is a declaration.

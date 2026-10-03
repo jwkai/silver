@@ -1,0 +1,25 @@
+// @decompDepth may be given once per declaration.
+field v: Int
+
+domain Array {
+  function loc(a: Array, i: Int): Ref
+  function len(a: Array): Int
+  function first(r: Ref): Array
+  function second(r: Ref): Int
+  axiom all_diff { forall a: Array, i: Int :: {loc(a,i)} first(loc(a,i)) == a && second(loc(a,i)) == i }
+}
+
+function max(x: Int, y: Int): Int
+  ensures (x <= y ==> result == y) && (x > y ==> result == x)
+function arrayRange(start: Int, end: Int): Set[Int]
+  ensures (forall i: Int :: { i in result } (i in result) == (i >= start && i < end))
+
+@decompDepth("1") @decompDepth("2")
+receiver arrayRec(a: Array) (fun (i: Int) : Ref :: loc(a, i))
+operator add() (fun (x: Int, y: Int) : Int :: x + y, 0)
+
+method m(a: Array) returns (s: Int)
+  requires forall k: Int :: {loc(a, k)} k in arrayRange(0, 2) ==> acc(loc(a, k).v)
+{
+  s := crimp[add()][arrayRec(a).v](arrayRange(0, 2))
+}

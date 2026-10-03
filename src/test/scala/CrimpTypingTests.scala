@@ -14,12 +14,6 @@ import viper.silver.verifier._
 
 import java.nio.file.Paths
 
-/** Type checking of crimp expressions in context: the crimp versions of HReduceTypingTests' inputs
-  * (src/test/resources/crimp/typing, translated from hreduce/typing; the error lines are hreduce's, the columns
-  * crimp's). A checked crimp exposes its type to the enclosing expression, so that misuses are type errors and
-  * well-typed uses are accepted and lowered. A crimp that the plugin does not lower (outside a method body or
-  * specification, inside another crimp, in a decreases clause, inside a magic wand or in a package proof script) is a
-  * type error, as for hreduce. */
 class CrimpTypingTests extends AnyFunSuite {
   val plugin = "viper.silver.plugin.crimp.CrimpPlugin"
   val dir = "crimp/typing/"
@@ -56,6 +50,11 @@ class CrimpTypingTests extends AnyFunSuite {
     "method_decreases_bad.vpr" -> Seq(decreases("method_decreases_bad.vpr@29.13")),
     "func_decreases_bad.vpr" -> Seq(decreases("func_decreases_bad.vpr@28.13")),
     "op_unit_bad.vpr" -> Seq(outside("op_unit_bad.vpr@28.58")),
+    "decomp_depth_zero_bad.vpr" -> Seq("@decompDepth expects one positive integer, e.g. @decompDepth(\"1\"); found (\"0\")."),
+    "decomp_depth_twice_bad.vpr" -> Seq("@decompDepth is given more than once."),
+    "decomp_depth_mapping_bad.vpr" ->
+      Seq("@decompDepth applies to operators, receivers and crimp expressions, not to a mapping."),
+    "decomp_depth_expr_bad.vpr" -> Seq("@decompDepth expects one positive integer, e.g. @decompDepth(\"1\"); found (\"two\")."),
     "wand_bad.vpr" -> Seq(wand("wand_bad.vpr@26.52"), wand("wand_bad.vpr@28.49"), wand("wand_bad.vpr@34.50"),
       script("wand_bad.vpr@41.12")),
     "return_type_bad.vpr" -> Seq("found incompatible type `Int`, expected `Bool`"),

@@ -6,7 +6,16 @@ import viper.silver.plugin.crimp.DomainsGenerator
 
 import scala.collection.mutable
 
-class AxiomHelper(program: Program, fuelIsTwo: Boolean) {
+class AxiomHelper(program: Program, defaultDepth: Int) {
+
+  // The names of the program (AxiomHelper.namesOf); computed on first use.
+  private lazy val programNames: Set[String] = AxiomHelper.namesOf(program)
+
+  /** A bound variable of a generated axiom: `base`, or the first `base_1`, `base_2`, ... that is no name of the
+    * program. A generated axiom contains user expressions (e.g. a written receiver loc(a, j)); a bound variable named
+    * like a variable of the program would capture it. */
+  def boundName(base: String): String =
+    (Iterator(base) ++ Iterator.from(1).map(i => s"${base}_$i")).find(n => !programNames.contains(n)).get
 
   //  def getStartLabel: Label = {
   //    Label(s"${labelPrefix}l0", Seq())()
@@ -17,23 +26,14 @@ class AxiomHelper(program: Program, fuelIsTwo: Boolean) {
     DomainType.apply(fuelDomain, Map())
   }
 
-  var fuelDefaultExp: Exp = {
-    val sFuel = if (fuelIsTwo) {
-      applyDomainFunc(
-        DomainsGenerator.fuelSKey,
-        Seq(applyDomainFunc(
-          DomainsGenerator.fuelSKey,
-          Seq(applyDomainFunc(DomainsGenerator.fuelZKey, Seq(), fuelDomainType.typVarsMap)),
-          fuelDomainType.typVarsMap)),
-        fuelDomainType.typVarsMap)
-    } else { // fuel is one
-      applyDomainFunc(
-        DomainsGenerator.fuelSKey,
-        Seq(applyDomainFunc(DomainsGenerator.fuelZKey, Seq(), fuelDomainType.typVarsMap)),
-        fuelDomainType.typVarsMap)
+  /** The fuel term succ^depth(zero()) of a crimp term with decomposition depth `depth` (>= 1; DecompDepth). */
+  def fuelExp(depth: Int): Exp =
+    (1 to depth).foldLeft(applyDomainFunc(DomainsGenerator.fuelZKey, Seq(), fuelDomainType.typVarsMap)) { (f, _) =>
+      applyDomainFunc(DomainsGenerator.fuelSKey, Seq(f), fuelDomainType.typVarsMap)
     }
-    sFuel
-  }
+
+  /** The fuel term of the default decomposition depth. */
+  val fuelDefaultExp: Exp = fuelExp(defaultDepth)
 
   def labelPrefix: String = {
     "_crimpLabel"
@@ -273,8 +273,8 @@ class AxiomHelper(program: Program, fuelIsTwo: Boolean) {
       case _ => throw new Exception("Filter must be a set")
     }
     // Make the injectivity checks
-    val forallVarInd1 = LocalVarDecl("__ind1", recvElemType)()
-    val forallVarInd2 = LocalVarDecl("__ind2", recvElemType)()
+    val forallVarInd1 = LocalVarDecl(boundName("__ind1"), recvElemType)()
+    val forallVarInd2 = LocalVarDecl(boundName("__ind2"), recvElemType)()
     val setContains1 = AnySetContains(forallVarInd1.localVar, filter)()
     val setContains2 = AnySetContains(forallVarInd2.localVar, filter)()
     val idxsNeq = NeCmp(forallVarInd1.localVar, forallVarInd2.localVar)()
@@ -320,7 +320,7 @@ class AxiomHelper(program: Program, fuelIsTwo: Boolean) {
 
   // Index footprints as preimages (sec-indexical.tex, Definition "Index Footprints"): the plugin never assumes an
   // inverse of a receiver. A receiver that is injective on a filter fs maps at most one index of fs to a location l;
-  // preimgElem names it (_preimgElemIdx), per filter.
+  // preimgElem names it (_preimgElemInv), per filter.
 
   private def receiverTypeOf(crimpExp: Exp): DomainType = {
     val crimpType = crimpExp.typ.asInstanceOf[DomainType]
@@ -403,7 +403,7 @@ class AxiomHelper(program: Program, fuelIsTwo: Boolean) {
       case setType : SetType => setType.elementType
       case _ => throw new Exception("Filter must be a set")
     }
-    val forallVarInd = LocalVarDecl("__ind", fElemType)()
+    val forallVarInd = LocalVarDecl(boundName("__ind"), fElemType)()
     val permNonZero = permNonZeroCmp(forallVarInd.localVar, crimpExp, fieldName)(hasID)
     val oldApplied = oldOption match {
       case Some(lbl) => LabelledOld(permNonZero, lbl)()
@@ -615,6 +615,15 @@ class AxiomHelper(program: Program, fuelIsTwo: Boolean) {
 }
 
 object AxiomHelper {
+  // Every name declared or used in `p`: members, domain functions, local variables (bound ones included) and labels
+  def namesOf(p: Program): Set[String] =
+    (p.members.map(_.name) ++ p.domains.flatMap(_.functions.map(_.name)) ++ p.deepCollect {
+      case d: LocalVarDecl => d.name
+      case v: LocalVar => v.name
+      case l: Label => l.name
+      case lo: LabelledOld => lo.oldLabel
+    }).toSet
+
   /** The field identifier of `fieldName` in `program`: its position in `program.fields`. It is deterministic for a
     * given program and never shared across programs; the terms and the axiom guards must use the same program. */
   def fieldID(program: Program, fieldName: String): Int = {

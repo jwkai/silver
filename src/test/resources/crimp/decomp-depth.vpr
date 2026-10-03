@@ -1,0 +1,36 @@
+// Decomposition depths (DecompDepth): add is declared with depth 1, deepRec with 3, maxOp and arrayRec have none (the
+// default, 2, or -Dcrimp.decompDepth). Expected fuel depths of the lowered terms: s1 1 (operator), s2 default, s3 3 (the
+// larger of operator and receiver), s4 4 (expression annotation), s5 3 (receiver).
+field v: Int
+
+domain Array {
+  function loc(a: Array, i: Int): Ref
+  function len(a: Array): Int
+  function first(r: Ref): Array
+  function second(r: Ref): Int
+  axiom all_diff { forall a: Array, i: Int :: {loc(a,i)} first(loc(a,i)) == a && second(loc(a,i)) == i }
+}
+
+function max(x: Int, y: Int): Int
+  ensures (x <= y ==> result == y) && (x > y ==> result == x)
+function arrayRange(start: Int, end: Int): Set[Int]
+  ensures (forall i: Int :: { i in result } (i in result) == (i >= start && i < end))
+
+receiver arrayRec(a: Array) (fun (i: Int) : Ref :: loc(a, i))
+@decompDepth("3")
+receiver deepRec(a: Array) (fun (i: Int) : Ref :: loc(a, i))
+@decompDepth("1")
+operator add() (fun (x: Int, y: Int) : Int :: x + y, 0)
+operator maxOp() (fun (x: Int, y: Int) : Int :: max(x, y))
+
+define ACC(a) forall k: Int :: {loc(a, k)} k in arrayRange(0, 2) ==> acc(loc(a, k).v)
+
+method m(a: Array) returns (s1: Int, s2: Int, s3: Int, s4: Int, s5: Int)
+  requires ACC(a)
+{
+  s1 := crimp[add()][arrayRec(a).v](arrayRange(0, 2))
+  s2 := crimp[maxOp()][arrayRec(a).v](arrayRange(0, 2))
+  s3 := crimp[add()][deepRec(a).v](arrayRange(0, 2))
+  s4 := @decompDepth("4") (crimp[add()][arrayRec(a).v](arrayRange(0, 2)))
+  s5 := crimp[maxOp()][deepRec(a).v](arrayRange(0, 2))
+}
