@@ -269,9 +269,7 @@ class CrimpPlugin(@unused reporter: viper.silver.reporter.Reporter,
     p.copy(methods = opMethods ++ p.methods)(p.pos, p.info, p.errT)
   }
 
-  /** Called after methods are filtered but before the verification by the backend happens: lowers the crimp
-   * expressions (as HReducePlugin.beforeVerify, without its debug print). A program without crimp expressions is
-   * returned unchanged (the lowering's AxiomHelper needs the imported crimp domains, which such a program may lack).
+  /** Called after methods are filtered but before the verification by the backend happens.
    *
    * @param input AST
    * @return Modified AST
@@ -288,11 +286,9 @@ class CrimpPlugin(@unused reporter: viper.silver.reporter.Reporter,
     newInput = newInput.transform({
       case e@Assume(a) => Inhale(a)(e.pos, e.info, e.errT)
     })
-    // The frontend's consistency check ran before the lowering; the lowered program must pass it as well (e.g. a
-    // generated declaration must not clash with a user's). A failure is a lowering bug: report it instead of handing an
-    // inconsistent program to the backend.
     newInput.checkTransitively.foreach(e => reportError(ConsistencyError(
-      s"crimp: internal error: the lowered program is inconsistent: ${e.message}", e.pos)))
+      s"crimp: internal error: the translated program is inconsistent: ${e.message}", e.pos)))
+//    print(pretty(newInput) + "\n\n")
     newInput
   }
 
@@ -395,11 +391,7 @@ object CrimpPlugin {
 //          })
 //      }, recurse = Traverse.BottomUp)
 
-      // Now, transform CrimpApp nodes in context of cHeap annotations. A reduction is evaluated at the index of its
-      // receiver (heapKey): in a statement, at the indices the statement is tagged with; inside old(e), at the method's
-      // entry indices; inside old[L](e), at the indices recorded at label L. The old(..)/old[L](..) wrapper is kept, so
-      // that Viper evaluates the reduction's receiver and filter arguments in that state, too.
-      def lowerReductions[N <: Node](n: N, rhInitial: CrHeapMap): N = n.transformWithContext[CrHeapMap]({
+      def lowerCrimps[N <: Node](n: N, rhInitial: CrHeapMap): N = n.transformWithContext[CrHeapMap]({
         case (s@NodeWithCrHeapInfo(crHeapInfo(rh)), _) =>
           (s, rh)
         case (o: Old, _) =>
@@ -413,7 +405,7 @@ object CrimpPlugin {
       outM = outM.body match {
         case Some(mBody) =>
           outM.copy(body =
-            Some(lowerReductions(mBody, axiomGenerator.getOldCrHeap))
+            Some(lowerCrimps(mBody, axiomGenerator.getOldCrHeap))
           )(outM.pos, outM.info, outM.errT)
         case None => outM
       }
@@ -438,9 +430,9 @@ object CrimpPlugin {
       // containing one are asserted and assumed in the loop body instead (InlineAxiomGenerator).
       outM = outM.copy(
         pres =
-          outM.pres.map(pre => lowerReductions(pre, axiomGenerator.getOldCrHeap)),
+          outM.pres.map(pre => lowerCrimps(pre, axiomGenerator.getOldCrHeap)),
         posts =
-          outM.posts.map(post => lowerReductions(post, axiomGenerator.getCurrentCrHeap))
+          outM.posts.map(post => lowerCrimps(post, axiomGenerator.getCurrentCrHeap))
       )(outM.pos, outM.info, outM.errT)
 
       outM
