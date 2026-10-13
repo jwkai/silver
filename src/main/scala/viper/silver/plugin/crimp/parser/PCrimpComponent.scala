@@ -148,7 +148,7 @@ trait PCrimpComponent extends PExtender with PNoSpecsFunction with PSingleMember
 
   override def translateMemberSignature(t: Translator): Member = {
     val d = Domain(name = genDomainName, functions = Seq(), axioms = Seq())(
-      pos = t.liftPos(this), info = Translator.toInfo(this.annotations, this)
+      pos = t.liftPos(this), info = MakeInfoPair(SourcePNodeInfo(this), Translator.toInfo(this.annotations, this))
     )
     t.getMembers().put(idndef.name, translateDomainFunc(t, d.name))
     d

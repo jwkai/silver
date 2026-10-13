@@ -120,7 +120,7 @@ object DomainsGenerator {
          |    // the location of a witness term (which only the inline axioms create), and creates no other term.
          |    // Logically the same as preimgElem(r, f, l) == a for every a in f with recApply(r, a) == l.
          |    // Receivers whose body is no trigger term get their receiver applications from their own declaration
-         |    // (PReduceComponentDecl.getEvalFuncAxiom).
+         |    // (PCrimpComponent.getEvalFuncAxiom).
          |    axiom _preimgElemInv {
          |        forall ${prefix}a: $crimpDTV0, ${prefix}f: Set[$crimpDTV0], ${prefix}r: $recDKey[$crimpDTV0] ::
          |        { $preimgElemKey(${prefix}r, ${prefix}f, $recApplyKey(${prefix}r, ${prefix}a)) }

@@ -625,7 +625,7 @@ class InlineAxiomGenerator(program: Program, methodName: String, depths: DecompD
 
     // Filter Var declaration
     val forallVarFS = LocalVarDecl(boundName("__fs"), SetType(crimpIdxType))()
-    var filterVar = forallVarFS.localVar
+    val filterVar = forallVarFS.localVar
 
     val frGood = helper.filterReceiverGood(filterVar, crimpVar)(crimpHasID)
     val frGoodOrInj = helper.filterRecvGoodOrInjCheck(filterVar, crimpVar)(crimpHasID)

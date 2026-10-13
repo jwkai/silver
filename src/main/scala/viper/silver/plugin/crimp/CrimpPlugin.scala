@@ -3,7 +3,7 @@ package viper.silver.plugin.crimp
 import fastparse.{NoCut, P}
 import viper.silver.ast.pretty.FastPrettyPrinter.pretty
 import viper.silver.ast.utility.rewriter.StrategyBuilder
-import viper.silver.ast.{Assume, Infoed, Inhale, LabelledOld, Method, MethodCall, NoPosition, Node, Old, Position, Program}
+import viper.silver.ast.{Assume, Infoed, Inhale, LabelledOld, Method, MethodCall, NoPosition, Node, Old, Position, Program, SourcePNodeInfo}
 import viper.silver.frontend.{DefaultStates, ViperPAstProvider}
 import viper.silver.logger.SilentLogger
 import viper.silver.parser.{FastParser, FastParserCompanion, PAccPred, PAnnotationsPosition, PCall, PCallable, PDelimited, PDomain, PDomainType, PDomainTypeKinds, PExp, PFieldAccess, PGrouped, PIdnRef, PKw, PKwOp, PLocationAccess, PMaybePairArgument, PNode, PProgram, PReserved, PSetType, PSym, PType, PUnfolding}
@@ -26,15 +26,11 @@ class CrimpPlugin(@unused reporter: viper.silver.reporter.Reporter,
   import fp.{ParserExtension, funcApp, exp, argList, formalArg, fieldAccess, foldPExp, idndef, idnref, typ, lineCol, _file}
   import FastParserCompanion.{ExtendedParsing, LeadingWhitespace, PositionParsing, reservedKw, reservedSym}
 
-  // The declared decomposition depths of operators and receivers (DecompDepth), collected in beforeTranslate.
-  private var declaredDepths: Map[String, Int] = Map()
-
   /** Keeps the annotations written before a component declaration (e.g. `@decompDepth("1")`). */
   private def withAnnotations[C <: PCrimpComponent](c: C, ap: PAnnotationsPosition): C = {
     c.userAnnotations = ap.annotations
     c
   }
-  private var setOperators: Set[POperator] = Set()
 
   /** Parser for crimp statements. */
   def crimp[$: P]: P[PCrimp] =
@@ -149,10 +145,6 @@ class CrimpPlugin(@unused reporter: viper.silver.reporter.Reporter,
     }) {
       input
     } else {
-      setOperators = input.deepCollect({
-        case op: POperator => op
-      }).toSet
-
       val importCrimpM = if (input.extensions.exists {
         case op: POperator => op.opUnit.isDefined
         case _ => false
@@ -240,18 +232,6 @@ class CrimpPlugin(@unused reporter: viper.silver.reporter.Reporter,
     }
   }
 
-  /** Called after identifiers have been resolved but before the parse AST is translated into the normal AST.
-   *
-   * @param input Parse AST
-   * @return Modified Parse AST
-   */
-  override def beforeTranslate(input: PProgram): PProgram = {
-    declaredDepths = input.extensions.collect {
-      case c: PCrimpComponent if c.declaredDecompDepth.isDefined => c.idndef.name -> c.declaredDecompDepth.get
-    }.toMap
-    input
-  }
-
   /** Called after parse AST has been translated into the normal AST but before methods to verify are filtered.
    * In [[viper.silver.frontend.SilFrontend]] this step is confusingly called doTranslate.
    *
@@ -265,7 +245,7 @@ class CrimpPlugin(@unused reporter: viper.silver.reporter.Reporter,
   }
 
   def addOpWelldefinednessMethods(p: Program): Program = {
-    val opMethods = setOperators.map(o => o.generatedOpWelldefinednessCheck(p)).toSeq
+    val opMethods = CrimpPlugin.components(p).collect { case o: POperator => o.generatedOpWelldefinednessCheck(p) }
     p.copy(methods = opMethods ++ p.methods)(p.pos, p.info, p.errT)
   }
 
@@ -282,6 +262,7 @@ class CrimpPlugin(@unused reporter: viper.silver.reporter.Reporter,
         reportError(ConsistencyError(s"crimp: $message", NoPosition))
         return input
     }
+    val declaredDepths = CrimpPlugin.components(input).flatMap(c => c.declaredDecompDepth.map(c.idndef.name -> _)).toMap
     var newInput = addInlinedAxioms(input, DecompDepth.Config(defaultDepth, declaredDepths), reportError)
     newInput = newInput.transform({
       case e@Assume(a) => Inhale(a)(e.pos, e.info, e.errT)
@@ -329,6 +310,12 @@ class CrimpPlugin(@unused reporter: viper.silver.reporter.Reporter,
 }
 
 object CrimpPlugin {
+
+  /** The crimp components (operators, receivers, mappings, filters) of a translated program, in declaration order:
+    * each component's generated domain carries the component's parse node as its SourcePNodeInfo
+    * (PCrimpComponent.translateMemberSignature). */
+  def components(p: Program): Seq[PCrimpComponent] =
+    p.domains.flatMap(_.info.getUniqueInfo[SourcePNodeInfo]).collect { case SourcePNodeInfo(c: PCrimpComponent) => c }
 
   /** `[a, b, c]` without positions: the type arguments of a generated domain type such as `Operator[Int]`. The
     * delimited list has no trailing delimiter (`end = None`), as the type arguments of a parsed domain type. */
